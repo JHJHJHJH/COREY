@@ -250,7 +250,7 @@ export function ViewerShell() {
   return (
     <div className="flex h-full min-h-0 flex-col bg-[color:var(--background)] text-[color:var(--foreground)]">
       <header className="w-full border-b border-[color:var(--viewer-border)] bg-[linear-gradient(135deg,rgba(243,236,224,0.98),rgba(230,221,206,0.92))] shadow-[var(--viewer-shadow)]">
-        <div className="flex w-full flex-col gap-4 px-0 py-4">
+        <div className="flex w-full flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="min-w-0 flex-1">
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-ink)]">
