@@ -45,6 +45,7 @@ export interface ViewerSelection {
 export interface ViewerSelectionDetails {
   selection: ViewerSelection | null;
   data: FRAGS.ItemData | null;
+  loading: boolean;
 }
 
 export interface ViewerSessionState {

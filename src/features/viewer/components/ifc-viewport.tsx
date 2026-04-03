@@ -30,6 +30,7 @@ import type {
 } from "@/features/viewer/types";
 
 type IfcViewportProps = {
+  embedded?: boolean;
   status: ViewerStatus;
   activeTool: ViewerTool;
   onStatusChange: (status: ViewerStatus) => void;
@@ -72,19 +73,76 @@ function hasRenderableBox(box: THREE.Box3) {
   return Number.isFinite(box.min.x) && Number.isFinite(box.max.x) && !box.isEmpty();
 }
 
+const selectionDetailsDataConfig = {
+  attributesDefault: true,
+  relations: {
+    IsDefinedBy: { attributes: true, relations: true },
+    HasAssociations: { attributes: true, relations: false },
+  },
+  relationsDefault: { attributes: false, relations: false },
+} satisfies Partial<FRAGS.ItemsDataConfig>;
+
 export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(function IfcViewport(
-  { status, activeTool, onModelLoaded, onSelectionDetailsChange, onSessionChange, onStatusChange },
+  {
+    embedded = false,
+    status,
+    activeTool,
+    onModelLoaded,
+    onSelectionDetailsChange,
+    onSessionChange,
+    onStatusChange,
+  },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const runtimeRef = useRef<ViewerRuntime | null>(null);
   const activeToolRef = useRef<ViewerTool>(activeTool);
   const loadSequenceRef = useRef(0);
+  const selectionLoadSequenceRef = useRef(0);
+  const selectionLoadTimerRef = useRef<number | null>(null);
+  const fragmentsUpdateFrameRef = useRef<number | null>(null);
+  const pendingFragmentsForceRef = useRef(false);
 
   const emitStatusChange = useEffectEvent(onStatusChange);
   const emitSelectionDetailsChange = useEffectEvent(onSelectionDetailsChange);
   const emitModelLoaded = useEffectEvent(onModelLoaded);
   const emitSessionChange = useEffectEvent(onSessionChange);
+
+  const clearSelectionDetailsTimer = () => {
+    if (selectionLoadTimerRef.current !== null) {
+      window.clearTimeout(selectionLoadTimerRef.current);
+      selectionLoadTimerRef.current = null;
+    }
+  };
+
+  const clearQueuedFragmentsUpdate = () => {
+    if (fragmentsUpdateFrameRef.current !== null) {
+      window.cancelAnimationFrame(fragmentsUpdateFrameRef.current);
+      fragmentsUpdateFrameRef.current = null;
+    }
+
+    pendingFragmentsForceRef.current = false;
+  };
+
+  const scheduleFragmentsUpdate = (force = false) => {
+    pendingFragmentsForceRef.current = pendingFragmentsForceRef.current || force;
+    if (fragmentsUpdateFrameRef.current !== null) {
+      return;
+    }
+
+    fragmentsUpdateFrameRef.current = window.requestAnimationFrame(() => {
+      fragmentsUpdateFrameRef.current = null;
+
+      const runtime = runtimeRef.current;
+      const nextForce = pendingFragmentsForceRef.current;
+      pendingFragmentsForceRef.current = false;
+      if (!runtime) {
+        return;
+      }
+
+      void runtime.fragments.core.update(nextForce);
+    });
+  };
 
   const syncSession = useEffectEvent((selection: ViewerSessionState["selected"] | null) => {
     const runtime = runtimeRef.current;
@@ -99,53 +157,91 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
     });
   });
 
-  const loadSelectionDetails = useEffectEvent(async (selection: ViewerSessionState["selected"] | null) => {
-    const runtime = runtimeRef.current;
-    if (!runtime || !runtime.model || !selection) {
-      emitSelectionDetailsChange({
-        selection: null,
-        data: null,
-      });
-      return;
-    }
-
-    const data = await runtime.model.getItemsData([selection.localId], {
-      attributesDefault: true,
-      relations: {
-        IsDefinedBy: { attributes: true, relations: true },
-        DefinesOccurrence: { attributes: true, relations: true },
-        HasAssociations: { attributes: true, relations: false },
-        ContainsElements: { attributes: true, relations: false },
-        IsDecomposedBy: { attributes: true, relations: false },
-      },
-      relationsDefault: { attributes: false, relations: false },
-    });
-
-    const first = data[0] ?? null;
-    if (first) {
-      readNameMaps(first, selection.localId, runtime.labels, runtime.categories);
-    }
-
-    const enrichedSelection = {
-      ...selection,
-      label: runtime.labels.get(selection.localId) ?? selection.label,
-      category: runtime.categories.get(selection.localId) ?? selection.category,
-    };
-
-    syncSession(enrichedSelection);
+  const resetSelectionDetails = useEffectEvent(() => {
+    selectionLoadSequenceRef.current += 1;
+    clearSelectionDetailsTimer();
     emitSelectionDetailsChange({
-      selection: enrichedSelection,
-      data: first,
+      selection: null,
+      data: null,
+      loading: false,
     });
   });
 
-  const syncSelectionFromMap = useEffectEvent(async (selectionMap: OBC.ModelIdMap) => {
+  const loadSelectionDetails = useEffectEvent((selection: ViewerSessionState["selected"] | null) => {
+    const requestId = ++selectionLoadSequenceRef.current;
+    clearSelectionDetailsTimer();
+
+    const runtime = runtimeRef.current;
+    if (!runtime || !runtime.model || !selection) {
+      resetSelectionDetails();
+      return;
+    }
+
+    emitSelectionDetailsChange({
+      selection,
+      data: null,
+      loading: true,
+    });
+
+    selectionLoadTimerRef.current = window.setTimeout(() => {
+      selectionLoadTimerRef.current = null;
+
+      void (async () => {
+        const activeRuntime = runtimeRef.current;
+        if (!activeRuntime || !activeRuntime.model) {
+          return;
+        }
+
+        try {
+          const data = await activeRuntime.model.getItemsData(
+            [selection.localId],
+            selectionDetailsDataConfig,
+          );
+
+          if (selectionLoadSequenceRef.current !== requestId) {
+            return;
+          }
+
+          const first = data[0] ?? null;
+          if (first) {
+            readNameMaps(first, selection.localId, activeRuntime.labels, activeRuntime.categories);
+          }
+
+          const enrichedSelection = {
+            ...selection,
+            label: activeRuntime.labels.get(selection.localId) ?? selection.label,
+            category: activeRuntime.categories.get(selection.localId) ?? selection.category,
+          };
+
+          syncSession(enrichedSelection);
+          emitSelectionDetailsChange({
+            selection: enrichedSelection,
+            data: first,
+            loading: false,
+          });
+        } catch (error) {
+          if (selectionLoadSequenceRef.current !== requestId) {
+            return;
+          }
+
+          console.error("Failed to load selection details", error);
+          emitSelectionDetailsChange({
+            selection,
+            data: null,
+            loading: false,
+          });
+        }
+      })();
+    }, 80);
+  });
+
+  const syncSelectionFromMap = useEffectEvent((selectionMap: OBC.ModelIdMap) => {
     const runtime = runtimeRef.current;
     if (!runtime) return;
 
     const selection = getPrimarySelection(selectionMap, runtime.labels, runtime.categories);
     syncSession(selection);
-    await loadSelectionDetails(selection);
+    loadSelectionDetails(selection);
   });
 
   useEffect(() => {
@@ -229,7 +325,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
         });
 
         syncSession(null);
-        emitSelectionDetailsChange({ selection: null, data: null });
+        resetSelectionDetails();
 
         await runtime.fragments.core.update(true);
 
@@ -302,12 +398,14 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
     },
     async clearModel() {
       loadSequenceRef.current += 1;
+      selectionLoadSequenceRef.current += 1;
+      clearSelectionDetailsTimer();
       const runtime = runtimeRef.current;
       if (!runtime || !runtime.model) {
         void runtime?.highlighter.clear("select");
         if (runtime) {
           syncSession(null);
-          emitSelectionDetailsChange({ selection: null, data: null });
+          resetSelectionDetails();
         }
         return;
       }
@@ -323,7 +421,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       runtime.clipper.deleteAll();
       await runtime.highlighter.clear("select");
 
-      emitSelectionDetailsChange({ selection: null, data: null });
+      resetSelectionDetails();
       syncSession(null);
     },
     async selectNode(localId) {
@@ -334,7 +432,6 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
 
       const selection = buildSingleItemMap(runtime.model.modelId, localId);
       await runtime.highlighter.highlightByID("select", selection);
-      await syncSelectionFromMap(selection);
     },
     async showAll() {
       const runtime = runtimeRef.current;
@@ -358,7 +455,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       };
       await runtime.highlighter.clear("select");
       syncSession(null);
-      emitSelectionDetailsChange({ selection: null, data: null });
+      resetSelectionDetails();
     },
     async isolateSelection() {
       const runtime = runtimeRef.current;
@@ -494,21 +591,27 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       const fragments = components.get(OBC.FragmentsManager);
       fragments.init(fragmentsWorkerUrl.toString());
 
-      world.camera.controls?.addEventListener("update", () => {
-        void fragments.core.update();
-      });
+      const controls = world.camera.controls;
+      const handleCameraUpdate = () => {
+        scheduleFragmentsUpdate(false);
+      };
+      const handleCameraRest = () => {
+        scheduleFragmentsUpdate(true);
+      };
+      controls?.addEventListener("update", handleCameraUpdate);
+      controls?.addEventListener("rest", handleCameraRest);
 
       world.onCameraChanged.add((camera) => {
         for (const [, model] of fragments.list) {
           model.useCamera(camera.three);
         }
-        void fragments.core.update(true);
+        scheduleFragmentsUpdate(true);
       });
 
       fragments.list.onItemSet.add(({ value: model }) => {
         model.useCamera(world.camera.three);
         world.scene.three.add(model.object);
-        void fragments.core.update(true);
+        scheduleFragmentsUpdate(true);
       });
 
       fragments.core.models.materials.list.onItemSet.add(({ value: material }) => {
@@ -532,14 +635,15 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
           renderedFaces: 0,
         },
       });
+      highlighter.mouseMoveThreshold = 10;
 
       highlighter.events.select.onHighlight.add((selectionMap) => {
-        void syncSelectionFromMap(selectionMap);
+        syncSelectionFromMap(selectionMap);
       });
 
       highlighter.events.select.onClear.add(() => {
         syncSession(null);
-        emitSelectionDetailsChange({ selection: null, data: null });
+        resetSelectionDetails();
       });
 
       const hider = components.get(OBC.Hider);
@@ -643,6 +747,8 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
 
     return () => {
       cancelled = true;
+      clearSelectionDetailsTimer();
+      clearQueuedFragmentsUpdate();
       container.removeEventListener("dblclick", handleDoubleClick);
       window.removeEventListener("keydown", handleKeyDown);
       runtimeRef.current?.components.dispose();
@@ -651,8 +757,14 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
   }, []);
 
   return (
-    <div className="relative h-full min-h-[34rem] overflow-hidden rounded-[2rem] border border-[color:var(--viewer-border)] bg-[radial-gradient(circle_at_top,#f6f1e8,transparent_40%),linear-gradient(180deg,#d8c8b0_0%,#c6b49a_100%)] shadow-[var(--viewer-shadow)]">
-      <div ref={containerRef} className="h-full min-h-[34rem] w-full" />
+    <div
+      className={`relative h-full min-h-0 overflow-hidden bg-[radial-gradient(circle_at_top,#f6f1e8,transparent_40%),linear-gradient(180deg,#d8c8b0_0%,#c6b49a_100%)] ${
+        embedded
+          ? ""
+          : "rounded-[2rem] border border-[color:var(--viewer-border)] shadow-[var(--viewer-shadow)]"
+      }`}
+    >
+      <div ref={containerRef} className="h-full min-h-0 w-full" />
       <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 bg-[linear-gradient(180deg,transparent_0%,rgba(23,29,24,0.75)_100%)] px-5 pb-5 pt-20 text-sm text-white">
         <div className="flex flex-wrap gap-x-4 gap-y-2">
           <span>Click to select</span>

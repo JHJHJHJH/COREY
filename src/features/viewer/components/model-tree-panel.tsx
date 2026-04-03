@@ -10,6 +10,7 @@ import type {
 } from "@/features/viewer/types";
 
 type ModelTreePanelProps = {
+  embedded?: boolean;
   metadata: ModelMetadata | null;
   categories: ViewerCategorySummary[];
   nodes: ViewerTreeNode[];
@@ -92,6 +93,7 @@ function TreeNodeRow({
 }
 
 export function ModelTreePanel({
+  embedded = false,
   metadata,
   categories,
   nodes,
@@ -127,7 +129,13 @@ export function ModelTreePanel({
   };
 
   return (
-    <aside className="flex h-full min-h-[20rem] flex-col overflow-hidden rounded-[1.75rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] shadow-[var(--viewer-shadow)]">
+    <aside
+      className={`flex h-full min-h-0 flex-col overflow-hidden ${
+        embedded
+          ? "bg-[color:var(--panel-bg)]/92"
+          : "rounded-[1.75rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] shadow-[var(--viewer-shadow)]"
+      }`}
+    >
       <div className="border-b border-[color:var(--viewer-border)] px-5 py-4">
         <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
           Model Tree
@@ -151,7 +159,7 @@ export function ModelTreePanel({
         </label>
       </div>
 
-      <div className="grid gap-4 overflow-y-auto px-5 py-4">
+      <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-5 py-4">
         <section>
           <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
             Categories
