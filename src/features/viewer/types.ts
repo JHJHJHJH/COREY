@@ -1,8 +1,8 @@
-import type * as FRAGS from "@thatopen/fragments";
-
 export type LoadStatus = "idle" | "loading" | "loaded" | "error";
 
 export type ViewerTool = "select" | "measure" | "section";
+
+export type ViewerInspectionValueState = "present" | "missing" | "empty" | "null" | "undefined";
 
 export interface ModelMetadata {
   name: string;
@@ -42,9 +42,90 @@ export interface ViewerSelection {
   category: string | null;
 }
 
+export interface ViewerInspectionValue {
+  raw: unknown;
+  text: string;
+  state: ViewerInspectionValueState;
+}
+
+export interface ViewerDataTableCell {
+  raw: unknown;
+  text: string;
+  state: ViewerInspectionValueState;
+}
+
+export type ViewerDataTableColumnKind = "base" | "attribute" | "property";
+
+export interface ViewerDataTableColumn {
+  key: string;
+  label: string;
+  kind: ViewerDataTableColumnKind;
+  group: string | null;
+  populatedRowCount: number;
+}
+
+export interface ViewerDataTableRow {
+  key: string;
+  modelId: string;
+  localId: number;
+  selection: ViewerSelection;
+  cells: Record<string, ViewerDataTableCell>;
+  searchText: string;
+  ifcType: string | null;
+}
+
+export interface ViewerDataTableData {
+  rows: ViewerDataTableRow[];
+  columns: ViewerDataTableColumn[];
+  ifcTypes: string[];
+}
+
+export type ViewerDataTableSortDirection = "asc" | "desc";
+
+export interface ViewerDataTableSort {
+  columnKey: string;
+  direction: ViewerDataTableSortDirection;
+}
+
+export interface ViewerDataTableFilters {
+  query: string;
+  ifcType: string;
+}
+
+export interface ViewerDataTableState {
+  phase: LoadStatus;
+  message: string;
+  data: ViewerDataTableData | null;
+}
+
+export interface ViewerInspectionRow {
+  key: string;
+  label: string;
+  value: ViewerInspectionValue;
+}
+
+export interface ViewerInspectionGroup {
+  key: string;
+  title: string;
+  subtitle: string | null;
+  rows: ViewerInspectionRow[];
+  issueCount: number;
+}
+
+export interface ViewerElementInspection {
+  title: string;
+  ifcType: ViewerInspectionValue;
+  globalId: ViewerInspectionValue;
+  modelId: string;
+  localId: number;
+  coreAttributes: ViewerInspectionRow[];
+  propertySets: ViewerInspectionGroup[];
+  issueCount: number;
+}
+
 export interface ViewerSelectionDetails {
   selection: ViewerSelection | null;
-  data: FRAGS.ItemData | null;
+  inspection: ViewerElementInspection | null;
   loading: boolean;
 }
 

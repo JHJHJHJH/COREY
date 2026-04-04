@@ -1,6 +1,7 @@
 "use client";
 
 import { startTransition, useCallback, useEffect, useRef, useState } from "react";
+import { DataTablePanel } from "@/features/viewer/components/data-table-panel";
 import { ModelTreePanel } from "@/features/viewer/components/model-tree-panel";
 import { IfcViewport } from "@/features/viewer/components/ifc-viewport";
 import { PropertiesPanel } from "@/features/viewer/components/properties-panel";
@@ -9,6 +10,7 @@ import { formatBytes } from "@/features/viewer/lib/ifc-data";
 import type {
   ModelMetadata,
   ViewerCategorySummary,
+  ViewerDataTableState,
   ViewerSelectionDetails,
   ViewerSessionState,
   ViewerStatus,
@@ -19,6 +21,12 @@ import type {
 const initialStatus: ViewerStatus = {
   phase: "idle",
   message: "Choose an IFC file to begin.",
+};
+
+const initialDataTableState: ViewerDataTableState = {
+  phase: "idle",
+  message: "Load a model to review element data in a table.",
+  data: null,
 };
 
 const initialSession: ViewerSessionState = {
@@ -36,6 +44,13 @@ const MIN_CONSTRAINED_DRAWER_WIDTH = 160;
 const MAX_DRAWER_WIDTH = 520;
 const MIN_VIEWPORT_WIDTH = 420;
 const DRAWER_HANDLE_WIDTH = 18;
+const DEFAULT_DATA_TABLE_DIALOG_WIDTH = 1120;
+const DEFAULT_DATA_TABLE_DIALOG_HEIGHT = 560;
+const MIN_DATA_TABLE_DIALOG_WIDTH = 420;
+const MIN_DATA_TABLE_DIALOG_HEIGHT = 260;
+const MAX_DATA_TABLE_DIALOG_WIDTH = Number.POSITIVE_INFINITY;
+const MAX_DATA_TABLE_DIALOG_HEIGHT = Number.POSITIVE_INFINITY;
+const DATA_TABLE_DIALOG_MARGIN = 12;
 
 type DrawerSide = "left" | "right";
 
@@ -45,26 +60,258 @@ type DrawerDragState = {
   startWidth: number;
 };
 
+type DataTableDialogLayout = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  initialized: boolean;
+};
+
+type DataTableDialogMoveState = {
+  startX: number;
+  startY: number;
+  startLayout: DataTableDialogLayout;
+};
+
+type DataTableDialogResizeState = {
+  startX: number;
+  startY: number;
+  startLayout: DataTableDialogLayout;
+};
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-function DrawerResizeHandle({
-  label,
-  onPointerDown,
-}: {
+function handleToggleGlyph(side: DrawerSide, collapsed: boolean) {
+  if (side === "left") {
+    return collapsed ? ">" : "<";
+  }
+
+  return collapsed ? "<" : ">";
+}
+
+function dataTablePhaseTone(phase: ViewerDataTableState["phase"]) {
+  switch (phase) {
+    case "loading":
+      return "border-[#d8af80] bg-[#fff1df] text-[#915217]";
+    case "error":
+      return "border-[#c78972] bg-[#fff0ea] text-[#8a3e1f]";
+    case "loaded":
+      return "border-[color:var(--viewer-border)] bg-white/70 text-[color:var(--muted-ink)]";
+    default:
+      return "border-[color:var(--viewer-border)] bg-white/60 text-[color:var(--muted-ink)]";
+  }
+}
+
+function UploadIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <path d="M12 16V5" strokeLinecap="round" />
+      <path d="m8 9 4-4 4 4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 19h14" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CubeIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z" strokeLinejoin="round" />
+      <path d="M12 12 4 7.5M12 12l8-4.5M12 12v9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function PanelLeftIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <rect x="4.5" y="4.5" width="15" height="15" rx="2.5" />
+      <path d="M9 5v14" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PanelRightIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <rect x="4.5" y="4.5" width="15" height="15" rx="2.5" />
+      <path d="M15 5v14" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TableIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <rect x="4.5" y="5" width="15" height="14" rx="2.5" />
+      <path d="M4.5 10h15M9.5 10v9M14.5 10v9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function StatusDot({ phase }: { phase: ViewerStatus["phase"] }) {
+  const tone =
+    phase === "loaded"
+      ? "bg-emerald-500"
+      : phase === "loading"
+        ? "bg-amber-500"
+        : phase === "error"
+          ? "bg-rose-500"
+          : "bg-[color:var(--viewer-border)]";
+
+  return <span className={`h-2.5 w-2.5 rounded-full ${tone}`} aria-hidden="true" />;
+}
+
+type HeaderActionButtonProps = {
   label: string;
-  onPointerDown: (event: React.PointerEvent<HTMLButtonElement>) => void;
-}) {
+  active?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+};
+
+function HeaderActionButton({
+  label,
+  active = false,
+  onClick,
+  children,
+}: HeaderActionButtonProps) {
   return (
     <button
       type="button"
       aria-label={label}
-      onPointerDown={onPointerDown}
-      className="group relative z-10 hidden h-full w-[18px] shrink-0 cursor-col-resize touch-none border-x border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/85 transition hover:bg-[color:var(--surface-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)] lg:block"
+      title={label}
+      onClick={onClick}
+      className={`flex h-10 w-10 items-center justify-center rounded-xl border transition ${
+        active
+          ? "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
+          : "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
+      }`}
     >
-      <span className="absolute inset-y-1/2 left-1/2 h-16 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[color:var(--viewer-border)] transition group-hover:bg-[color:var(--accent)]" />
+      {children}
     </button>
+  );
+}
+
+function clampDataTableDialogLayoutToBounds(
+  layout: DataTableDialogLayout,
+  boundsWidth: number,
+  boundsHeight: number,
+) {
+  if (boundsWidth <= 0 || boundsHeight <= 0) {
+    return layout;
+  }
+
+  const maxWidth = Math.max(1, boundsWidth - DATA_TABLE_DIALOG_MARGIN * 2);
+  const maxHeight = Math.max(1, boundsHeight - DATA_TABLE_DIALOG_MARGIN * 2);
+  const width = clamp(
+    layout.width,
+    Math.min(MIN_DATA_TABLE_DIALOG_WIDTH, maxWidth),
+    Math.min(MAX_DATA_TABLE_DIALOG_WIDTH, maxWidth),
+  );
+  const height = clamp(
+    layout.height,
+    Math.min(MIN_DATA_TABLE_DIALOG_HEIGHT, maxHeight),
+    Math.min(MAX_DATA_TABLE_DIALOG_HEIGHT, maxHeight),
+  );
+  const maxX = Math.max(DATA_TABLE_DIALOG_MARGIN, boundsWidth - width - DATA_TABLE_DIALOG_MARGIN);
+  const maxY = Math.max(
+    DATA_TABLE_DIALOG_MARGIN,
+    boundsHeight - height - DATA_TABLE_DIALOG_MARGIN,
+  );
+
+  return {
+    x: clamp(layout.x, DATA_TABLE_DIALOG_MARGIN, maxX),
+    y: clamp(layout.y, DATA_TABLE_DIALOG_MARGIN, maxY),
+    width,
+    height,
+    initialized: true,
+  } satisfies DataTableDialogLayout;
+}
+
+function buildDefaultDataTableDialogLayout(boundsWidth: number, boundsHeight: number) {
+  const clampedLayout = clampDataTableDialogLayoutToBounds(
+    {
+      x: DATA_TABLE_DIALOG_MARGIN,
+      y: DATA_TABLE_DIALOG_MARGIN,
+      width: Math.max(
+        DEFAULT_DATA_TABLE_DIALOG_WIDTH,
+        boundsWidth - DATA_TABLE_DIALOG_MARGIN * 2,
+      ),
+      height: Math.max(
+        DEFAULT_DATA_TABLE_DIALOG_HEIGHT,
+        boundsHeight - DATA_TABLE_DIALOG_MARGIN * 2,
+      ),
+      initialized: true,
+    },
+    boundsWidth,
+    boundsHeight,
+  );
+
+  return {
+    ...clampedLayout,
+    x: Math.max(
+      DATA_TABLE_DIALOG_MARGIN,
+      Math.round((boundsWidth - clampedLayout.width) / 2),
+    ),
+    y: Math.max(
+      DATA_TABLE_DIALOG_MARGIN,
+      Math.round((boundsHeight - clampedLayout.height) / 2),
+    ),
+  } satisfies DataTableDialogLayout;
+}
+
+function hasSameDataTableDialogLayout(
+  left: DataTableDialogLayout,
+  right: DataTableDialogLayout,
+) {
+  return (
+    left.x === right.x &&
+    left.y === right.y &&
+    left.width === right.width &&
+    left.height === right.height &&
+    left.initialized === right.initialized
+  );
+}
+
+function DrawerResizeHandle({
+  dragLabel,
+  toggleLabel,
+  side,
+  collapsed = false,
+  onPointerDown,
+  onToggle,
+}: {
+  dragLabel: string;
+  toggleLabel: string;
+  side: DrawerSide;
+  collapsed?: boolean;
+  onPointerDown?: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="group relative z-10 hidden h-full w-[18px] shrink-0 lg:block">
+      <div
+        aria-hidden="true"
+        onPointerDown={collapsed ? undefined : onPointerDown}
+        title={collapsed ? undefined : dragLabel}
+        className={`absolute inset-0 touch-none border-x border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/85 transition group-hover:bg-[color:var(--surface-soft)] ${
+          collapsed ? "" : "cursor-col-resize"
+        }`}
+      >
+        <span className="absolute inset-y-1/2 left-1/2 h-16 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[color:var(--viewer-border)] transition group-hover:bg-[color:var(--accent)]" />
+      </div>
+      <button
+        type="button"
+        aria-label={toggleLabel}
+        title={toggleLabel}
+        onClick={onToggle}
+        className="absolute left-1/2 top-1/2 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] text-xs font-semibold text-[color:var(--foreground)] shadow-sm transition hover:bg-[color:var(--surface-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]"
+      >
+        {handleToggleGlyph(side, collapsed)}
+      </button>
+    </div>
   );
 }
 
@@ -72,26 +319,124 @@ export function ViewerShell() {
   const viewportRef = useRef<ViewerViewportHandle | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
+  const dataTableDialogRef = useRef<HTMLDivElement | null>(null);
+  const dataTableDialogLayoutRef = useRef<DataTableDialogLayout>({
+    x: DATA_TABLE_DIALOG_MARGIN,
+    y: DATA_TABLE_DIALOG_MARGIN,
+    width: DEFAULT_DATA_TABLE_DIALOG_WIDTH,
+    height: DEFAULT_DATA_TABLE_DIALOG_HEIGHT,
+    initialized: false,
+  });
+  const pendingDataTableDialogLayoutRef = useRef<DataTableDialogLayout | null>(null);
+  const pendingDataTableDialogPreviewKindRef = useRef<"move" | "resize" | null>(null);
+  const dataTableDialogAnimationFrameRef = useRef<number | null>(null);
 
   const [status, setStatus] = useState(initialStatus);
   const [session, setSession] = useState(initialSession);
   const [metadata, setMetadata] = useState<ModelMetadata | null>(null);
   const [tree, setTree] = useState<ViewerTreeNode[]>([]);
   const [categories, setCategories] = useState<ViewerCategorySummary[]>([]);
+  const [dataTableState, setDataTableState] = useState(initialDataTableState);
   const [selectionDetails, setSelectionDetails] = useState<ViewerSelectionDetails>({
     selection: null,
-    data: null,
+    inspection: null,
     loading: false,
   });
   const [showTree, setShowTree] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
+  const [showDataTable, setShowDataTable] = useState(true);
   const [treeDrawerWidth, setTreeDrawerWidth] = useState(DEFAULT_TREE_DRAWER_WIDTH);
   const [propertiesDrawerWidth, setPropertiesDrawerWidth] = useState(
     DEFAULT_PROPERTIES_DRAWER_WIDTH,
   );
+  const [dataTableDialogLayout, setDataTableDialogLayout] = useState<DataTableDialogLayout>({
+    x: DATA_TABLE_DIALOG_MARGIN,
+    y: DATA_TABLE_DIALOG_MARGIN,
+    width: DEFAULT_DATA_TABLE_DIALOG_WIDTH,
+    height: DEFAULT_DATA_TABLE_DIALOG_HEIGHT,
+    initialized: false,
+  });
   const [drawerDragState, setDrawerDragState] = useState<DrawerDragState | null>(null);
+  const [dataTableDialogMoveState, setDataTableDialogMoveState] =
+    useState<DataTableDialogMoveState | null>(null);
+  const [dataTableDialogResizeState, setDataTableDialogResizeState] =
+    useState<DataTableDialogResizeState | null>(null);
 
   const hasModel = Boolean(metadata && status.phase === "loaded");
+
+  const applyCommittedDataTableDialogLayout = useCallback((layout: DataTableDialogLayout) => {
+    const dialog = dataTableDialogRef.current;
+    if (!dialog) {
+      return;
+    }
+
+    dialog.style.left = `${layout.x}px`;
+    dialog.style.top = `${layout.y}px`;
+    dialog.style.width = `${layout.width}px`;
+    dialog.style.height = `${layout.height}px`;
+    dialog.style.transform = "translate3d(0, 0, 0)";
+  }, []);
+
+  const applyPreviewDataTableDialogLayout = useCallback(
+    (layout: DataTableDialogLayout, kind: "move" | "resize") => {
+      const dialog = dataTableDialogRef.current;
+      if (!dialog) {
+        return;
+      }
+
+      if (kind === "move") {
+        const committedLayout = dataTableDialogLayoutRef.current;
+        dialog.style.left = `${committedLayout.x}px`;
+        dialog.style.top = `${committedLayout.y}px`;
+        dialog.style.width = `${committedLayout.width}px`;
+        dialog.style.height = `${committedLayout.height}px`;
+        dialog.style.transform = `translate3d(${layout.x - committedLayout.x}px, ${layout.y - committedLayout.y}px, 0)`;
+        return;
+      }
+
+      dialog.style.left = `${layout.x}px`;
+      dialog.style.top = `${layout.y}px`;
+      dialog.style.width = `${layout.width}px`;
+      dialog.style.height = `${layout.height}px`;
+      dialog.style.transform = "translate3d(0, 0, 0)";
+    },
+    [],
+  );
+
+  const flushPendingDataTableDialogPreview = useCallback(() => {
+    dataTableDialogAnimationFrameRef.current = null;
+
+    const pendingLayout = pendingDataTableDialogLayoutRef.current;
+    const pendingKind = pendingDataTableDialogPreviewKindRef.current;
+    if (!pendingLayout || !pendingKind) {
+      return;
+    }
+
+    applyPreviewDataTableDialogLayout(pendingLayout, pendingKind);
+  }, [applyPreviewDataTableDialogLayout]);
+
+  const scheduleDataTableDialogPreview = useCallback(
+    (layout: DataTableDialogLayout, kind: "move" | "resize") => {
+      pendingDataTableDialogLayoutRef.current = layout;
+      pendingDataTableDialogPreviewKindRef.current = kind;
+
+      if (dataTableDialogAnimationFrameRef.current !== null) {
+        return;
+      }
+
+      dataTableDialogAnimationFrameRef.current = window.requestAnimationFrame(
+        flushPendingDataTableDialogPreview,
+      );
+    },
+    [flushPendingDataTableDialogPreview],
+  );
+
+  const stopPendingDataTableDialogPreview = useCallback(() => {
+    if (dataTableDialogAnimationFrameRef.current !== null) {
+      window.cancelAnimationFrame(dataTableDialogAnimationFrameRef.current);
+      dataTableDialogAnimationFrameRef.current = null;
+    }
+  }, []);
 
   const clampDrawerWidth = useCallback((side: DrawerSide, nextWidth: number) => {
     const workspaceWidth = workspaceRef.current?.clientWidth ?? 0;
@@ -107,7 +452,7 @@ export function ViewerShell() {
         : showTree
           ? treeDrawerWidth
           : 0;
-    const handleCount = Number(showTree) + Number(showProperties);
+    const handleCount = 2;
     const availableWidth =
       workspaceWidth - otherDrawerWidth - handleCount * DRAWER_HANDLE_WIDTH - MIN_VIEWPORT_WIDTH;
     const maxWidth = Math.min(
@@ -119,7 +464,20 @@ export function ViewerShell() {
     return clamp(nextWidth, minWidth, maxWidth);
   }, [propertiesDrawerWidth, showProperties, showTree, treeDrawerWidth]);
 
-  const syncDrawerWidths = useCallback(() => {
+  const clampDataTableDialogLayout = useCallback((nextLayout: DataTableDialogLayout) => {
+    const workspace = workspaceRef.current;
+    if (!workspace) {
+      return nextLayout;
+    }
+
+    return clampDataTableDialogLayoutToBounds(
+      nextLayout,
+      workspace.clientWidth,
+      workspace.clientHeight,
+    );
+  }, []);
+
+  const syncWorkspaceLayout = useCallback(() => {
     if (showTree) {
       setTreeDrawerWidth((current) => clampDrawerWidth("left", current));
     }
@@ -135,6 +493,32 @@ export function ViewerShell() {
     document.body.style.removeProperty("user-select");
   }, []);
 
+  const stopDataTableDialogMove = useCallback(() => {
+    stopPendingDataTableDialogPreview();
+    setDataTableDialogMoveState(null);
+    document.body.style.removeProperty("cursor");
+    document.body.style.removeProperty("user-select");
+    setDataTableDialogLayout((current) => {
+      const pendingLayout = pendingDataTableDialogLayoutRef.current;
+      pendingDataTableDialogLayoutRef.current = null;
+      pendingDataTableDialogPreviewKindRef.current = null;
+      return pendingLayout ?? current;
+    });
+  }, [stopPendingDataTableDialogPreview]);
+
+  const stopDataTableDialogResize = useCallback(() => {
+    stopPendingDataTableDialogPreview();
+    setDataTableDialogResizeState(null);
+    document.body.style.removeProperty("cursor");
+    document.body.style.removeProperty("user-select");
+    setDataTableDialogLayout((current) => {
+      const pendingLayout = pendingDataTableDialogLayoutRef.current;
+      pendingDataTableDialogLayoutRef.current = null;
+      pendingDataTableDialogPreviewKindRef.current = null;
+      return pendingLayout ?? current;
+    });
+  }, [stopPendingDataTableDialogPreview]);
+
   const updateDraggedDrawerWidth = useCallback((clientX: number) => {
     if (!drawerDragState) {
       return;
@@ -149,20 +533,56 @@ export function ViewerShell() {
     setPropertiesDrawerWidth(clampDrawerWidth("right", drawerDragState.startWidth - delta));
   }, [clampDrawerWidth, drawerDragState]);
 
+  const updateDraggedDataTableDialogPosition = useCallback((clientX: number, clientY: number) => {
+    if (!dataTableDialogMoveState) {
+      return;
+    }
+
+    const deltaX = clientX - dataTableDialogMoveState.startX;
+    const deltaY = clientY - dataTableDialogMoveState.startY;
+    scheduleDataTableDialogPreview(
+      clampDataTableDialogLayout({
+        ...dataTableDialogMoveState.startLayout,
+        x: dataTableDialogMoveState.startLayout.x + deltaX,
+        y: dataTableDialogMoveState.startLayout.y + deltaY,
+        initialized: true,
+      }),
+      "move",
+    );
+  }, [clampDataTableDialogLayout, dataTableDialogMoveState, scheduleDataTableDialogPreview]);
+
+  const updateDraggedDataTableDialogSize = useCallback((clientX: number, clientY: number) => {
+    if (!dataTableDialogResizeState) {
+      return;
+    }
+
+    const deltaX = clientX - dataTableDialogResizeState.startX;
+    const deltaY = clientY - dataTableDialogResizeState.startY;
+    scheduleDataTableDialogPreview(
+      clampDataTableDialogLayout({
+        ...dataTableDialogResizeState.startLayout,
+        width: dataTableDialogResizeState.startLayout.width + deltaX,
+        height: dataTableDialogResizeState.startLayout.height + deltaY,
+        initialized: true,
+      }),
+      "resize",
+    );
+  }, [clampDataTableDialogLayout, dataTableDialogResizeState, scheduleDataTableDialogPreview]);
+
   useEffect(() => {
-    syncDrawerWidths();
-  }, [showTree, showProperties, syncDrawerWidths]);
+    syncWorkspaceLayout();
+  }, [showTree, showProperties, syncWorkspaceLayout]);
 
   useEffect(() => {
     const handleResize = () => {
-      syncDrawerWidths();
+      syncWorkspaceLayout();
     };
 
     window.addEventListener("resize", handleResize);
     return () => {
       window.removeEventListener("resize", handleResize);
     };
-  }, [syncDrawerWidths]);
+  }, [syncWorkspaceLayout]);
 
   useEffect(() => {
     if (!drawerDragState) {
@@ -190,6 +610,123 @@ export function ViewerShell() {
       document.body.style.removeProperty("user-select");
     };
   }, [drawerDragState, stopDrawerResize, updateDraggedDrawerWidth]);
+
+  useEffect(() => {
+    if (!showDataTable) {
+      stopDataTableDialogMove();
+      stopDataTableDialogResize();
+      return;
+    }
+
+    setDataTableDialogLayout((current) => {
+      const next = current.initialized
+        ? clampDataTableDialogLayout(current)
+        : buildDefaultDataTableDialogLayout(
+            workspaceRef.current?.clientWidth ?? 0,
+            workspaceRef.current?.clientHeight ?? 0,
+          );
+
+      return hasSameDataTableDialogLayout(current, next) ? current : next;
+    });
+  }, [
+    clampDataTableDialogLayout,
+    showDataTable,
+    stopDataTableDialogMove,
+    stopDataTableDialogResize,
+  ]);
+
+  useEffect(() => {
+    const workspace = workspaceRef.current;
+    if (!workspace || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      setDataTableDialogLayout((current) => {
+        if (!current.initialized) {
+          return current;
+        }
+
+        const next = clampDataTableDialogLayout(current);
+        return hasSameDataTableDialogLayout(current, next) ? current : next;
+      });
+    });
+
+    observer.observe(workspace);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [clampDataTableDialogLayout]);
+
+  useEffect(() => {
+    dataTableDialogLayoutRef.current = dataTableDialogLayout;
+    applyCommittedDataTableDialogLayout(dataTableDialogLayout);
+  }, [applyCommittedDataTableDialogLayout, dataTableDialogLayout]);
+
+  useEffect(() => {
+    return () => {
+      stopPendingDataTableDialogPreview();
+    };
+  }, [stopPendingDataTableDialogPreview]);
+
+  useEffect(() => {
+    if (!dataTableDialogMoveState) {
+      return;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      updateDraggedDataTableDialogPosition(event.clientX, event.clientY);
+    };
+    const handlePointerUp = () => {
+      stopDataTableDialogMove();
+    };
+
+    document.body.style.cursor = "move";
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+      document.body.style.removeProperty("cursor");
+      document.body.style.removeProperty("user-select");
+    };
+  }, [dataTableDialogMoveState, stopDataTableDialogMove, updateDraggedDataTableDialogPosition]);
+
+  useEffect(() => {
+    if (!dataTableDialogResizeState) {
+      return;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      updateDraggedDataTableDialogSize(event.clientX, event.clientY);
+    };
+    const handlePointerUp = () => {
+      stopDataTableDialogResize();
+    };
+
+    document.body.style.cursor = "nwse-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+      document.body.style.removeProperty("cursor");
+      document.body.style.removeProperty("user-select");
+    };
+  }, [
+    dataTableDialogResizeState,
+    stopDataTableDialogResize,
+    updateDraggedDataTableDialogSize,
+  ]);
 
   const openFilePicker = () => {
     inputRef.current?.click();
@@ -237,7 +774,7 @@ export function ViewerShell() {
     event.target.value = "";
   };
 
-  const startDrawerResize = (side: DrawerSide) => (event: React.PointerEvent<HTMLButtonElement>) => {
+  const startDrawerResize = (side: DrawerSide) => (event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
 
     setDrawerDragState({
@@ -247,25 +784,60 @@ export function ViewerShell() {
     });
   };
 
+  const startDataTableDialogMove = (event: React.PointerEvent<HTMLElement>) => {
+    event.preventDefault();
+    setDataTableDialogResizeState(null);
+    setDataTableDialogMoveState({
+      startX: event.clientX,
+      startY: event.clientY,
+      startLayout: dataTableDialogLayout,
+    });
+  };
+
+  const startDataTableDialogResize = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDataTableDialogMoveState(null);
+    setDataTableDialogResizeState({
+      startX: event.clientX,
+      startY: event.clientY,
+      startLayout: dataTableDialogLayout,
+    });
+  };
+
+  const resetDataTableDialogLayout = () => {
+    const workspace = workspaceRef.current;
+    if (!workspace) {
+      return;
+    }
+
+    setDataTableDialogLayout(
+      buildDefaultDataTableDialogLayout(workspace.clientWidth, workspace.clientHeight),
+    );
+  };
+
+  const handleDataTableRowSelect = useCallback((localId: number) => {
+    void viewportRef.current?.selectNode(localId);
+  }, []);
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-[color:var(--background)] text-[color:var(--foreground)]">
       <header className="w-full border-b border-[color:var(--viewer-border)] bg-[linear-gradient(135deg,rgba(243,236,224,0.98),rgba(230,221,206,0.92))] shadow-[var(--viewer-shadow)]">
-        <div className="flex w-full flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex w-full flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-ink)]">
-                BCA IFC Viewer
-              </div>
-              <div className="mt-2 flex flex-col gap-2 xl:flex-row xl:items-end xl:justify-between">
-                <div>
-                  <h1 className="text-2xl font-semibold tracking-tight text-[color:var(--foreground)]">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-ink)]">
+                    BCA IFC Viewer
+                  </div>
+                  <h1 className="mt-1 text-lg font-semibold tracking-tight text-[color:var(--foreground)] sm:text-xl">
                     Local IFC review workspace
                   </h1>
-                  <p className="mt-1 max-w-3xl text-sm leading-6 text-[color:var(--muted-ink)]">
-                    Upload an IFC from your machine, inspect the spatial tree, review element
-                    properties, isolate visibility, and place section cuts or measurements without
-                    a backend.
-                  </p>
+                </div>
+                <div className="inline-flex min-w-0 items-center gap-2 rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/80 px-3 py-1.5 text-xs text-[color:var(--muted-ink)]">
+                  <StatusDot phase={status.phase} />
+                  <span className="max-w-[min(26rem,70vw)] truncate">{status.message}</span>
                 </div>
               </div>
             </div>
@@ -281,68 +853,69 @@ export function ViewerShell() {
               <button
                 type="button"
                 onClick={openFilePicker}
-                className="rounded-2xl bg-[color:var(--accent)] px-5 py-3 text-sm font-semibold text-[color:var(--accent-ink)] transition hover:brightness-95"
+                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[color:var(--accent)] px-4 text-sm font-semibold text-[color:var(--accent-ink)] transition hover:brightness-95"
               >
-                Open IFC file
+                <UploadIcon className="h-4 w-4" />
+                <span>Open IFC</span>
               </button>
               <button
                 type="button"
                 onClick={() => {
                   void handleLoadBundledModel();
                 }}
-                className="rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-5 py-3 text-sm font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]"
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-4 text-sm font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]"
               >
-                Load test model
+                <CubeIcon className="h-4 w-4" />
+                <span>Test model</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setShowTree((value) => !value)}
-                className="rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-4 py-3 text-sm font-medium text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]"
-              >
-                {showTree ? "Hide tree" : "Show tree"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowProperties((value) => !value)}
-                className="rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-4 py-3 text-sm font-medium text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]"
-              >
-                {showProperties ? "Hide properties" : "Show properties"}
-              </button>
+              <div className="flex items-center gap-2 rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/72 p-1.5">
+                <HeaderActionButton
+                  label={showTree ? "Hide model tree" : "Show model tree"}
+                  active={showTree}
+                  onClick={() => setShowTree((value) => !value)}
+                >
+                  <PanelLeftIcon className="h-4 w-4" />
+                </HeaderActionButton>
+                <HeaderActionButton
+                  label={showProperties ? "Hide properties" : "Show properties"}
+                  active={showProperties}
+                  onClick={() => setShowProperties((value) => !value)}
+                >
+                  <PanelRightIcon className="h-4 w-4" />
+                </HeaderActionButton>
+                <HeaderActionButton
+                  label={showDataTable ? "Hide data table" : "Show data table"}
+                  active={showDataTable}
+                  onClick={() => setShowDataTable((value) => !value)}
+                >
+                  <TableIcon className="h-4 w-4" />
+                </HeaderActionButton>
+              </div>
             </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-4">
-            <div className="rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/70 px-4 py-3">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-                File
-              </div>
-              <div className="mt-2 truncate text-sm font-medium text-[color:var(--foreground)]">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <div className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/72 px-3 py-1.5 text-[color:var(--muted-ink)]">
+              <span className="font-semibold text-[color:var(--foreground)]">File:</span>{" "}
+              <span className="max-w-[18rem] truncate align-bottom inline-block">
                 {metadata?.name ?? "No file loaded"}
-              </div>
+              </span>
             </div>
-            <div className="rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/70 px-4 py-3">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-                Size
-              </div>
-              <div className="mt-2 text-sm font-medium text-[color:var(--foreground)]">
-                {metadata ? formatBytes(metadata.size) : "—"}
-              </div>
+            <div className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/72 px-3 py-1.5 text-[color:var(--muted-ink)]">
+              <span className="font-semibold text-[color:var(--foreground)]">Size:</span>{" "}
+              {metadata ? formatBytes(metadata.size) : "—"}
             </div>
-            <div className="rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/70 px-4 py-3">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-                Active Tool
-              </div>
-              <div className="mt-2 text-sm font-medium capitalize text-[color:var(--foreground)]">
+            <div className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/72 px-3 py-1.5 text-[color:var(--muted-ink)]">
+              <span className="font-semibold capitalize text-[color:var(--foreground)]">
                 {session.activeTool}
-              </div>
+              </span>{" "}
+              active
             </div>
-            <div className="rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/70 px-4 py-3">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-                Status
-              </div>
-              <div className="mt-2 text-sm font-medium text-[color:var(--foreground)]">
+            <div className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/72 px-3 py-1.5 text-[color:var(--muted-ink)]">
+              <span className="font-semibold capitalize text-[color:var(--foreground)]">
                 {status.phase}
-              </div>
+              </span>{" "}
+              status
             </div>
           </div>
         </div>
@@ -352,31 +925,31 @@ export function ViewerShell() {
         <main className="flex min-h-0 flex-1">
           <div
             ref={workspaceRef}
-            className="relative -mt-px flex min-h-0 flex-1 overflow-hidden rounded-b-[2rem] border border-t-0 border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/60 shadow-[var(--viewer-shadow)]"
+            className="relative -mt-px flex min-h-0 flex-1 flex-col overflow-hidden rounded-b-[2rem] border border-t-0 border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/60 shadow-[var(--viewer-shadow)]"
           >
-            {showTree ? (
-              <div className="absolute inset-y-0 left-0 z-30 w-[min(85vw,24rem)] max-w-full border-r border-[color:var(--viewer-border)] shadow-[var(--viewer-shadow)] lg:hidden">
-                <ModelTreePanel
-                  embedded
-                  metadata={metadata}
-                  categories={categories}
-                  nodes={tree}
-                  selection={session.selected}
-                  onSelectNode={(localId) => {
-                    void viewportRef.current?.selectNode(localId);
-                  }}
-                  onHideCategory={(category) => {
-                    void viewportRef.current?.hideCategory(category);
-                  }}
-                  onIsolateCategory={(category) => {
-                    void viewportRef.current?.isolateCategory(category);
-                  }}
-                />
-              </div>
-            ) : null}
+            <div className="relative min-h-0 flex flex-1 overflow-hidden">
+              {showTree ? (
+                <div className="absolute inset-y-0 left-0 z-30 w-[min(85vw,24rem)] max-w-full border-r border-[color:var(--viewer-border)] shadow-[var(--viewer-shadow)] lg:hidden">
+                  <ModelTreePanel
+                    embedded
+                    metadata={metadata}
+                    categories={categories}
+                    nodes={tree}
+                    selection={session.selected}
+                    onSelectNode={(localId) => {
+                      void viewportRef.current?.selectNode(localId);
+                    }}
+                    onHideCategory={(category) => {
+                      void viewportRef.current?.hideCategory(category);
+                    }}
+                    onIsolateCategory={(category) => {
+                      void viewportRef.current?.isolateCategory(category);
+                    }}
+                  />
+                </div>
+              ) : null}
 
-            {showTree ? (
-              <>
+              {showTree ? (
                 <div
                   className="hidden min-h-0 shrink-0 lg:block"
                   style={{ width: `${treeDrawerWidth}px` }}
@@ -398,100 +971,203 @@ export function ViewerShell() {
                     }}
                   />
                 </div>
-                <DrawerResizeHandle
-                  label="Resize model tree panel"
-                  onPointerDown={startDrawerResize("left")}
-                />
-              </>
-            ) : null}
+              ) : null}
 
-            <section className="relative min-w-0 flex-1">
-              <IfcViewport
-                ref={viewportRef}
-                embedded
-                status={status}
-                activeTool={session.activeTool}
-                onStatusChange={(nextStatus) => {
-                  startTransition(() => {
-                    setStatus(nextStatus);
-                    if (nextStatus.phase !== "loaded") {
-                      setMetadata((current) =>
-                        current ? { ...current, loadStatus: nextStatus.phase } : current,
-                      );
-                    }
-                  });
-                }}
-                onSessionChange={(nextSession) => {
-                  startTransition(() => {
-                    setSession(nextSession);
-                  });
-                }}
-                onModelLoaded={({
-                  metadata: nextMetadata,
-                  tree: nextTree,
-                  categories: nextCategories,
-                }) => {
-                  startTransition(() => {
-                    setMetadata(nextMetadata);
-                    setTree(nextTree);
-                    setCategories(nextCategories);
-                    setSelectionDetails({ selection: null, data: null, loading: false });
-                  });
-                }}
-                onSelectionDetailsChange={(details) => {
-                  startTransition(() => {
-                    setSelectionDetails(details);
-                  });
-                }}
+              <DrawerResizeHandle
+                dragLabel="Drag to resize model tree panel"
+                toggleLabel={showTree ? "Hide model tree panel" : "Show model tree panel"}
+                side="left"
+                collapsed={!showTree}
+                onPointerDown={showTree ? startDrawerResize("left") : undefined}
+                onToggle={() => setShowTree((value) => !value)}
               />
 
-              <ViewerToolbar
-                disabled={!hasModel}
-                session={session}
-                status={status}
-                onToolChange={(tool) => {
-                  setSession((current) => ({ ...current, activeTool: tool }));
-                  viewportRef.current?.setTool(tool);
-                }}
-                onFocusSelection={() => {
-                  void viewportRef.current?.focusSelection();
-                }}
-                onShowAll={() => {
-                  void viewportRef.current?.showAll();
-                }}
-                onHideSelection={() => {
-                  void viewportRef.current?.hideSelection();
-                }}
-                onIsolateSelection={() => {
-                  void viewportRef.current?.isolateSelection();
-                }}
-                onClearSections={() => {
-                  viewportRef.current?.clearSections();
-                }}
-                onClearMeasurements={() => {
-                  viewportRef.current?.clearMeasurements();
-                }}
-              />
-            </section>
-
-            {showProperties ? (
-              <>
-                <DrawerResizeHandle
-                  label="Resize properties panel"
-                  onPointerDown={startDrawerResize("right")}
+              <section className="relative min-w-0 flex-1">
+                <IfcViewport
+                  ref={viewportRef}
+                  embedded
+                  status={status}
+                  activeTool={session.activeTool}
+                  onStatusChange={(nextStatus) => {
+                    startTransition(() => {
+                      setStatus(nextStatus);
+                      if (nextStatus.phase !== "loaded") {
+                        setMetadata((current) =>
+                          current ? { ...current, loadStatus: nextStatus.phase } : current,
+                        );
+                      }
+                    });
+                  }}
+                  onSessionChange={(nextSession) => {
+                    startTransition(() => {
+                      setSession(nextSession);
+                    });
+                  }}
+                  onModelLoaded={({
+                    metadata: nextMetadata,
+                    tree: nextTree,
+                    categories: nextCategories,
+                  }) => {
+                    startTransition(() => {
+                      setMetadata(nextMetadata);
+                      setTree(nextTree);
+                      setCategories(nextCategories);
+                      setSelectionDetails({ selection: null, inspection: null, loading: false });
+                    });
+                  }}
+                  onDataTableChange={(nextDataTableState) => {
+                    startTransition(() => {
+                      setDataTableState(nextDataTableState);
+                    });
+                  }}
+                  onSelectionDetailsChange={(details) => {
+                    startTransition(() => {
+                      setSelectionDetails(details);
+                    });
+                  }}
                 />
+
+                <ViewerToolbar
+                  disabled={!hasModel}
+                  session={session}
+                  status={status}
+                  onToolChange={(tool) => {
+                    setSession((current) => ({ ...current, activeTool: tool }));
+                    viewportRef.current?.setTool(tool);
+                  }}
+                  onFocusSelection={() => {
+                    void viewportRef.current?.focusSelection();
+                  }}
+                  onShowAll={() => {
+                    void viewportRef.current?.showAll();
+                  }}
+                  onHideSelection={() => {
+                    void viewportRef.current?.hideSelection();
+                  }}
+                  onIsolateSelection={() => {
+                    void viewportRef.current?.isolateSelection();
+                  }}
+                  onClearSections={() => {
+                    viewportRef.current?.clearSections();
+                  }}
+                  onClearMeasurements={() => {
+                    viewportRef.current?.clearMeasurements();
+                  }}
+                />
+              </section>
+
+              <DrawerResizeHandle
+                dragLabel="Drag to resize properties panel"
+                toggleLabel={showProperties ? "Hide properties panel" : "Show properties panel"}
+                side="right"
+                collapsed={!showProperties}
+                onPointerDown={showProperties ? startDrawerResize("right") : undefined}
+                onToggle={() => setShowProperties((value) => !value)}
+              />
+
+              {showProperties ? (
                 <div
                   className="hidden min-h-0 shrink-0 lg:block"
                   style={{ width: `${propertiesDrawerWidth}px` }}
                 >
-                  <PropertiesPanel embedded details={selectionDetails} session={session} />
+                  <PropertiesPanel embedded details={selectionDetails} />
                 </div>
-              </>
-            ) : null}
+              ) : null}
 
-            {showProperties ? (
-              <div className="absolute inset-y-0 right-0 z-40 w-[min(85vw,24rem)] max-w-full border-l border-[color:var(--viewer-border)] shadow-[var(--viewer-shadow)] lg:hidden">
-                <PropertiesPanel embedded details={selectionDetails} session={session} />
+              {showProperties ? (
+                <div className="absolute inset-y-0 right-0 z-40 w-[min(85vw,24rem)] max-w-full border-l border-[color:var(--viewer-border)] shadow-[var(--viewer-shadow)] lg:hidden">
+                  <PropertiesPanel embedded details={selectionDetails} />
+                </div>
+              ) : null}
+            </div>
+
+            {showDataTable && dataTableDialogLayout.initialized ? (
+              <div className="pointer-events-none absolute inset-0 z-50">
+                <div
+                  ref={dataTableDialogRef}
+                  className="pointer-events-auto absolute flex min-h-0 flex-col overflow-hidden rounded-[1.5rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/96 shadow-[var(--viewer-shadow)] backdrop-blur"
+                  style={{
+                    left: `${dataTableDialogLayout.x}px`,
+                    top: `${dataTableDialogLayout.y}px`,
+                    width: `${dataTableDialogLayout.width}px`,
+                    height: `${dataTableDialogLayout.height}px`,
+                    willChange:
+                      dataTableDialogMoveState || dataTableDialogResizeState
+                        ? "transform, width, height"
+                        : undefined,
+                  }}
+                >
+                  <div
+                    onPointerDown={startDataTableDialogMove}
+                    title="Drag to move data table window"
+                    className="flex cursor-move items-start justify-between gap-3 border-b border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)]/90 px-4 py-2.5"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="truncate text-sm font-semibold text-[color:var(--foreground)]">
+                          Data table
+                        </div>
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${dataTablePhaseTone(dataTableState.phase)}`}
+                        >
+                          {dataTableState.phase}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[color:var(--muted-ink)]">
+                        {metadata ? (
+                          <span className="inline-flex items-center rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-2.5 py-1">
+                            {metadata.name}
+                          </span>
+                        ) : null}
+                        {metadata ? (
+                          <span className="inline-flex items-center rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-2.5 py-1">
+                            {formatBytes(metadata.size)}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={resetDataTableDialogLayout}
+                        className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)]"
+                      >
+                        Reset
+                      </button>
+                      <button
+                        type="button"
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={() => setShowDataTable(false)}
+                        className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)]"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="min-h-0 flex-1">
+                    <DataTablePanel
+                      embedded
+                      metadata={metadata}
+                      tableState={dataTableState}
+                      activeSelection={session.selected}
+                      onSelectRow={handleDataTableRowSelect}
+                      showMetaHeader={false}
+                    />
+                  </div>
+
+                  <div
+                    aria-hidden="true"
+                    onPointerDown={startDataTableDialogResize}
+                    title="Drag to resize data table window"
+                    className="absolute bottom-2 right-2 z-10 h-5 w-5 cursor-se-resize touch-none rounded-md border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/92"
+                  >
+                    <span className="absolute bottom-1 right-1 h-2.5 w-0.5 rotate-45 rounded-full bg-[color:var(--muted-ink)]" />
+                    <span className="absolute bottom-1 right-2.5 h-1.5 w-0.5 rotate-45 rounded-full bg-[color:var(--muted-ink)]" />
+                  </div>
+                </div>
               </div>
             ) : null}
           </div>

@@ -1,137 +1,217 @@
 "use client";
 
-import type { ItemAttribute, ItemData } from "@thatopen/fragments";
-import type { ViewerSelectionDetails, ViewerSessionState } from "@/features/viewer/types";
+import type {
+  ViewerElementInspection,
+  ViewerInspectionGroup,
+  ViewerInspectionRow,
+  ViewerInspectionValue,
+  ViewerInspectionValueState,
+  ViewerSelection,
+  ViewerSelectionDetails,
+} from "@/features/viewer/types";
 
-const MAX_RENDER_DEPTH = 6;
-const MAX_ARRAY_ITEMS = 24;
-
-function isItemAttribute(value: ItemAttribute | ItemData[]): value is ItemAttribute {
-  return typeof value === "object" && value !== null && "value" in value;
+function isIssueState(state: ViewerInspectionValueState) {
+  return state !== "present";
 }
 
-function formatValue(value: unknown): string {
-  if (value === null || value === undefined) {
-    return "—";
-  }
-
-  if (typeof value === "string") {
-    return value;
-  }
-
-  if (typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
+function issueLabel(state: ViewerInspectionValueState) {
+  switch (state) {
+    case "missing":
+      return "Missing";
+    case "empty":
+      return "Empty";
+    case "null":
+      return "Null";
+    case "undefined":
+      return "Undefined";
+    default:
+      return null;
   }
 }
 
-type PropertyGroupProps = {
+function rowClass(state: ViewerInspectionValueState) {
+  if (isIssueState(state)) {
+    return "bg-[#fff7ed]";
+  }
+
+  return "bg-white/30";
+}
+
+function valueClass(state: ViewerInspectionValueState) {
+  if (isIssueState(state)) {
+    return "text-[#7d4414]";
+  }
+
+  return "text-[color:var(--foreground)]";
+}
+
+function badgeClass(state: ViewerInspectionValueState) {
+  if (isIssueState(state)) {
+    return "border-[#d8af80] bg-[#fff1df] text-[#915217]";
+  }
+
+  return "border-[color:var(--viewer-border)] bg-white/70 text-[color:var(--muted-ink)]";
+}
+
+function InspectionValueRow({
+  label,
+  value,
+}: {
   label: string;
-  data: ItemData;
-  depth?: number;
-  ancestors?: Set<object>;
-};
-
-function PropertyGroup({ label, data, depth = 0, ancestors = new Set<object>() }: PropertyGroupProps) {
-  if (depth >= MAX_RENDER_DEPTH) {
-    return (
-      <section
-        className="rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] p-4"
-        style={{ marginLeft: `${depth * 8}px` }}
-      >
-        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-          {label}
-        </div>
-        <div className="mt-3 text-sm text-[color:var(--muted-ink)]">
-          Nested relations were truncated to keep the panel responsive.
-        </div>
-      </section>
-    );
-  }
-
-  const nextAncestors = new Set(ancestors);
-  nextAncestors.add(data);
-  const entries = Object.entries(data);
+  value: ViewerInspectionValue;
+}) {
+  const badge = issueLabel(value.state);
 
   return (
-    <section
-      className="rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] p-4"
-      style={{ marginLeft: `${depth * 8}px` }}
+    <div
+      className={`grid gap-1.5 px-2.5 py-1.5 md:grid-cols-[minmax(0,9rem)_minmax(0,1fr)_auto] md:items-start ${rowClass(value.state)}`}
     >
-      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-ink)]">
         {label}
       </div>
-      <div className="mt-3 space-y-3">
-        {entries.map(([key, value]) => {
-          if (Array.isArray(value)) {
-            return (
-              <div key={key} className="space-y-2">
-                <div className="text-sm font-semibold text-[color:var(--foreground)]">{key}</div>
-                {value.length === 0 ? (
-                  <div className="text-sm text-[color:var(--muted-ink)]">No values</div>
-                ) : (
-                  <>
-                    {value.slice(0, MAX_ARRAY_ITEMS).map((entry, index) =>
-                      nextAncestors.has(entry) ? (
-                        <section
-                          key={`${key}-${index}`}
-                          className="rounded-2xl border border-dashed border-[color:var(--viewer-border)] px-4 py-3 text-sm text-[color:var(--muted-ink)]"
-                          style={{ marginLeft: `${(depth + 1) * 8}px` }}
-                        >
-                          {key} {index + 1} references data already shown above.
-                        </section>
-                      ) : (
-                        <PropertyGroup
-                          key={`${key}-${index}`}
-                          label={`${key} ${index + 1}`}
-                          data={entry}
-                          depth={depth + 1}
-                          ancestors={nextAncestors}
-                        />
-                      ),
-                    )}
-                    {value.length > MAX_ARRAY_ITEMS ? (
-                      <div className="text-sm text-[color:var(--muted-ink)]">
-                        Showing {MAX_ARRAY_ITEMS} of {value.length} values.
-                      </div>
-                    ) : null}
-                  </>
-                )}
-              </div>
-            );
-          }
+      <div className={`min-w-0 break-words text-sm leading-6 ${valueClass(value.state)}`}>
+        {value.text}
+      </div>
+      <div className="flex justify-start md:justify-end">
+        {badge ? (
+          <span
+            className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${badgeClass(value.state)}`}
+          >
+            {badge}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
-          return (
-            <div
-              key={key}
-              className="grid gap-1 border-b border-[color:var(--viewer-border)] pb-3 last:border-b-0 last:pb-0"
-            >
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-ink)]">
-                {key}
-              </div>
-              <div className="break-words text-sm text-[color:var(--foreground)]">
-                {isItemAttribute(value) ? formatValue(value.value) : "—"}
-              </div>
-            </div>
-          );
-        })}
+function InspectionRowView({ row }: { row: ViewerInspectionRow }) {
+  return <InspectionValueRow label={row.label} value={row.value} />;
+}
+
+function PropertySetGroup({ group }: { group: ViewerInspectionGroup }) {
+  return (
+    <section className="overflow-hidden rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)]">
+      <div className="border-b border-[color:var(--viewer-border)] px-2.5 py-2">
+        <h3 className="break-words text-sm font-semibold text-[color:var(--foreground)]">
+          {group.title}
+        </h3>
+        {group.subtitle ? (
+          <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[color:var(--muted-ink)]">
+            {group.subtitle}
+          </div>
+        ) : null}
+      </div>
+
+      {group.rows.length > 0 ? (
+        <div className="divide-y divide-[color:var(--viewer-border)]">
+          {group.rows.map((row) => (
+            <InspectionRowView key={row.key} row={row} />
+          ))}
+        </div>
+      ) : (
+        <div className="px-2.5 py-2.5 text-sm text-[color:var(--muted-ink)]">
+          No properties were resolved for this property set.
+        </div>
+      )}
+    </section>
+  );
+}
+
+function EmptySelectionState() {
+  return (
+    <section className="rounded-xl border border-dashed border-[color:var(--viewer-border)] bg-white/35 px-3 py-3.5 text-sm text-[color:var(--muted-ink)]">
+      Select an element in the viewport or model tree to view its IFC class, attributes, and
+      property sets.
+    </section>
+  );
+}
+
+function LoadingState({ selection }: { selection: ViewerSelection }) {
+  return (
+    <section className="space-y-2">
+      <div>
+        <div className="text-sm font-semibold text-[color:var(--foreground)]">{selection.label}</div>
+        <div className="mt-1 text-xs uppercase tracking-[0.16em] text-[color:var(--muted-ink)]">
+          Loading properties
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-dashed border-[color:var(--viewer-border)] bg-white/35 px-3 py-3 text-sm text-[color:var(--muted-ink)]">
+        Resolving IFC attributes and property sets for the selected element.
       </div>
     </section>
+  );
+}
+
+function UnavailableState({ selection }: { selection: ViewerSelection }) {
+  return (
+    <section className="space-y-2">
+      <div>
+        <div className="text-sm font-semibold text-[color:var(--foreground)]">{selection.label}</div>
+        <div className="mt-1 text-xs uppercase tracking-[0.16em] text-[color:var(--muted-ink)]">
+          Properties unavailable
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-dashed border-[#d8af80] bg-[#fff7ed] px-3 py-3 text-sm text-[#915217]">
+        The element is selected, but its IFC attributes or property relations could not be resolved.
+      </div>
+    </section>
+  );
+}
+
+function InspectionContent({ inspection }: { inspection: ViewerElementInspection }) {
+  return (
+    <div className="space-y-4">
+      <section className="space-y-2">
+        <div>
+          <h2 className="break-words text-base font-semibold text-[color:var(--foreground)]">
+            {inspection.title}
+          </h2>
+          <div className="mt-1 text-xs uppercase tracking-[0.16em] text-[color:var(--muted-ink)]">
+            Model {inspection.modelId} | Local ID #{inspection.localId}
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)]">
+          <div className="divide-y divide-[color:var(--viewer-border)]">
+            <InspectionValueRow label="IFC Class" value={inspection.ifcType} />
+            <InspectionValueRow label="GlobalId" value={inspection.globalId} />
+            {inspection.coreAttributes.map((row) => (
+              <InspectionRowView key={row.key} row={row} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-2">
+        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+          Property Sets
+        </div>
+
+        {inspection.propertySets.length > 0 ? (
+          <div className="space-y-2">
+            {inspection.propertySets.map((group) => (
+              <PropertySetGroup key={group.key} group={group} />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-[color:var(--viewer-border)] bg-white/35 px-3 py-3 text-sm text-[color:var(--muted-ink)]">
+            No property sets were found for this element.
+          </div>
+        )}
+      </section>
+    </div>
   );
 }
 
 type PropertiesPanelProps = {
   embedded?: boolean;
   details: ViewerSelectionDetails;
-  session: ViewerSessionState;
 };
 
-export function PropertiesPanel({ embedded = false, details, session }: PropertiesPanelProps) {
+export function PropertiesPanel({ embedded = false, details }: PropertiesPanelProps) {
   return (
     <aside
       className={`flex h-full min-h-0 flex-col overflow-hidden ${
@@ -140,47 +220,19 @@ export function PropertiesPanel({ embedded = false, details, session }: Properti
           : "rounded-[1.75rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] shadow-[var(--viewer-shadow)]"
       }`}
     >
-      <div className="border-b border-[color:var(--viewer-border)] px-5 py-4">
-        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-          Properties
-        </div>
-        <h2 className="mt-2 text-lg font-semibold text-[color:var(--foreground)]">
-          {details.selection?.label ?? "Select an element"}
-        </h2>
-        <div className="mt-2 flex flex-wrap gap-2 text-xs text-[color:var(--muted-ink)]">
-          <span>{details.selection?.category ?? "No IFC class"}</span>
-          <span>Tool: {session.activeTool}</span>
-        </div>
+      <div className="border-b border-[color:var(--viewer-border)] px-3 py-3">
+        <h1 className="text-lg font-semibold text-[color:var(--foreground)]">Properties</h1>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-5 py-4">
-        {details.selection ? (
-          <section className="rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] p-4">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-              Selection
-            </div>
-            <div className="mt-3 space-y-2 text-sm text-[color:var(--foreground)]">
-              <div>Model ID: {details.selection.modelId}</div>
-              <div>Local ID: {details.selection.localId}</div>
-              <div>Label: {details.selection.label}</div>
-            </div>
-          </section>
-        ) : null}
-
-        {details.data ? (
-          <PropertyGroup label="Element Data" data={details.data} />
-        ) : details.selection && details.loading ? (
-          <section className="rounded-2xl border border-dashed border-[color:var(--viewer-border)] px-4 py-6 text-sm text-[color:var(--muted-ink)]">
-            Loading element properties...
-          </section>
-        ) : details.selection ? (
-          <section className="rounded-2xl border border-dashed border-[color:var(--viewer-border)] px-4 py-6 text-sm text-[color:var(--muted-ink)]">
-            Detailed properties are unavailable for this selection.
-          </section>
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+        {!details.selection ? (
+          <EmptySelectionState />
+        ) : details.loading && !details.inspection ? (
+          <LoadingState selection={details.selection} />
+        ) : details.inspection ? (
+          <InspectionContent inspection={details.inspection} />
         ) : (
-          <section className="rounded-2xl border border-dashed border-[color:var(--viewer-border)] px-4 py-6 text-sm text-[color:var(--muted-ink)]">
-            Click an element in the viewport or tree to inspect attributes, relationships, and property sets.
-          </section>
+          <UnavailableState selection={details.selection} />
         )}
       </div>
     </aside>

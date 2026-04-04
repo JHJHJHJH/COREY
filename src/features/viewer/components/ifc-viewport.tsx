@@ -13,6 +13,8 @@ import * as FRAGS from "@thatopen/fragments";
 import * as THREE from "three";
 import {
   buildCategorySummary,
+  buildViewerDataTable,
+  buildSelectionInspection,
   buildSingleItemMap,
   buildViewerTree,
   countItems,
@@ -22,6 +24,7 @@ import {
 import { LocalFileModelSource } from "@/features/viewer/lib/model-source";
 import type {
   ModelMetadata,
+  ViewerDataTableState,
   ViewerSelectionDetails,
   ViewerSessionState,
   ViewerStatus,
@@ -40,6 +43,7 @@ type IfcViewportProps = {
     tree: Awaited<ReturnType<typeof buildViewerTree>>;
     categories: Awaited<ReturnType<typeof buildCategorySummary>>;
   }) => void;
+  onDataTableChange: (state: ViewerDataTableState) => void;
   onSelectionDetailsChange: (details: ViewerSelectionDetails) => void;
 };
 
@@ -87,6 +91,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
     embedded = false,
     status,
     activeTool,
+    onDataTableChange,
     onModelLoaded,
     onSelectionDetailsChange,
     onSessionChange,
@@ -105,6 +110,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
 
   const emitStatusChange = useEffectEvent(onStatusChange);
   const emitSelectionDetailsChange = useEffectEvent(onSelectionDetailsChange);
+  const emitDataTableChange = useEffectEvent(onDataTableChange);
   const emitModelLoaded = useEffectEvent(onModelLoaded);
   const emitSessionChange = useEffectEvent(onSessionChange);
 
@@ -162,7 +168,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
     clearSelectionDetailsTimer();
     emitSelectionDetailsChange({
       selection: null,
-      data: null,
+      inspection: null,
       loading: false,
     });
   });
@@ -179,7 +185,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
 
     emitSelectionDetailsChange({
       selection,
-      data: null,
+      inspection: null,
       loading: true,
     });
 
@@ -216,7 +222,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
           syncSession(enrichedSelection);
           emitSelectionDetailsChange({
             selection: enrichedSelection,
-            data: first,
+            inspection: first ? buildSelectionInspection(enrichedSelection, first) : null,
             loading: false,
           });
         } catch (error) {
@@ -227,7 +233,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
           console.error("Failed to load selection details", error);
           emitSelectionDetailsChange({
             selection,
-            data: null,
+            inspection: null,
             loading: false,
           });
         }
@@ -318,6 +324,11 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
           tree: [],
           categories: [],
         });
+        emitDataTableChange({
+          phase: "loading",
+          message: `Indexing ${metadata.name} element data...`,
+          data: null,
+        });
 
         emitStatusChange({
           phase: "loaded",
@@ -343,10 +354,46 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
         }
 
         void (async () => {
+          let lastDataTableProgress = -1;
+
           try {
-            const [tree, categories] = await Promise.all([
+            const [treeResult, categoriesResult, dataTableResult] = await Promise.allSettled([
               buildViewerTree(model, metadata.name),
               buildCategorySummary(model),
+              buildViewerDataTable(model, {
+                onProgress: ({ processedRowCount, totalRowCount }) => {
+                  const normalizedProgress =
+                    totalRowCount === 0
+                      ? 100
+                      : Math.floor((processedRowCount / totalRowCount) * 100);
+                  if (
+                    normalizedProgress === lastDataTableProgress ||
+                    (normalizedProgress % 10 !== 0 && processedRowCount !== totalRowCount)
+                  ) {
+                    return;
+                  }
+
+                  lastDataTableProgress = normalizedProgress;
+
+                  const activeRuntime = runtimeRef.current;
+                  if (
+                    !activeRuntime ||
+                    activeRuntime.model?.modelId !== model.modelId ||
+                    loadSequenceRef.current !== loadSequence
+                  ) {
+                    return;
+                  }
+
+                  emitDataTableChange({
+                    phase: "loading",
+                    message:
+                      processedRowCount >= totalRowCount
+                        ? `Indexed ${totalRowCount} table rows. Finalizing columns...`
+                        : `Indexing element data table... ${processedRowCount}/${totalRowCount}`,
+                    data: null,
+                  });
+                },
+              }),
             ]);
 
             const activeRuntime = runtimeRef.current;
@@ -358,15 +405,83 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
               return;
             }
 
+            const tree = treeResult.status === "fulfilled" ? treeResult.value : [];
+            const categories = categoriesResult.status === "fulfilled" ? categoriesResult.value : [];
+
             emitModelLoaded({
               metadata: { ...metadata, loadStatus: "loaded" },
               tree,
               categories,
             });
 
+            if (dataTableResult.status === "fulfilled") {
+              const dataTable = dataTableResult.value;
+
+              for (const row of dataTable.rows) {
+                if (row.cells.name?.state === "present") {
+                  activeRuntime.labels.set(row.localId, row.cells.name.text);
+                }
+
+                if (row.ifcType) {
+                  activeRuntime.categories.set(row.localId, row.ifcType);
+                }
+              }
+
+              emitDataTableChange({
+                phase: "loaded",
+                message:
+                  dataTable.rows.length > 0
+                    ? `Indexed ${dataTable.rows.length} elements across ${dataTable.columns.length} columns.`
+                    : "No IFC elements with geometry were available for tabular review.",
+                data: dataTable,
+              });
+            } else {
+              const dataTableMessage =
+                dataTableResult.reason instanceof Error
+                  ? dataTableResult.reason.message
+                  : "Unknown table indexing error";
+              console.error("Failed to index IFC element table", dataTableResult.reason);
+
+              emitDataTableChange({
+                phase: "error",
+                message: `Failed to index the data table: ${dataTableMessage}`,
+                data: null,
+              });
+            }
+
+            const indexingFailures: string[] = [];
+            if (treeResult.status === "rejected") {
+              const message =
+                treeResult.reason instanceof Error
+                  ? treeResult.reason.message
+                  : "Unknown tree indexing error";
+              console.error("Failed to index IFC tree", treeResult.reason);
+              indexingFailures.push(`tree: ${message}`);
+            }
+
+            if (categoriesResult.status === "rejected") {
+              const message =
+                categoriesResult.reason instanceof Error
+                  ? categoriesResult.reason.message
+                  : "Unknown category indexing error";
+              console.error("Failed to index IFC categories", categoriesResult.reason);
+              indexingFailures.push(`categories: ${message}`);
+            }
+
+            if (dataTableResult.status === "rejected") {
+              const message =
+                dataTableResult.reason instanceof Error
+                  ? dataTableResult.reason.message
+                  : "Unknown table indexing error";
+              indexingFailures.push(`table: ${message}`);
+            }
+
             emitStatusChange({
               phase: "loaded",
-              message: `${metadata.name} ready. Click to select, double-click to place tools.`,
+              message:
+                indexingFailures.length === 0
+                  ? `${metadata.name} ready. Click to select, double-click to place tools.`
+                  : `${metadata.name} loaded with indexing issues: ${indexingFailures.join(" | ")}`,
             });
           } catch (indexingError) {
             const message =
@@ -382,9 +497,14 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
               return;
             }
 
+            emitDataTableChange({
+              phase: "error",
+              message: `Failed to index the data table: ${message}`,
+              data: null,
+            });
             emitStatusChange({
               phase: "loaded",
-              message: `${metadata.name} rendered, but tree indexing failed: ${message}`,
+              message: `${metadata.name} rendered, but metadata indexing failed: ${message}`,
             });
           }
         })();
@@ -407,6 +527,11 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
           syncSession(null);
           resetSelectionDetails();
         }
+        emitDataTableChange({
+          phase: "idle",
+          message: "Load a model to review element data in a table.",
+          data: null,
+        });
         return;
       }
 
@@ -423,6 +548,11 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
 
       resetSelectionDetails();
       syncSession(null);
+      emitDataTableChange({
+        phase: "idle",
+        message: "Load a model to review element data in a table.",
+        data: null,
+      });
     },
     async selectNode(localId) {
       const runtime = runtimeRef.current;
@@ -700,6 +830,11 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       emitStatusChange({
         phase: "idle",
         message: "Choose an IFC file to begin.",
+      });
+      emitDataTableChange({
+        phase: "idle",
+        message: "Load a model to review element data in a table.",
+        data: null,
       });
       syncSession(null);
     };
