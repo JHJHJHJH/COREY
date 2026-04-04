@@ -1,6 +1,23 @@
 "use client";
 
-import { startTransition, useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import {
+  startTransition,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  applyViewerValidationToInspection,
+  buildViewerValidationRows,
+  compileViewerValidationRules,
+  groupViewerValidationResultsBySeverity,
+  VIEWER_VALIDATION_CONFIG_VERSION,
+} from "@/features/rules/lib/validation";
+import { useViewerRules } from "@/features/rules/rules-provider";
 import { DataTablePanel } from "@/features/viewer/components/data-table-panel";
 import { ModelTreePanel } from "@/features/viewer/components/model-tree-panel";
 import { IfcViewport } from "@/features/viewer/components/ifc-viewport";
@@ -14,6 +31,9 @@ import type {
   ViewerSelectionDetails,
   ViewerSessionState,
   ViewerStatus,
+  ViewerValidationHighlights,
+  ViewerValidationRunPayload,
+  ViewerValidationRunResult,
   ViewerTreeNode,
   ViewerViewportHandle,
 } from "@/features/viewer/types";
@@ -52,6 +72,31 @@ const MAX_DATA_TABLE_DIALOG_WIDTH = Number.POSITIVE_INFINITY;
 const MAX_DATA_TABLE_DIALOG_HEIGHT = Number.POSITIVE_INFINITY;
 const DATA_TABLE_DIALOG_MARGIN = 12;
 
+const validationWorkerUrl = new URL("../../rules/workers/validation-worker.ts", import.meta.url);
+
+const emptyValidationHighlights: ViewerValidationHighlights = {
+  warn: {},
+  error: {},
+};
+
+type ViewerValidationPhase = "idle" | "running" | "ready" | "error";
+
+type ViewerValidationState = {
+  phase: ViewerValidationPhase;
+  mode: "worker" | "api" | null;
+  progress: number;
+  issueCount: number;
+  message: string;
+};
+
+const initialValidationState: ViewerValidationState = {
+  phase: "idle",
+  mode: null,
+  progress: 0,
+  issueCount: 0,
+  message: "No validation rules configured.",
+};
+
 type DrawerSide = "left" | "right";
 
 type DrawerDragState = {
@@ -80,6 +125,24 @@ type DataTableDialogResizeState = {
   startLayout: DataTableDialogLayout;
 };
 
+type ViewerValidationWorkerMessage =
+  | {
+      type: "progress";
+      runId: string;
+      processedRowCount: number;
+      totalRowCount: number;
+    }
+  | {
+      type: "result";
+      runId: string;
+      result: ViewerValidationRunResult;
+    }
+  | {
+      type: "error";
+      runId: string;
+      message: string;
+    };
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
@@ -99,6 +162,19 @@ function dataTablePhaseTone(phase: ViewerDataTableState["phase"]) {
     case "error":
       return "border-[#c78972] bg-[#fff0ea] text-[#8a3e1f]";
     case "loaded":
+      return "border-[color:var(--viewer-border)] bg-white/70 text-[color:var(--muted-ink)]";
+    default:
+      return "border-[color:var(--viewer-border)] bg-white/60 text-[color:var(--muted-ink)]";
+  }
+}
+
+function validationPhaseTone(phase: ViewerValidationState["phase"]) {
+  switch (phase) {
+    case "running":
+      return "border-[#d8af80] bg-[#fff1df] text-[#915217]";
+    case "error":
+      return "border-[#c78972] bg-[#fff0ea] text-[#8a3e1f]";
+    case "ready":
       return "border-[color:var(--viewer-border)] bg-white/70 text-[color:var(--muted-ink)]";
     default:
       return "border-[color:var(--viewer-border)] bg-white/60 text-[color:var(--muted-ink)]";
@@ -316,10 +392,14 @@ function DrawerResizeHandle({
 }
 
 export function ViewerShell() {
+  const { config } = useViewerRules();
   const viewportRef = useRef<ViewerViewportHandle | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const dataTableDialogRef = useRef<HTMLDivElement | null>(null);
+  const validationWorkerRef = useRef<Worker | null>(null);
+  const validationAbortControllerRef = useRef<AbortController | null>(null);
+  const validationRunIdRef = useRef(0);
   const dataTableDialogLayoutRef = useRef<DataTableDialogLayout>({
     x: DATA_TABLE_DIALOG_MARGIN,
     y: DATA_TABLE_DIALOG_MARGIN,
@@ -342,6 +422,10 @@ export function ViewerShell() {
     inspection: null,
     loading: false,
   });
+  const [validationState, setValidationState] = useState(initialValidationState);
+  const [validationHighlights, setValidationHighlights] = useState<ViewerValidationHighlights>(
+    emptyValidationHighlights,
+  );
   const [showTree, setShowTree] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
   const [showDataTable, setShowDataTable] = useState(true);
@@ -363,6 +447,54 @@ export function ViewerShell() {
     useState<DataTableDialogResizeState | null>(null);
 
   const hasModel = Boolean(metadata && status.phase === "loaded");
+  const deferredRules = useDeferredValue(config.rules);
+  const compiledValidationRules = useMemo(
+    () => compileViewerValidationRules(deferredRules),
+    [deferredRules],
+  );
+  const runnableRuleCount = useMemo(
+    () =>
+      [...compiledValidationRules.values()].reduce(
+        (count, rulesForType) => count + rulesForType.size,
+        0,
+      ),
+    [compiledValidationRules],
+  );
+  const validatedSelectionDetails = useMemo<ViewerSelectionDetails>(
+    () => ({
+      ...selectionDetails,
+      inspection: applyViewerValidationToInspection(selectionDetails.inspection, deferredRules),
+    }),
+    [deferredRules, selectionDetails],
+  );
+  const validationPayload = useMemo<ViewerValidationRunPayload | null>(() => {
+    if (
+      !metadata ||
+      status.phase !== "loaded" ||
+      !dataTableState.data ||
+      deferredRules.length === 0 ||
+      runnableRuleCount === 0
+    ) {
+      return null;
+    }
+
+    return {
+      version: VIEWER_VALIDATION_CONFIG_VERSION,
+      sourceId: metadata.sourceId ?? metadata.name,
+      rules: deferredRules,
+      rows: buildViewerValidationRows(dataTableState.data, deferredRules),
+    };
+  }, [dataTableState.data, deferredRules, metadata, runnableRuleCount, status.phase]);
+
+  const stopValidationWorker = useCallback(() => {
+    validationWorkerRef.current?.terminate();
+    validationWorkerRef.current = null;
+  }, []);
+
+  const stopValidationRequest = useCallback(() => {
+    validationAbortControllerRef.current?.abort();
+    validationAbortControllerRef.current = null;
+  }, []);
 
   const applyCommittedDataTableDialogLayout = useCallback((layout: DataTableDialogLayout) => {
     const dialog = dataTableDialogRef.current;
@@ -718,7 +850,7 @@ export function ViewerShell() {
     return () => {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
-      window.removeEventListener("pointercancel", handlePointerUp);
+    window.removeEventListener("pointercancel", handlePointerUp);
       document.body.style.removeProperty("cursor");
       document.body.style.removeProperty("user-select");
     };
@@ -726,6 +858,237 @@ export function ViewerShell() {
     dataTableDialogResizeState,
     stopDataTableDialogResize,
     updateDraggedDataTableDialogSize,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      stopValidationWorker();
+      stopValidationRequest();
+    };
+  }, [stopValidationRequest, stopValidationWorker]);
+
+  useEffect(() => {
+    stopValidationWorker();
+    stopValidationRequest();
+
+    if (!metadata || status.phase !== "loaded" || !dataTableState.data) {
+      startTransition(() => {
+        setValidationHighlights(emptyValidationHighlights);
+        setValidationState({
+          phase: "idle",
+          mode: null,
+          progress: 0,
+          issueCount: 0,
+          message:
+            deferredRules.length === 0
+              ? "No validation rules configured."
+              : runnableRuleCount === 0
+                ? "Complete at least one rule to start validation."
+              : "Load and index a model to evaluate rules.",
+        });
+      });
+      return;
+    }
+
+    if (!validationPayload) {
+      startTransition(() => {
+        setValidationHighlights(emptyValidationHighlights);
+        setValidationState({
+          phase: "idle",
+          mode: null,
+          progress: 0,
+          issueCount: 0,
+          message:
+            deferredRules.length === 0
+              ? "No validation rules configured."
+              : "Complete at least one rule to start validation.",
+        });
+      });
+      return;
+    }
+
+    if (validationPayload.rows.length === 0) {
+      startTransition(() => {
+        setValidationHighlights(emptyValidationHighlights);
+        setValidationState({
+          phase: "ready",
+          mode: null,
+          progress: 100,
+          issueCount: 0,
+          message: "No indexed elements match the current rule IFC types.",
+        });
+      });
+      return;
+    }
+
+    const runToken = ++validationRunIdRef.current;
+    const runId = String(runToken);
+    let fallbackStarted = false;
+
+    const commitSuccess = (mode: "worker" | "api", result: ViewerValidationRunResult) => {
+      if (validationRunIdRef.current !== runToken) {
+        return;
+      }
+
+      startTransition(() => {
+        setValidationHighlights(groupViewerValidationResultsBySeverity(result.results));
+        setValidationState({
+          phase: "ready",
+          mode,
+          progress: 100,
+          issueCount: result.results.length,
+          message:
+            result.results.length === 0
+              ? `Validated ${validationPayload.rows.length} elements with no issues.`
+              : `Validated ${validationPayload.rows.length} elements. ${result.results.length} flagged.`,
+        });
+      });
+    };
+
+    const commitError = (mode: "worker" | "api" | null, message: string) => {
+      if (validationRunIdRef.current !== runToken) {
+        return;
+      }
+
+      startTransition(() => {
+        setValidationState((current) => ({
+          phase: "error",
+          mode,
+          progress: current.progress,
+          issueCount: current.issueCount,
+          message,
+        }));
+      });
+    };
+
+    const fallbackToApi = async () => {
+      if (fallbackStarted || validationRunIdRef.current !== runToken) {
+        return;
+      }
+
+      fallbackStarted = true;
+      stopValidationWorker();
+
+      const controller = new AbortController();
+      validationAbortControllerRef.current = controller;
+
+      startTransition(() => {
+        setValidationState({
+          phase: "running",
+          mode: "api",
+          progress: 0,
+          issueCount: 0,
+          message: `Validating ${validationPayload.rows.length} elements via API fallback...`,
+        });
+      });
+
+      try {
+        const response = await fetch("/api/rules/evaluate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(validationPayload),
+          signal: controller.signal,
+        });
+
+        const body = (await response.json()) as ViewerValidationRunResult & { error?: string };
+        if (!response.ok) {
+          throw new Error(body.error ?? "Validation API request failed.");
+        }
+
+        commitSuccess("api", body);
+      } catch (error) {
+        if (controller.signal.aborted || validationRunIdRef.current !== runToken) {
+          return;
+        }
+
+        commitError(
+          "api",
+          error instanceof Error ? error.message : "Validation API request failed.",
+        );
+      } finally {
+        if (validationAbortControllerRef.current === controller) {
+          validationAbortControllerRef.current = null;
+        }
+      }
+    };
+
+    startTransition(() => {
+      setValidationState({
+        phase: "running",
+        mode: "worker",
+        progress: 0,
+        issueCount: 0,
+        message: `Validating ${validationPayload.rows.length} elements in a worker...`,
+      });
+    });
+
+    try {
+      const worker = new Worker(validationWorkerUrl, { type: "module" });
+      validationWorkerRef.current = worker;
+
+      worker.onmessage = (event: MessageEvent<ViewerValidationWorkerMessage>) => {
+        const message = event.data;
+
+        if (validationRunIdRef.current !== runToken || message.runId !== runId) {
+          return;
+        }
+
+        if (message.type === "progress") {
+          const progress =
+            message.totalRowCount === 0
+              ? 100
+              : Math.floor((message.processedRowCount / message.totalRowCount) * 100);
+
+          startTransition(() => {
+            setValidationState({
+              phase: "running",
+              mode: "worker",
+              progress,
+              issueCount: 0,
+              message: `Validating ${message.totalRowCount} elements in a worker... ${progress}%`,
+            });
+          });
+          return;
+        }
+
+        if (message.type === "result") {
+          stopValidationWorker();
+          commitSuccess("worker", message.result);
+          return;
+        }
+
+        void fallbackToApi();
+      };
+
+      worker.onerror = (event) => {
+        event.preventDefault();
+        void fallbackToApi();
+      };
+
+      worker.postMessage({
+        type: "run",
+        runId,
+        payload: validationPayload,
+      });
+    } catch {
+      void fallbackToApi();
+    }
+
+    return () => {
+      stopValidationWorker();
+      stopValidationRequest();
+    };
+  }, [
+    dataTableState.data,
+    deferredRules.length,
+    metadata,
+    runnableRuleCount,
+    status.phase,
+    stopValidationRequest,
+    stopValidationWorker,
+    validationPayload,
   ]);
 
   const openFilePicker = () => {
@@ -868,6 +1231,12 @@ export function ViewerShell() {
                 <CubeIcon className="h-4 w-4" />
                 <span>Test model</span>
               </button>
+              <Link
+                href="/rules"
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-4 text-sm font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]"
+              >
+                <span>Rules</span>
+              </Link>
               <div className="flex items-center gap-2 rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/72 p-1.5">
                 <HeaderActionButton
                   label={showTree ? "Hide model tree" : "Show model tree"}
@@ -916,6 +1285,31 @@ export function ViewerShell() {
                 {status.phase}
               </span>{" "}
               status
+            </div>
+            <div className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/72 px-3 py-1.5 text-[color:var(--muted-ink)]">
+              <span className="font-semibold text-[color:var(--foreground)]">Rules:</span>{" "}
+              {config.rules.length}
+            </div>
+            <div
+              className={`rounded-full border px-3 py-1.5 ${validationPhaseTone(validationState.phase)}`}
+            >
+              <span className="font-semibold">
+                {validationState.phase === "running"
+                  ? `Validation ${validationState.progress}%`
+                  : validationState.phase === "ready"
+                    ? validationState.issueCount === 0
+                      ? "Validation clear"
+                      : `Validation ${validationState.issueCount} flagged`
+                    : validationState.phase === "error"
+                      ? "Validation error"
+                      : "Validation idle"}
+              </span>
+              {validationState.mode ? ` · ${validationState.mode}` : ""}
+            </div>
+            <div className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/72 px-3 py-1.5 text-[color:var(--muted-ink)]">
+              <span className="max-w-[min(30rem,70vw)] truncate align-bottom inline-block">
+                {validationState.message}
+              </span>
             </div>
           </div>
         </div>
@@ -988,6 +1382,7 @@ export function ViewerShell() {
                   embedded
                   status={status}
                   activeTool={session.activeTool}
+                  validationHighlights={validationHighlights}
                   onStatusChange={(nextStatus) => {
                     startTransition(() => {
                       setStatus(nextStatus);
@@ -1070,13 +1465,13 @@ export function ViewerShell() {
                   className="hidden min-h-0 shrink-0 lg:block"
                   style={{ width: `${propertiesDrawerWidth}px` }}
                 >
-                  <PropertiesPanel embedded details={selectionDetails} />
+                  <PropertiesPanel embedded details={validatedSelectionDetails} />
                 </div>
               ) : null}
 
               {showProperties ? (
                 <div className="absolute inset-y-0 right-0 z-40 w-[min(85vw,24rem)] max-w-full border-l border-[color:var(--viewer-border)] shadow-[var(--viewer-shadow)] lg:hidden">
-                  <PropertiesPanel embedded details={selectionDetails} />
+                  <PropertiesPanel embedded details={validatedSelectionDetails} />
                 </div>
               ) : null}
             </div>

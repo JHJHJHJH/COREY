@@ -4,6 +4,99 @@ export type ViewerTool = "select" | "measure" | "section";
 
 export type ViewerInspectionValueState = "present" | "missing" | "empty" | "null" | "undefined";
 
+export type ViewerValidationFailureSeverity = "warn" | "error";
+
+export type ViewerValidationResult = "ok" | "warn" | "error";
+
+export type ViewerValidationTarget =
+  | {
+      kind: "attribute";
+      name: string;
+    }
+  | {
+      kind: "property";
+      group: string;
+      label: string;
+    };
+
+export type ViewerValidationCheck =
+  | {
+      kind: "empty";
+    }
+  | {
+      kind: "enum";
+      allowedValues: string[];
+    }
+  | {
+      kind: "numberRange";
+      min: number | null;
+      max: number | null;
+    };
+
+export interface ViewerValidationRule {
+  id: string;
+  ifcType: string;
+  target: ViewerValidationTarget;
+  check: ViewerValidationCheck;
+  failSeverity: ViewerValidationFailureSeverity;
+}
+
+export interface ViewerValidationConfig {
+  version: 1;
+  rules: ViewerValidationRule[];
+}
+
+export interface ViewerValidationMatch {
+  result: ViewerValidationResult;
+  ruleId: string;
+}
+
+export interface ViewerValidationSummary {
+  result: ViewerValidationResult | null;
+  targetedRowCount: number;
+  okCount: number;
+  warnCount: number;
+  errorCount: number;
+}
+
+export interface ViewerValidationValue {
+  text: string;
+  state: ViewerInspectionValueState;
+}
+
+export interface ViewerValidationRow {
+  modelId: string;
+  localId: number;
+  ifcType: string | null;
+  values: Record<string, ViewerValidationValue>;
+}
+
+export interface ViewerValidationElementResult {
+  modelId: string;
+  localId: number;
+  result: ViewerValidationFailureSeverity;
+  matchedRuleIds: string[];
+}
+
+export interface ViewerValidationRunPayload {
+  version: number;
+  sourceId: string;
+  rules: ViewerValidationRule[];
+  rows: ViewerValidationRow[];
+}
+
+export interface ViewerValidationRunResult {
+  sourceId: string;
+  results: ViewerValidationElementResult[];
+}
+
+export type ViewerValidationElementMap = Record<string, number[]>;
+
+export interface ViewerValidationHighlights {
+  warn: ViewerValidationElementMap;
+  error: ViewerValidationElementMap;
+}
+
 export interface ModelMetadata {
   name: string;
   size: number;
@@ -46,6 +139,7 @@ export interface ViewerInspectionValue {
   raw: unknown;
   text: string;
   state: ViewerInspectionValueState;
+  validation: ViewerValidationMatch | null;
 }
 
 export interface ViewerDataTableCell {
@@ -101,6 +195,7 @@ export interface ViewerDataTableState {
 export interface ViewerInspectionRow {
   key: string;
   label: string;
+  target: ViewerValidationTarget | null;
   value: ViewerInspectionValue;
 }
 
@@ -114,13 +209,12 @@ export interface ViewerInspectionGroup {
 
 export interface ViewerElementInspection {
   title: string;
-  ifcType: ViewerInspectionValue;
-  globalId: ViewerInspectionValue;
   modelId: string;
   localId: number;
-  coreAttributes: ViewerInspectionRow[];
+  summaryRows: ViewerInspectionRow[];
   propertySets: ViewerInspectionGroup[];
   issueCount: number;
+  validationSummary: ViewerValidationSummary | null;
 }
 
 export interface ViewerSelectionDetails {

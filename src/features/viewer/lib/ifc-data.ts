@@ -14,6 +14,7 @@ import type {
   ViewerInspectionValue,
   ViewerInspectionValueState,
   ViewerSelection,
+  ViewerValidationTarget,
   ViewerTreeNode,
 } from "@/features/viewer/types";
 
@@ -177,35 +178,36 @@ function buildInspectionValue(
   missingText = "Missing",
 ): ViewerInspectionValue {
   if (!exists) {
-    return { raw: undefined, text: missingText, state: "missing" };
+    return { raw: undefined, text: missingText, state: "missing", validation: null };
   }
 
   const normalized = normalizeValue(value);
 
   if (normalized === undefined) {
-    return { raw: value, text: "Undefined", state: "undefined" };
+    return { raw: value, text: "Undefined", state: "undefined", validation: null };
   }
 
   if (normalized === null) {
-    return { raw: value, text: "Null", state: "null" };
+    return { raw: value, text: "Null", state: "null", validation: null };
   }
 
   if (typeof normalized === "string" && normalized.trim().length === 0) {
-    return { raw: value, text: "Empty string", state: "empty" };
+    return { raw: value, text: "Empty string", state: "empty", validation: null };
   }
 
   if (Array.isArray(normalized) && normalized.length === 0) {
-    return { raw: value, text: "Empty list", state: "empty" };
+    return { raw: value, text: "Empty list", state: "empty", validation: null };
   }
 
   if (normalized && typeof normalized === "object" && Object.keys(normalized).length === 0) {
-    return { raw: value, text: "Empty object", state: "empty" };
+    return { raw: value, text: "Empty object", state: "empty", validation: null };
   }
 
   return {
     raw: value,
     text: formatValue(normalized),
     state: "present",
+    validation: null,
   };
 }
 
@@ -224,13 +226,22 @@ function combineInspectionValues(
     raw,
     text,
     state,
+    validation: null,
   };
 }
 
-function buildRow(key: string, label: string, exists: boolean, value: unknown, missingText?: string) {
+function buildRow(
+  key: string,
+  label: string,
+  exists: boolean,
+  value: unknown,
+  missingText?: string,
+  target: ViewerValidationTarget | null = null,
+) {
   return {
     key,
     label,
+    target,
     value: buildInspectionValue(exists, value, missingText),
   } satisfies ViewerInspectionRow;
 }
@@ -304,6 +315,10 @@ function isPropertyContainer(item: ItemData) {
 }
 
 function resolvePropertyDefinitions(relation: ItemData) {
+  if (isPropertyContainer(relation)) {
+    return [relation];
+  }
+
   const related = readRelation(relation, "RelatingPropertyDefinition").filter(isPropertyContainer);
   if (related.length > 0) {
     return related;
@@ -326,6 +341,7 @@ function flattenPropertyItem(
       {
         key: `${path.join("/")}:${fallbackLabel}:cycle`,
         label: [...path, fallbackLabel].join(" / "),
+        target: null,
         value: buildInspectionValue(false, undefined, "Circular property reference"),
       },
     ];
@@ -353,6 +369,7 @@ function flattenPropertyItem(
     {
       key: `${path.join("/")}:${label}:${index}`,
       label: [...path, label].join(" / "),
+      target: null,
       value: extractPropertyValue(item),
     },
   ];
@@ -389,7 +406,14 @@ function buildPropertyGroups(data: ItemData) {
         key: `${title}:${groups.length}`,
         title,
         subtitle: readAttributeText(definition, "type"),
-        rows,
+        rows: rows.map((row) => ({
+          ...row,
+          target: {
+            kind: "property",
+            group: title,
+            label: row.label,
+          },
+        })),
         issueCount,
       });
     }
@@ -407,14 +431,38 @@ export function buildSelectionInspection(
     (selection.label.trim().length > 0 ? selection.label : null) ??
     selection.category ??
     `#${selection.localId}`;
-  const coreAttributes = [
-    buildRow("Name", "Name", hasAttribute(data, "Name"), readAttribute(data, "Name"), "Missing name"),
+  const summaryRows = [
+    buildRow(
+      "type",
+      "IFC Class",
+      hasAttribute(data, "type"),
+      readAttribute(data, "type"),
+      "Missing IFC type",
+      { kind: "attribute", name: "type" },
+    ),
+    buildRow(
+      "GlobalId",
+      "GlobalId",
+      hasAttribute(data, "GlobalId"),
+      readAttribute(data, "GlobalId"),
+      "Missing GlobalId",
+      { kind: "attribute", name: "GlobalId" },
+    ),
+    buildRow(
+      "Name",
+      "Name",
+      hasAttribute(data, "Name"),
+      readAttribute(data, "Name"),
+      "Missing name",
+      { kind: "attribute", name: "Name" },
+    ),
     buildRow(
       "Description",
       "Description",
       hasAttribute(data, "Description"),
       readAttribute(data, "Description"),
       "Missing description",
+      { kind: "attribute", name: "Description" },
     ),
     buildRow(
       "ObjectType",
@@ -422,34 +470,22 @@ export function buildSelectionInspection(
       hasAttribute(data, "ObjectType"),
       readAttribute(data, "ObjectType"),
       "Missing object type",
+      { kind: "attribute", name: "ObjectType" },
     ),
   ];
   const propertySets = buildPropertyGroups(data);
   const issueCount =
-    Number(buildInspectionValue(hasAttribute(data, "type"), readAttribute(data, "type")).state !== "present") +
-    Number(
-      buildInspectionValue(hasAttribute(data, "GlobalId"), readAttribute(data, "GlobalId")).state !== "present",
-    ) +
-    coreAttributes.reduce((count, row) => count + Number(row.value.state !== "present"), 0) +
+    summaryRows.reduce((count, row) => count + Number(row.value.state !== "present"), 0) +
     propertySets.reduce((count, group) => count + group.issueCount, 0);
 
   return {
     title,
-    ifcType: buildInspectionValue(
-      hasAttribute(data, "type"),
-      readAttribute(data, "type"),
-      "Missing IFC type",
-    ),
-    globalId: buildInspectionValue(
-      hasAttribute(data, "GlobalId"),
-      readAttribute(data, "GlobalId"),
-      "Missing GlobalId",
-    ),
     modelId: selection.modelId,
     localId: selection.localId,
-    coreAttributes,
+    summaryRows,
     propertySets,
     issueCount,
+    validationSummary: null,
   };
 }
 
@@ -1097,9 +1133,15 @@ export function formatTreeNodeCount(nodes: ViewerTreeNode[]) {
   return count;
 }
 
-export function filterTree(nodes: ViewerTreeNode[], query: string): ViewerTreeNode[] {
+export function filterTree(
+  nodes: ViewerTreeNode[],
+  query: string,
+  categoryFilter?: ReadonlySet<string> | null,
+): ViewerTreeNode[] {
   const trimmed = query.trim().toLowerCase();
-  if (!trimmed) {
+  const activeCategoryFilter = categoryFilter && categoryFilter.size > 0 ? categoryFilter : null;
+
+  if (!trimmed && !activeCategoryFilter) {
     return nodes;
   }
 
@@ -1108,7 +1150,15 @@ export function filterTree(nodes: ViewerTreeNode[], query: string): ViewerTreeNo
       .map((child) => prune(child))
       .filter((child): child is ViewerTreeNode => child !== null);
 
-    if (node.label.toLowerCase().includes(trimmed) || children.length > 0) {
+    const matchesQuery =
+      !trimmed ||
+      node.label.toLowerCase().includes(trimmed) ||
+      node.category?.toLowerCase().includes(trimmed) === true;
+    const matchesCategory =
+      !activeCategoryFilter ||
+      (node.category !== null && activeCategoryFilter.has(node.category));
+
+    if ((matchesQuery && matchesCategory) || children.length > 0) {
       return {
         ...node,
         children,

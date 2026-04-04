@@ -8,6 +8,8 @@ import type {
   ViewerInspectionValueState,
   ViewerSelection,
   ViewerSelectionDetails,
+  ViewerValidationMatch,
+  ViewerValidationSummary,
 } from "@/features/viewer/types";
 
 function isIssueState(state: ViewerInspectionValueState) {
@@ -29,24 +31,75 @@ function issueLabel(state: ViewerInspectionValueState) {
   }
 }
 
-function rowClass(state: ViewerInspectionValueState) {
-  if (isIssueState(state)) {
+function validationLabel(validation: ViewerValidationMatch | null) {
+  if (!validation) {
+    return null;
+  }
+
+  switch (validation.result) {
+    case "ok":
+      return "OK";
+    case "warn":
+      return "Warn";
+    case "error":
+      return "Error";
+  }
+}
+
+function rowClass(value: ViewerInspectionValue) {
+  if (value.validation?.result === "ok") {
+    return "bg-[#edf7f1]";
+  }
+
+  if (value.validation?.result === "warn") {
+    return "bg-[#fff7ed]";
+  }
+
+  if (value.validation?.result === "error") {
+    return "bg-[#fff0ea]";
+  }
+
+  if (isIssueState(value.state)) {
     return "bg-[#fff7ed]";
   }
 
   return "bg-white/30";
 }
 
-function valueClass(state: ViewerInspectionValueState) {
-  if (isIssueState(state)) {
+function valueClass(value: ViewerInspectionValue) {
+  if (value.validation?.result === "ok") {
+    return "text-[#1e6b45]";
+  }
+
+  if (value.validation?.result === "warn") {
+    return "text-[#7d4414]";
+  }
+
+  if (value.validation?.result === "error") {
+    return "text-[#8a3e1f]";
+  }
+
+  if (isIssueState(value.state)) {
     return "text-[#7d4414]";
   }
 
   return "text-[color:var(--foreground)]";
 }
 
-function badgeClass(state: ViewerInspectionValueState) {
-  if (isIssueState(state)) {
+function badgeClass(value: ViewerInspectionValue) {
+  if (value.validation?.result === "ok") {
+    return "border-[#8cc3a3] bg-[#edf7f1] text-[#1e6b45]";
+  }
+
+  if (value.validation?.result === "warn") {
+    return "border-[#d8af80] bg-[#fff1df] text-[#915217]";
+  }
+
+  if (value.validation?.result === "error") {
+    return "border-[#d3a08e] bg-[#fff0ea] text-[#8a3e1f]";
+  }
+
+  if (isIssueState(value.state)) {
     return "border-[#d8af80] bg-[#fff1df] text-[#915217]";
   }
 
@@ -60,22 +113,24 @@ function InspectionValueRow({
   label: string;
   value: ViewerInspectionValue;
 }) {
-  const badge = issueLabel(value.state);
+  const badge = validationLabel(value.validation) ?? issueLabel(value.state);
 
   return (
     <div
-      className={`grid gap-1.5 px-2.5 py-1.5 md:grid-cols-[minmax(0,9rem)_minmax(0,1fr)_auto] md:items-start ${rowClass(value.state)}`}
+      className={`grid gap-1.5 px-2.5 py-1.5 md:grid-cols-[minmax(0,9rem)_minmax(0,1fr)] md:items-start md:gap-x-3 ${rowClass(value)}`}
     >
-      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-ink)]">
+      <div className="min-w-0 break-words text-xs font-semibold uppercase tracking-[0.16em] [overflow-wrap:anywhere] text-[color:var(--muted-ink)]">
         {label}
       </div>
-      <div className={`min-w-0 break-words text-sm leading-6 ${valueClass(value.state)}`}>
-        {value.text}
-      </div>
-      <div className="flex justify-start md:justify-end">
+      <div className="flex min-w-0 flex-wrap items-start gap-2 md:flex-nowrap md:justify-between">
+        <div
+          className={`min-w-0 flex-1 break-words text-sm leading-6 [overflow-wrap:anywhere] ${valueClass(value)}`}
+        >
+          {value.text}
+        </div>
         {badge ? (
           <span
-            className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${badgeClass(value.state)}`}
+            className={`inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${badgeClass(value)}`}
           >
             {badge}
           </span>
@@ -161,6 +216,32 @@ function UnavailableState({ selection }: { selection: ViewerSelection }) {
   );
 }
 
+function ValidationSummaryBanner({ summary }: { summary: ViewerValidationSummary | null }) {
+  if (!summary) {
+    return null;
+  }
+
+  const tone =
+    summary.result === "error"
+      ? "border-[#d3a08e] bg-[#fff0ea] text-[#8a3e1f]"
+      : summary.result === "warn"
+        ? "border-[#d8af80] bg-[#fff7ed] text-[#915217]"
+        : "border-[#8cc3a3] bg-[#edf7f1] text-[#1e6b45]";
+
+  return (
+    <section className={`rounded-xl border px-3 py-3 ${tone}`}>
+      <div className="text-xs font-semibold uppercase tracking-[0.18em]">Rule Summary</div>
+      <div className="mt-2 text-sm">
+        {summary.errorCount > 0 ? `${summary.errorCount} error` : "0 error"}
+        {" · "}
+        {summary.warnCount > 0 ? `${summary.warnCount} warn` : "0 warn"}
+        {" · "}
+        {summary.okCount > 0 ? `${summary.okCount} ok` : "0 ok"}
+      </div>
+    </section>
+  );
+}
+
 function InspectionContent({ inspection }: { inspection: ViewerElementInspection }) {
   return (
     <div className="space-y-4">
@@ -174,11 +255,11 @@ function InspectionContent({ inspection }: { inspection: ViewerElementInspection
           </div>
         </div>
 
+        <ValidationSummaryBanner summary={inspection.validationSummary} />
+
         <div className="overflow-hidden rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)]">
           <div className="divide-y divide-[color:var(--viewer-border)]">
-            <InspectionValueRow label="IFC Class" value={inspection.ifcType} />
-            <InspectionValueRow label="GlobalId" value={inspection.globalId} />
-            {inspection.coreAttributes.map((row) => (
+            {inspection.summaryRows.map((row) => (
               <InspectionRowView key={row.key} row={row} />
             ))}
           </div>

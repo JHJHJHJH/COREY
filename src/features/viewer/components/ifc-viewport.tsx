@@ -25,6 +25,7 @@ import { LocalFileModelSource } from "@/features/viewer/lib/model-source";
 import type {
   ModelMetadata,
   ViewerDataTableState,
+  ViewerValidationHighlights,
   ViewerSelectionDetails,
   ViewerSessionState,
   ViewerStatus,
@@ -36,6 +37,7 @@ type IfcViewportProps = {
   embedded?: boolean;
   status: ViewerStatus;
   activeTool: ViewerTool;
+  validationHighlights: ViewerValidationHighlights;
   onStatusChange: (status: ViewerStatus) => void;
   onSessionChange: (session: ViewerSessionState) => void;
   onModelLoaded: (input: {
@@ -64,6 +66,18 @@ type ViewerRuntime = {
 
 const source = new LocalFileModelSource();
 const fragmentsWorkerUrl = new URL("@thatopen/fragments/worker", import.meta.url);
+const validationWarnMaterial = {
+  color: new THREE.Color("#d29a2f"),
+  opacity: 1,
+  transparent: false,
+  renderedFaces: 0,
+} satisfies Omit<FRAGS.MaterialDefinition, "customId">;
+const validationErrorMaterial = {
+  color: new THREE.Color("#bb5a36"),
+  opacity: 1,
+  transparent: false,
+  renderedFaces: 0,
+} satisfies Omit<FRAGS.MaterialDefinition, "customId">;
 
 function toBox(boxes: THREE.Box3[]) {
   const aggregate = new THREE.Box3();
@@ -75,6 +89,12 @@ function toBox(boxes: THREE.Box3[]) {
 
 function hasRenderableBox(box: THREE.Box3) {
   return Number.isFinite(box.min.x) && Number.isFinite(box.max.x) && !box.isEmpty();
+}
+
+function toModelIdMap(highlights: ViewerValidationHighlights["warn"]) {
+  return Object.fromEntries(
+    Object.entries(highlights).map(([modelId, ids]) => [modelId, new Set(ids)]),
+  );
 }
 
 const selectionDetailsDataConfig = {
@@ -91,6 +111,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
     embedded = false,
     status,
     activeTool,
+    validationHighlights,
     onDataTableChange,
     onModelLoaded,
     onSelectionDetailsChange,
@@ -262,6 +283,30 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
     runtime.clipper.enabled = activeTool === "section";
     syncSession(runtime.model ? getPrimarySelection(runtime.highlighter.selection.select, runtime.labels, runtime.categories) : null);
   }, [activeTool]);
+
+  useEffect(() => {
+    const runtime = runtimeRef.current;
+    if (!runtime) {
+      return;
+    }
+
+    void (async () => {
+      await runtime.highlighter.clear("validation-warn");
+      await runtime.highlighter.clear("validation-error");
+
+      if (runtime.model) {
+        const warnMap = toModelIdMap(validationHighlights.warn);
+        if (!OBC.ModelIdMapUtils.isEmpty(warnMap)) {
+          await runtime.highlighter.highlightByID("validation-warn", warnMap, true, false);
+        }
+
+        const errorMap = toModelIdMap(validationHighlights.error);
+        if (!OBC.ModelIdMapUtils.isEmpty(errorMap)) {
+          await runtime.highlighter.highlightByID("validation-error", errorMap, true, false);
+        }
+      }
+    })();
+  }, [validationHighlights]);
 
   useImperativeHandle(ref, () => ({
     async loadIfc(file) {
@@ -766,6 +811,8 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
         },
       });
       highlighter.mouseMoveThreshold = 10;
+      highlighter.styles.set("validation-warn", validationWarnMaterial);
+      highlighter.styles.set("validation-error", validationErrorMaterial);
 
       highlighter.events.select.onHighlight.add((selectionMap) => {
         syncSelectionFromMap(selectionMap);
