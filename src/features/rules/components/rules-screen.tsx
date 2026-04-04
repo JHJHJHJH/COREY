@@ -77,7 +77,7 @@ function RuleCard({
   const numberRangeCheck = rule.check.kind === "numberRange" ? rule.check : null;
 
   return (
-    <section className="rounded-[1.5rem] border border-[color:var(--viewer-border)] bg-white/65 p-4 shadow-[0_12px_30px_rgba(57,42,22,0.08)]">
+    <section className="rounded-[1.5rem] border border-[color:var(--viewer-border)] bg-white/65 p-4 shadow-[0_12px_30px_rgba(10,48,128,0.08)]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <label>
@@ -300,7 +300,7 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
     const href = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = href;
-    anchor.download = "viewer-rules.json";
+    anchor.download = "corey-rules.json";
     anchor.click();
     URL.revokeObjectURL(href);
   };
@@ -328,11 +328,11 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
         mode === "modal" ? "h-full" : "min-h-[calc(100vh-5rem)]"
       }`}
     >
-      <div className="border-b border-[color:var(--viewer-border)] bg-[linear-gradient(135deg,rgba(243,236,224,0.98),rgba(230,221,206,0.9))] px-5 py-4">
+      <div className="border-b border-[color:var(--viewer-border)] bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(234,242,255,0.94))] px-5 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-ink)]">
-              Viewer Rules
+              COREY Rules
             </div>
             <h1 className="mt-1 text-xl font-semibold tracking-tight text-[color:var(--foreground)]">
               Validation rules workspace
@@ -346,7 +346,7 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
           <div className="flex items-center gap-2">
             {mode === "page" ? (
               <Link href="/" className={secondaryButtonClassName()}>
-                Open viewer
+                Open COREY
               </Link>
             ) : null}
             {mode === "modal" && onClose ? (

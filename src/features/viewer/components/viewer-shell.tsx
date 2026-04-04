@@ -1185,17 +1185,14 @@ export function ViewerShell() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[color:var(--background)] text-[color:var(--foreground)]">
-      <header className="w-full border-b border-[color:var(--viewer-border)] bg-[linear-gradient(135deg,rgba(243,236,224,0.98),rgba(230,221,206,0.92))] shadow-[var(--viewer-shadow)]">
+      <header className="w-full border-b border-[color:var(--viewer-border)] bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(234,242,255,0.94))] shadow-[var(--viewer-shadow)]">
         <div className="flex w-full flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-ink)]">
-                    BCA IFC Viewer
-                  </div>
                   <h1 className="mt-1 text-lg font-semibold tracking-tight text-[color:var(--foreground)] sm:text-xl">
-                    Local IFC review workspace
+                    COREY
                   </h1>
                 </div>
                 <div className="inline-flex min-w-0 items-center gap-2 rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/80 px-3 py-1.5 text-xs text-[color:var(--muted-ink)]">

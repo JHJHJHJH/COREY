@@ -747,16 +747,16 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       world.scene = new OBC.SimpleScene(components);
       world.scene.setup({
         directionalLight: {
-          color: new THREE.Color("#fff3dc"),
+          color: new THREE.Color("#ffffff"),
           intensity: 0.9,
           position: new THREE.Vector3(25, 50, 25),
         },
         ambientLight: {
           intensity: 0.8,
-          color: new THREE.Color("#f3efe5"),
+          color: new THREE.Color("#edf4ff"),
         },
       });
-      world.scene.three.background = new THREE.Color("#e8e0d2");
+      world.scene.three.background = new THREE.Color("#ffffff");
       world.renderer = new OBF.PostproductionRenderer(components, container);
       world.camera = new OBC.OrthoPerspectiveCamera(components);
       await world.camera.controls?.setLookAt(18, 16, 18, 0, 0, 0);
@@ -804,7 +804,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       highlighter.setup({
         world,
         selectMaterialDefinition: {
-          color: new THREE.Color("#0b6e4f"),
+          color: new THREE.Color("#0a5cff"),
           opacity: 1,
           transparent: false,
           renderedFaces: 0,
@@ -959,7 +959,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-[color:var(--viewport-overlay)]">
           <div className="max-w-md rounded-[1.75rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/95 px-6 py-5 text-center shadow-[var(--viewer-shadow)] backdrop-blur">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-              IFC Viewer
+              COREY
             </div>
             <div className="mt-3 text-lg font-semibold text-[color:var(--foreground)]">{status.message}</div>
             <div className="mt-2 text-sm text-[color:var(--muted-ink)]">

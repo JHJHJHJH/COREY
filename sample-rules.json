@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "rule-attribute-name-required",
+      "ifcType": "IFCWALL",
+      "target": {
+        "kind": "attribute",
+        "name": "Name"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "rule-property-reference-enum",
+      "ifcType": "IFCWALL",
+      "target": {
+        "kind": "property",
+        "group": "Pset_WallCommon",
+        "label": "Reference"
+      },
+      "check": {
+        "kind": "enum",
+        "allowedValues": [
+          "WALL-A",
+          "WALL-B",
+          "WALL-C"
+        ]
+      },
+      "failSeverity": "warn"
+    }
+  ]
+}

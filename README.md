@@ -1,4 +1,4 @@
-# BCA IFC Viewer
+# COREY
 
 Browser-based IFC viewer built with `Next.js`, `@thatopen/components`, and `@thatopen/components-front`.
 
