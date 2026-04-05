@@ -106,6 +106,14 @@ function readAttributeText(data: ItemData, key: string) {
   return typeof value === "string" ? value : null;
 }
 
+function readIfcCategory(data: ItemData) {
+  return readAttributeText(data, "_category") ?? readAttributeText(data, "type");
+}
+
+function hasIfcCategory(data: ItemData) {
+  return hasAttribute(data, "_category") || hasAttribute(data, "type");
+}
+
 function readFirstText(data: ItemData, keys: string[]) {
   for (const key of keys) {
     const value = readAttributeText(data, key);
@@ -218,9 +226,7 @@ function combineInspectionValues(
   const state =
     entries.find(([, entry]) => entry.state !== "present")?.[1].state ?? ("present" satisfies ViewerInspectionValueState);
 
-  const text = entries
-    .map(([label, entry]) => `${humanizeKey(label)}: ${entry.text}`)
-    .join(" | ");
+  const text = entries.map(([label, entry]) => `${label}: ${entry.text}`).join(" | ");
 
   return {
     raw,
@@ -305,7 +311,7 @@ function extractPropertyValue(item: ItemData) {
 }
 
 function isPropertyContainer(item: ItemData) {
-  const type = readAttributeText(item, "type")?.toUpperCase();
+  const type = readIfcCategory(item)?.toUpperCase();
   return (
     readRelation(item, "HasProperties").length > 0 ||
     readRelation(item, "Quantities").length > 0 ||
@@ -388,7 +394,7 @@ function buildPropertyGroups(data: ItemData) {
 
       const title =
         readFirstText(definition, ["Name", "LongName"]) ??
-        readAttributeText(definition, "type") ??
+        readIfcCategory(definition) ??
         "Unnamed Property Set";
       const rows = [
         ...readRelation(definition, "HasProperties").flatMap((entry, index) =>
@@ -405,7 +411,7 @@ function buildPropertyGroups(data: ItemData) {
       groups.push({
         key: `${title}:${groups.length}`,
         title,
-        subtitle: readAttributeText(definition, "type"),
+        subtitle: readIfcCategory(definition),
         rows: rows.map((row) => ({
           ...row,
           target: {
@@ -434,9 +440,9 @@ export function buildSelectionInspection(
   const summaryRows = [
     buildRow(
       "type",
-      "IFC Class",
-      hasAttribute(data, "type"),
-      readAttribute(data, "type"),
+      "type",
+      hasIfcCategory(data),
+      readIfcCategory(data),
       "Missing IFC type",
       { kind: "attribute", name: "type" },
     ),
@@ -466,7 +472,7 @@ export function buildSelectionInspection(
     ),
     buildRow(
       "ObjectType",
-      "Object Type",
+      "ObjectType",
       hasAttribute(data, "ObjectType"),
       readAttribute(data, "ObjectType"),
       "Missing object type",
@@ -561,6 +567,7 @@ function buildViewerDataTableRow(
   localId: number,
   data: ItemData,
   columnMap: Map<string, ViewerDataTableColumn>,
+  fallbackIfcType: string | null,
 ): ViewerDataTableRow {
   const cells: Record<string, ViewerDataTableCell> = {};
 
@@ -569,10 +576,13 @@ function buildViewerDataTableRow(
   }
 
   cells.ifcType = buildViewerDataTableCell(
-    hasAttribute(data, "type"),
-    readAttribute(data, "type"),
+    hasIfcCategory(data),
+    readIfcCategory(data),
     "Missing",
   );
+  if (cells.ifcType.state !== "present" && fallbackIfcType) {
+    cells.ifcType = buildViewerDataTableCell(true, fallbackIfcType, "Missing");
+  }
   cells.globalId = buildViewerDataTableCell(
     hasAttribute(data, "GlobalId"),
     readAttribute(data, "GlobalId"),
@@ -758,6 +768,7 @@ export async function buildViewerDataTable(
     getItemsIdsWithGeometry?: () => Promise<number[]>;
     getSpatialStructure?: () => Promise<SpatialTreeItem>;
     getLocalIds?: () => Promise<number[]>;
+    getItemsCategories?: (ids: number[]) => (string | null)[];
     getItemsData: (ids: number[], config?: Partial<ItemsDataConfig>) => Promise<ItemData[]>;
   },
   options?: {
@@ -824,6 +835,7 @@ export async function buildViewerDataTable(
   for (let index = 0; index < orderedIds.length; index += chunkSize) {
     const chunkIds = orderedIds.slice(index, index + chunkSize);
     const items = await model.getItemsData(chunkIds, viewerDataTableDataConfig);
+    const categories = model.getItemsCategories?.(chunkIds) ?? [];
 
     for (const [chunkIndex, localId] of chunkIds.entries()) {
       const item = items[chunkIndex];
@@ -831,7 +843,15 @@ export async function buildViewerDataTable(
         continue;
       }
 
-      rows.push(buildViewerDataTableRow(model.modelId, localId, item, columnMap));
+      rows.push(
+        buildViewerDataTableRow(
+          model.modelId,
+          localId,
+          item,
+          columnMap,
+          categories[chunkIndex] ?? null,
+        ),
+      );
     }
 
     options?.onProgress?.({

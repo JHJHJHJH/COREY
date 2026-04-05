@@ -940,7 +940,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
 
   return (
     <div
-      className={`relative h-full min-h-0 overflow-hidden bg-[radial-gradient(circle_at_top,#f6f1e8,transparent_40%),linear-gradient(180deg,#d8c8b0_0%,#c6b49a_100%)] ${
+      className={`relative h-full min-h-0 overflow-hidden bg-[radial-gradient(circle_at_top,rgba(10,92,255,0.16),transparent_42%),linear-gradient(180deg,#f7faff_0%,#dfeaff_100%)] ${
         embedded
           ? ""
           : "rounded-[2rem] border border-[color:var(--viewer-border)] shadow-[var(--viewer-shadow)]"

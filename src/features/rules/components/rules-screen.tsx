@@ -18,6 +18,23 @@ type RulesScreenProps = {
   onClose?: () => void;
 };
 
+const STARTER_TEMPLATES = [
+  {
+    id: "testmodel-simple",
+    name: "Testmodel Simple",
+    description: "2 slab checks for GlobalId and SGPset_Slab > ReferTo2DDetail to force demo highlights.",
+    href: "/resources/testmodel-rules-simple.json",
+    ruleCount: 2,
+  },
+  {
+    id: "testmodel-comprehensive",
+    name: "Testmodel Comprehensive",
+    description: "67 mixed-severity rules for IfcSlab, IfcColumn, and IfcBeam with broad expected highlights.",
+    href: "/resources/testmodel-rules-comprehensive.json",
+    ruleCount: 67,
+  },
+] as const;
+
 function inputClassName() {
   return "w-full rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 py-2.5 text-sm text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent)]";
 }
@@ -292,6 +309,7 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { config, addRule, removeRule, replaceConfig, updateRule } = useViewerRules();
   const [importError, setImportError] = useState<string | null>(null);
+  const [loadingTemplateId, setLoadingTemplateId] = useState<string | null>(null);
 
   const handleExport = () => {
     const blob = new Blob([serializeViewerValidationConfig(config)], {
@@ -319,6 +337,30 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
       setImportError(error instanceof Error ? error.message : "Rules JSON could not be imported.");
     } finally {
       event.target.value = "";
+    }
+  };
+
+  const handleLoadStarterTemplate = async (template: (typeof STARTER_TEMPLATES)[number]) => {
+    try {
+      setLoadingTemplateId(template.id);
+
+      const response = await fetch(template.href, {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Starter template could not be loaded (${response.status}).`);
+      }
+
+      const importedConfig = parseViewerValidationConfigText(await response.text());
+      replaceConfig(importedConfig);
+      setImportError(null);
+    } catch (error) {
+      setImportError(
+        error instanceof Error ? error.message : "Starter template could not be loaded.",
+      );
+    } finally {
+      setLoadingTemplateId(null);
     }
   };
 
@@ -403,6 +445,55 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
             {importError}
           </div>
         ) : null}
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {STARTER_TEMPLATES.map((template) => {
+            const isLoading = loadingTemplateId === template.id;
+
+            return (
+              <section
+                key={template.id}
+                className="rounded-[1.5rem] border border-[color:var(--viewer-border)] bg-white/55 px-4 py-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-ink)]">
+                      Starter Template
+                    </div>
+                    <h2 className="mt-1 text-base font-semibold text-[color:var(--foreground)]">
+                      {template.name}
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 text-[color:var(--muted-ink)]">
+                      {template.description}
+                    </p>
+                  </div>
+
+                  <span className="shrink-0 rounded-full border border-[color:var(--viewer-border)] bg-white/75 px-3 py-1 text-xs font-medium text-[color:var(--muted-ink)]">
+                    {template.ruleCount} rules
+                  </span>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleLoadStarterTemplate(template)}
+                    disabled={loadingTemplateId !== null}
+                    className={`${secondaryButtonClassName()} disabled:cursor-wait disabled:opacity-60`}
+                  >
+                    {isLoading ? "Loading..." : "Load template"}
+                  </button>
+                  <a
+                    href={template.href}
+                    download
+                    className={secondaryButtonClassName()}
+                  >
+                    Download JSON
+                  </a>
+                </div>
+              </section>
+            );
+          })}
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">

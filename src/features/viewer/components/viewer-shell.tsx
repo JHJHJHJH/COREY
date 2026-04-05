@@ -181,6 +181,16 @@ function validationPhaseTone(phase: ViewerValidationState["phase"]) {
   }
 }
 
+function summarizeIfcTypes(ifcTypes: string[], max = 6) {
+  if (ifcTypes.length === 0) {
+    return "none";
+  }
+
+  const visible = ifcTypes.slice(0, max);
+  const suffix = ifcTypes.length > max ? ` (+${ifcTypes.length - max} more)` : "";
+  return `${visible.join(", ")}${suffix}`;
+}
+
 function UploadIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
@@ -396,10 +406,15 @@ export function ViewerShell() {
   const viewportRef = useRef<ViewerViewportHandle | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
+  const treeDrawerRef = useRef<HTMLDivElement | null>(null);
+  const propertiesDrawerRef = useRef<HTMLDivElement | null>(null);
   const dataTableDialogRef = useRef<HTMLDivElement | null>(null);
   const validationWorkerRef = useRef<Worker | null>(null);
   const validationAbortControllerRef = useRef<AbortController | null>(null);
   const validationRunIdRef = useRef(0);
+  const drawerDragStateRef = useRef<DrawerDragState | null>(null);
+  const pendingDrawerWidthRef = useRef<{ side: DrawerSide; width: number } | null>(null);
+  const drawerAnimationFrameRef = useRef<number | null>(null);
   const dataTableDialogLayoutRef = useRef<DataTableDialogLayout>({
     x: DATA_TABLE_DIALOG_MARGIN,
     y: DATA_TABLE_DIALOG_MARGIN,
@@ -428,7 +443,7 @@ export function ViewerShell() {
   );
   const [showTree, setShowTree] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
-  const [showDataTable, setShowDataTable] = useState(true);
+  const [showDataTable, setShowDataTable] = useState(false);
   const [treeDrawerWidth, setTreeDrawerWidth] = useState(DEFAULT_TREE_DRAWER_WIDTH);
   const [propertiesDrawerWidth, setPropertiesDrawerWidth] = useState(
     DEFAULT_PROPERTIES_DRAWER_WIDTH,
@@ -460,6 +475,17 @@ export function ViewerShell() {
       ),
     [compiledValidationRules],
   );
+  const runnableRuleIfcTypes = useMemo(
+    () =>
+      [...compiledValidationRules.keys()].sort((left, right) =>
+        left.localeCompare(right, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        }),
+      ),
+    [compiledValidationRules],
+  );
+  const indexedIfcTypes = useMemo(() => dataTableState.data?.ifcTypes ?? [], [dataTableState.data]);
   const validatedSelectionDetails = useMemo<ViewerSelectionDetails>(
     () => ({
       ...selectionDetails,
@@ -494,6 +520,46 @@ export function ViewerShell() {
   const stopValidationRequest = useCallback(() => {
     validationAbortControllerRef.current?.abort();
     validationAbortControllerRef.current = null;
+  }, []);
+
+  const applyDrawerWidth = useCallback((side: DrawerSide, width: number) => {
+    const drawer = side === "left" ? treeDrawerRef.current : propertiesDrawerRef.current;
+    if (!drawer) {
+      return;
+    }
+
+    drawer.style.width = `${width}px`;
+  }, []);
+
+  const flushPendingDrawerPreview = useCallback(() => {
+    drawerAnimationFrameRef.current = null;
+
+    const pendingWidth = pendingDrawerWidthRef.current;
+    if (!pendingWidth) {
+      return;
+    }
+
+    applyDrawerWidth(pendingWidth.side, pendingWidth.width);
+  }, [applyDrawerWidth]);
+
+  const scheduleDrawerPreview = useCallback(
+    (side: DrawerSide, width: number) => {
+      pendingDrawerWidthRef.current = { side, width };
+
+      if (drawerAnimationFrameRef.current !== null) {
+        return;
+      }
+
+      drawerAnimationFrameRef.current = window.requestAnimationFrame(flushPendingDrawerPreview);
+    },
+    [flushPendingDrawerPreview],
+  );
+
+  const stopPendingDrawerPreview = useCallback(() => {
+    if (drawerAnimationFrameRef.current !== null) {
+      window.cancelAnimationFrame(drawerAnimationFrameRef.current);
+      drawerAnimationFrameRef.current = null;
+    }
   }, []);
 
   const applyCommittedDataTableDialogLayout = useCallback((layout: DataTableDialogLayout) => {
@@ -620,10 +686,24 @@ export function ViewerShell() {
   }, [clampDrawerWidth, showProperties, showTree]);
 
   const stopDrawerResize = useCallback(() => {
+    stopPendingDrawerPreview();
+    drawerDragStateRef.current = null;
     setDrawerDragState(null);
+
+    const pendingWidth = pendingDrawerWidthRef.current;
+    pendingDrawerWidthRef.current = null;
+    if (pendingWidth) {
+      applyDrawerWidth(pendingWidth.side, pendingWidth.width);
+      if (pendingWidth.side === "left") {
+        setTreeDrawerWidth(pendingWidth.width);
+      } else {
+        setPropertiesDrawerWidth(pendingWidth.width);
+      }
+    }
+
     document.body.style.removeProperty("cursor");
     document.body.style.removeProperty("user-select");
-  }, []);
+  }, [applyDrawerWidth, stopPendingDrawerPreview]);
 
   const stopDataTableDialogMove = useCallback(() => {
     stopPendingDataTableDialogPreview();
@@ -652,18 +732,19 @@ export function ViewerShell() {
   }, [stopPendingDataTableDialogPreview]);
 
   const updateDraggedDrawerWidth = useCallback((clientX: number) => {
-    if (!drawerDragState) {
+    const dragState = drawerDragStateRef.current;
+    if (!dragState) {
       return;
     }
 
-    const delta = clientX - drawerDragState.startX;
-    if (drawerDragState.side === "left") {
-      setTreeDrawerWidth(clampDrawerWidth("left", drawerDragState.startWidth + delta));
-      return;
-    }
+    const delta = clientX - dragState.startX;
+    const nextWidth =
+      dragState.side === "left"
+        ? clampDrawerWidth("left", dragState.startWidth + delta)
+        : clampDrawerWidth("right", dragState.startWidth - delta);
 
-    setPropertiesDrawerWidth(clampDrawerWidth("right", drawerDragState.startWidth - delta));
-  }, [clampDrawerWidth, drawerDragState]);
+    scheduleDrawerPreview(dragState.side, nextWidth);
+  }, [clampDrawerWidth, scheduleDrawerPreview]);
 
   const updateDraggedDataTableDialogPosition = useCallback((clientX: number, clientY: number) => {
     if (!dataTableDialogMoveState) {
@@ -742,6 +823,20 @@ export function ViewerShell() {
       document.body.style.removeProperty("user-select");
     };
   }, [drawerDragState, stopDrawerResize, updateDraggedDrawerWidth]);
+
+  useEffect(() => {
+    applyDrawerWidth("left", treeDrawerWidth);
+  }, [applyDrawerWidth, treeDrawerWidth]);
+
+  useEffect(() => {
+    applyDrawerWidth("right", propertiesDrawerWidth);
+  }, [applyDrawerWidth, propertiesDrawerWidth]);
+
+  useEffect(() => {
+    return () => {
+      stopPendingDrawerPreview();
+    };
+  }, [stopPendingDrawerPreview]);
 
   useEffect(() => {
     if (!showDataTable) {
@@ -915,7 +1010,9 @@ export function ViewerShell() {
           mode: null,
           progress: 100,
           issueCount: 0,
-          message: "No indexed elements match the current rule IFC types.",
+          message: `No indexed elements match the current rule IFC types. Rules: ${summarizeIfcTypes(
+            runnableRuleIfcTypes,
+          )}. Indexed: ${summarizeIfcTypes(indexedIfcTypes)}.`,
         });
       });
       return;
@@ -1085,10 +1182,12 @@ export function ViewerShell() {
     deferredRules.length,
     metadata,
     runnableRuleCount,
+    runnableRuleIfcTypes,
     status.phase,
     stopValidationRequest,
     stopValidationWorker,
     validationPayload,
+    indexedIfcTypes,
   ]);
 
   const openFilePicker = () => {
@@ -1140,11 +1239,18 @@ export function ViewerShell() {
   const startDrawerResize = (side: DrawerSide) => (event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
 
-    setDrawerDragState({
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    const nextDragState = {
       side,
       startX: event.clientX,
       startWidth: side === "left" ? treeDrawerWidth : propertiesDrawerWidth,
-    });
+    } satisfies DrawerDragState;
+
+    drawerDragStateRef.current = nextDragState;
+    pendingDrawerWidthRef.current = { side, width: nextDragState.startWidth };
+    applyDrawerWidth(side, nextDragState.startWidth);
+    setDrawerDragState(nextDragState);
   };
 
   const startDataTableDialogMove = (event: React.PointerEvent<HTMLElement>) => {
@@ -1342,6 +1448,7 @@ export function ViewerShell() {
 
               {showTree ? (
                 <div
+                  ref={treeDrawerRef}
                   className="hidden min-h-0 shrink-0 lg:block"
                   style={{ width: `${treeDrawerWidth}px` }}
                 >
@@ -1459,6 +1566,7 @@ export function ViewerShell() {
 
               {showProperties ? (
                 <div
+                  ref={propertiesDrawerRef}
                   className="hidden min-h-0 shrink-0 lg:block"
                   style={{ width: `${propertiesDrawerWidth}px` }}
                 >

@@ -119,7 +119,7 @@ function InspectionValueRow({
     <div
       className={`grid gap-1.5 px-2.5 py-1.5 md:grid-cols-[minmax(0,9rem)_minmax(0,1fr)] md:items-start md:gap-x-3 ${rowClass(value)}`}
     >
-      <div className="min-w-0 break-words text-xs font-semibold uppercase tracking-[0.16em] [overflow-wrap:anywhere] text-[color:var(--muted-ink)]">
+      <div className="min-w-0 break-words text-xs font-semibold tracking-[0.08em] [overflow-wrap:anywhere] text-[color:var(--muted-ink)]">
         {label}
       </div>
       <div className="flex min-w-0 flex-wrap items-start gap-2 md:flex-nowrap md:justify-between">
@@ -152,7 +152,7 @@ function PropertySetGroup({ group }: { group: ViewerInspectionGroup }) {
           {group.title}
         </h3>
         {group.subtitle ? (
-          <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[color:var(--muted-ink)]">
+          <div className="mt-1 text-[11px] tracking-[0.08em] text-[color:var(--muted-ink)]">
             {group.subtitle}
           </div>
         ) : null}

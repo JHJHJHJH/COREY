@@ -23,8 +23,10 @@ type ModelTreePanelProps = {
 type TreeNodeRowProps = {
   node: ViewerTreeNode;
   selection: ViewerSelection | null;
+  selectedPathKeys: Set<string>;
   expandedKeys: Set<string>;
   forceExpanded: boolean;
+  registerRowButton: (localId: number | null, element: HTMLButtonElement | null) => void;
   onToggle: (key: string) => void;
   onSelectNode: (localId: number) => void;
 };
@@ -77,6 +79,54 @@ function SearchIcon({ className }: { className?: string }) {
   );
 }
 
+function HideIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M4 12s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="m4 4 16 16" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IsolateIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      className={className}
+      aria-hidden="true"
+    >
+      <rect x="4.5" y="4.5" width="15" height="15" rx="2.5" />
+      <rect x="9" y="9" width="6" height="6" rx="1.25" />
+    </svg>
+  );
+}
+
+function ArrowUpIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="m12 18 0-12" strokeLinecap="round" />
+      <path d="m7 11 5-5 5 5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function collectExpandableKeys(nodes: ViewerTreeNode[]) {
   const keys = new Set<string>();
 
@@ -96,11 +146,49 @@ function collectExpandableKeys(nodes: ViewerTreeNode[]) {
   return keys;
 }
 
+function collectSelectedPathKeys(
+  nodes: ViewerTreeNode[],
+  selectedLocalId: number | null | undefined,
+) {
+  if (selectedLocalId === null || selectedLocalId === undefined) {
+    return new Set<string>();
+  }
+
+  const path: string[] = [];
+
+  const visit = (node: ViewerTreeNode) => {
+    path.push(node.key);
+
+    if (node.localId === selectedLocalId) {
+      return true;
+    }
+
+    for (const child of node.children) {
+      if (visit(child)) {
+        return true;
+      }
+    }
+
+    path.pop();
+    return false;
+  };
+
+  for (const node of nodes) {
+    if (visit(node)) {
+      return new Set(path);
+    }
+  }
+
+  return new Set<string>();
+}
+
 function TreeNodeRow({
   node,
   selection,
+  selectedPathKeys,
   expandedKeys,
   forceExpanded,
+  registerRowButton,
   onToggle,
   onSelectNode,
 }: TreeNodeRowProps) {
@@ -131,6 +219,7 @@ function TreeNodeRow({
           {hasChildren ? <ChevronIcon expanded={showChildren} /> : <span className="text-[11px]">•</span>}
         </button>
         <button
+          ref={(element) => registerRowButton(node.localId, element)}
           type="button"
           disabled={node.localId === null}
           onClick={() => node.localId !== null && onSelectNode(node.localId)}
@@ -146,21 +235,40 @@ function TreeNodeRow({
       </div>
 
       {showChildren
-        ? node.children.map((child) => (
-            <div
-              key={child.key}
-              className="ml-2 border-l border-[color:var(--viewer-border)]/80 pl-2"
-            >
-              <TreeNodeRow
-                node={child}
-                selection={selection}
-                expandedKeys={expandedKeys}
-                forceExpanded={forceExpanded}
-                onToggle={onToggle}
-                onSelectNode={onSelectNode}
-              />
-            </div>
-          ))
+        ? node.children.map((child) => {
+            const branchActive = selectedPathKeys.has(child.key);
+
+            return (
+              <div key={child.key} className="group/tree-branch relative pl-3.5">
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none absolute bottom-0 left-1.5 top-0 border-l border-dotted transition-colors ${
+                    branchActive
+                      ? "border-[color:var(--accent)]"
+                      : "border-[color:var(--viewer-border)]/70 group-hover/tree-branch:border-[color:var(--accent)]"
+                  }`}
+                />
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none absolute left-1.5 top-4 w-2.5 border-t border-dotted transition-colors ${
+                    branchActive
+                      ? "border-[color:var(--accent)]"
+                      : "border-[color:var(--viewer-border)]/70 group-hover/tree-branch:border-[color:var(--accent)]"
+                  }`}
+                />
+                <TreeNodeRow
+                  node={child}
+                  selection={selection}
+                  selectedPathKeys={selectedPathKeys}
+                  expandedKeys={expandedKeys}
+                  forceExpanded={forceExpanded}
+                  registerRowButton={registerRowButton}
+                  onToggle={onToggle}
+                  onSelectNode={onSelectNode}
+                />
+              </div>
+            );
+          })
         : null}
     </div>
   );
@@ -184,6 +292,9 @@ export function ModelTreePanel({
   const deferredQuery = useDeferredValue(query);
   const filterMenuRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const treeScrollRef = useRef<HTMLDivElement | null>(null);
+  const rowButtonRefs = useRef(new Map<number, HTMLButtonElement>());
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   useEffect(() => {
     setExpandedKeys(collectExpandableKeys(nodes));
@@ -247,12 +358,16 @@ export function ModelTreePanel({
     () => filterTree(nodes, deferredQuery, selectedCategories),
     [deferredQuery, nodes, selectedCategories],
   );
+  const selectedPathKeys = useMemo(
+    () => collectSelectedPathKeys(filteredNodes, selection?.localId),
+    [filteredNodes, selection?.localId],
+  );
   const effectiveExpandedKeys = useMemo(
     () =>
       deferredQuery.trim() || hasActiveCategoryFilter
         ? collectExpandableKeys(filteredNodes)
-        : expandedKeys,
-    [deferredQuery, expandedKeys, filteredNodes, hasActiveCategoryFilter],
+        : new Set([...expandedKeys, ...selectedPathKeys]),
+    [deferredQuery, expandedKeys, filteredNodes, hasActiveCategoryFilter, selectedPathKeys],
   );
 
   const stats = useMemo(
@@ -308,9 +423,61 @@ export function ModelTreePanel({
     }
   };
 
+  const registerRowButton = (localId: number | null, element: HTMLButtonElement | null) => {
+    if (localId === null) {
+      return;
+    }
+
+    if (element) {
+      rowButtonRefs.current.set(localId, element);
+      return;
+    }
+
+    rowButtonRefs.current.delete(localId);
+  };
+
+  const syncScrollTopVisibility = () => {
+    const scrolled = (treeScrollRef.current?.scrollTop ?? 0) > 160;
+    setShowScrollTop((current) => (current === scrolled ? current : scrolled));
+  };
+
+  const scrollTreeToTop = () => {
+    treeScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    syncScrollTopVisibility();
+  }, [filteredNodes]);
+
+  useEffect(() => {
+    if (selection?.localId === null || selection?.localId === undefined) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const frame = window.requestAnimationFrame(() => {
+      if (cancelled) {
+        return;
+      }
+
+      const rowButton = rowButtonRefs.current.get(selection.localId);
+      if (!rowButton || rowButton.getClientRects().length === 0) {
+        return;
+      }
+
+      rowButton.scrollIntoView({ block: "nearest" });
+      rowButton.focus({ preventScroll: true });
+    });
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+    };
+  }, [effectiveExpandedKeys, filteredNodes, selection?.localId]);
+
   return (
     <aside
-      className={`flex h-full min-h-0 flex-col overflow-hidden ${
+      className={`relative flex h-full min-h-0 flex-col overflow-hidden ${
         embedded
           ? "bg-[color:var(--panel-bg)]/92"
           : "rounded-[1.75rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] shadow-[var(--viewer-shadow)]"
@@ -360,7 +527,7 @@ export function ModelTreePanel({
               <SearchIcon className="h-4 w-4" />
             </button>
           )}
-          <div className="relative shrink-0" ref={filterMenuRef}>
+          <div className="relative ml-auto shrink-0" ref={filterMenuRef}>
             <button
               type="button"
               aria-label="Filter categories"
@@ -429,17 +596,21 @@ export function ModelTreePanel({
                           </span>
                           <button
                             type="button"
+                            aria-label={`Hide ${category.category}`}
+                            title={`Hide ${category.category}`}
                             onClick={() => onHideCategory(category.category)}
-                            className="rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
+                            className="flex h-7 w-7 items-center justify-center rounded-full text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
                           >
-                            Hide
+                            <HideIcon className="h-3.5 w-3.5" />
                           </button>
                           <button
                             type="button"
+                            aria-label={`Isolate ${category.category}`}
+                            title={`Isolate ${category.category}`}
                             onClick={() => onIsolateCategory(category.category)}
-                            className="rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
+                            className="flex h-7 w-7 items-center justify-center rounded-full text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
                           >
-                            Iso
+                            <IsolateIcon className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       );
@@ -452,7 +623,11 @@ export function ModelTreePanel({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+      <div
+        ref={treeScrollRef}
+        onScroll={() => syncScrollTopVisibility()}
+        className="min-h-0 flex-1 overflow-y-auto px-3 py-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+      >
         <section>
           <div className="mb-2 flex items-center justify-between gap-2">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
@@ -477,8 +652,10 @@ export function ModelTreePanel({
                   key={node.key}
                   node={node}
                   selection={selection}
+                  selectedPathKeys={selectedPathKeys}
                   expandedKeys={effectiveExpandedKeys}
                   forceExpanded={forceExpanded}
+                  registerRowButton={registerRowButton}
                   onToggle={toggleNode}
                   onSelectNode={onSelectNode}
                 />
@@ -487,6 +664,20 @@ export function ModelTreePanel({
           </div>
         </section>
       </div>
+
+      {showScrollTop ? (
+        <div className="pointer-events-none absolute bottom-3 right-3">
+          <button
+            type="button"
+            aria-label="Scroll tree to top"
+            title="Scroll tree to top"
+            onClick={scrollTreeToTop}
+            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/95 text-[color:var(--muted-ink)] shadow-[var(--viewer-shadow)] backdrop-blur transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
+          >
+            <ArrowUpIcon className="h-4 w-4" />
+          </button>
+        </div>
+      ) : null}
     </aside>
   );
 }

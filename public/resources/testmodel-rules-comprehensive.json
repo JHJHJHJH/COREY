@@ -1,0 +1,873 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "ifcslab-globalid-required",
+      "ifcType": "IfcSlab",
+      "target": {
+        "kind": "attribute",
+        "name": "GlobalId"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcslab-sgpset-slab-reinforcementsteelgrade-required",
+      "ifcType": "IfcSlab",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Slab",
+        "label": "ReinforcementSteelGrade"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcslab-sgpset-slab-constructionmethod-required",
+      "ifcType": "IfcSlab",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Slab",
+        "label": "ConstructionMethod"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcslab-sgpset-slab-loadbearing-required",
+      "ifcType": "IfcSlab",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Slab",
+        "label": "LoadBearing"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcslab-sgpset-slab-type-designator-required",
+      "ifcType": "IfcSlab",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Slab",
+        "label": "Type Designator"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcslab-sgpset-slab-slabtype-required",
+      "ifcType": "IfcSlab",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Slab",
+        "label": "SlabType"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcslab-sgpset-slab-referto2ddetail-required",
+      "ifcType": "IfcSlab",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Slab",
+        "label": "ReferTo2DDetail"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifcslab-sgpset-slab-accreditation-pas-required",
+      "ifcType": "IfcSlab",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Slab",
+        "label": "Accreditation_PAS"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifcslab-sgpset-slab-mechanicalconnectiontype-required",
+      "ifcType": "IfcSlab",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Slab",
+        "label": "MechanicalConnectionType"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifcslab-sgpset-slab-latticegirderreinforcement-required",
+      "ifcType": "IfcSlab",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Slab",
+        "label": "LatticeGirderReinforcement"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifcslab-sgpset-slab-barrierfreeaccessibility-required",
+      "ifcType": "IfcSlab",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Slab",
+        "label": "BarrierFreeAccessibility"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifcslab-sgpset-slabdimension-mark-required",
+      "ifcType": "IfcSlab",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_SlabDimension",
+        "label": "Mark"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcslab-sgpset-slabdimension-width-required",
+      "ifcType": "IfcSlab",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_SlabDimension",
+        "label": "Width"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcslab-sgpset-slabdimension-thickness-required",
+      "ifcType": "IfcSlab",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_SlabDimension",
+        "label": "Thickness"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcslab-sgpset-slabreinforcement-weldedmesh-required",
+      "ifcType": "IfcSlab",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_SlabReinforcement",
+        "label": "WeldedMesh"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifcslab-sgpset-slabreinforcement-bottomdistribution-nominal-required",
+      "ifcType": "IfcSlab",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_SlabReinforcement",
+        "label": "BottomDistribution_nominal"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifcslab-sgpset-slabreinforcement-bottommain-nominal-required",
+      "ifcType": "IfcSlab",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_SlabReinforcement",
+        "label": "BottomMain_nominal"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifcslab-sgpset-slabreinforcement-stirrups-required",
+      "ifcType": "IfcSlab",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_SlabReinforcement",
+        "label": "Stirrups"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifcslab-sgpset-slabreinforcement-stirrupstype-required",
+      "ifcType": "IfcSlab",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_SlabReinforcement",
+        "label": "StirrupsType"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifcslab-sgpset-slabreinforcement-topdistribution-nominal-required",
+      "ifcType": "IfcSlab",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_SlabReinforcement",
+        "label": "TopDistribution_nominal"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifcslab-sgpset-slabreinforcement-topmain-nominal-required",
+      "ifcType": "IfcSlab",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_SlabReinforcement",
+        "label": "TopMain_nominal"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifccolumn-globalid-required",
+      "ifcType": "IfcColumn",
+      "target": {
+        "kind": "attribute",
+        "name": "GlobalId"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifccolumn-sgpset-column-constructionmethod-required",
+      "ifcType": "IfcColumn",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Column",
+        "label": "ConstructionMethod"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifccolumn-sgpset-column-reinforcementsteelgrade-required",
+      "ifcType": "IfcColumn",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Column",
+        "label": "ReinforcementSteelGrade"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifccolumn-sgpset-column-referto2ddetail-required",
+      "ifcType": "IfcColumn",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Column",
+        "label": "ReferTo2DDetail"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifccolumn-sgpset-column-sectionfabricationmethod-required",
+      "ifcType": "IfcColumn",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Column",
+        "label": "SectionFabricationMethod"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifccolumn-sgpset-column-accreditation-pas-required",
+      "ifcType": "IfcColumn",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Column",
+        "label": "Accreditation_PAS"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifccolumn-sgpset-column-mechanicalconnectiontype-required",
+      "ifcType": "IfcColumn",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Column",
+        "label": "MechanicalConnectionType"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifccolumn-sgpset-columndimension-breadth-required",
+      "ifcType": "IfcColumn",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_ColumnDimension",
+        "label": "Breadth"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifccolumn-sgpset-columndimension-mark-required",
+      "ifcType": "IfcColumn",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_ColumnDimension",
+        "label": "Mark"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifccolumn-sgpset-columndimension-startingstorey-required",
+      "ifcType": "IfcColumn",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_ColumnDimension",
+        "label": "StartingStorey"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifccolumn-sgpset-columndimension-endstorey-required",
+      "ifcType": "IfcColumn",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_ColumnDimension",
+        "label": "EndStorey"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifccolumn-sgpset-columndimension-width-required",
+      "ifcType": "IfcColumn",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_ColumnDimension",
+        "label": "Width"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifccolumn-sgpset-columndimension-diameter-required",
+      "ifcType": "IfcColumn",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_ColumnDimension",
+        "label": "Diameter"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifccolumn-sgpset-columndimension-membersection-required",
+      "ifcType": "IfcColumn",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_ColumnDimension",
+        "label": "MemberSection"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifccolumn-sgpset-columnreinforcement-mainrebar-required",
+      "ifcType": "IfcColumn",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_ColumnReinforcement",
+        "label": "MainRebar"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifccolumn-sgpset-columnreinforcement-stirrups-required",
+      "ifcType": "IfcColumn",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_ColumnReinforcement",
+        "label": "Stirrups"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifccolumn-sgpset-columnreinforcement-stirrupstype-required",
+      "ifcType": "IfcColumn",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_ColumnReinforcement",
+        "label": "StirrupsType"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifccolumn-sgpset-columnreinforcement-columncage-required",
+      "ifcType": "IfcColumn",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_ColumnReinforcement",
+        "label": "ColumnCage"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifccolumn-sgpset-columnreinforcement-prefabricationreinforcementcage-required",
+      "ifcType": "IfcColumn",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_ColumnReinforcement",
+        "label": "PrefabricationReinforcementCage"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifcbeam-globalid-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "attribute",
+        "name": "GlobalId"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcbeam-sgpset-beam-beamspantype-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Beam",
+        "label": "BeamSpanType"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcbeam-sgpset-beam-constructionmethod-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Beam",
+        "label": "ConstructionMethod"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcbeam-sgpset-beam-reinforcementsteelgrade-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Beam",
+        "label": "ReinforcementSteelGrade"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcbeam-sgpset-beam-sectionfabricationmethod-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Beam",
+        "label": "SectionFabricationMethod"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcbeam-sgpset-beam-referto2ddetail-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Beam",
+        "label": "ReferTo2DDetail"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifcbeam-sgpset-beam-accreditation-pas-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Beam",
+        "label": "Accreditation_PAS"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifcbeam-sgpset-beam-mechanicalconnectiontype-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_Beam",
+        "label": "MechanicalConnectionType"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifcbeam-sgpset-beamdimension-depth-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_BeamDimension",
+        "label": "Depth"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcbeam-sgpset-beamdimension-mark-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_BeamDimension",
+        "label": "Mark"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcbeam-sgpset-beamdimension-width-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_BeamDimension",
+        "label": "Width"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcbeam-sgpset-beamdimension-membersection-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_BeamDimension",
+        "label": "MemberSection"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifcbeam-sgpset-beamreinforcement-bottomleft-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_BeamReinforcement",
+        "label": "BottomLeft"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcbeam-sgpset-beamreinforcement-bottommiddle-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_BeamReinforcement",
+        "label": "BottomMiddle"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcbeam-sgpset-beamreinforcement-bottomright-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_BeamReinforcement",
+        "label": "BottomRight"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcbeam-sgpset-beamreinforcement-stirrupsleft-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_BeamReinforcement",
+        "label": "StirrupsLeft"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcbeam-sgpset-beamreinforcement-stirrupsmiddle-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_BeamReinforcement",
+        "label": "StirrupsMiddle"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcbeam-sgpset-beamreinforcement-stirrupsright-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_BeamReinforcement",
+        "label": "StirrupsRight"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcbeam-sgpset-beamreinforcement-topleft-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_BeamReinforcement",
+        "label": "TopLeft"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcbeam-sgpset-beamreinforcement-topmiddle-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_BeamReinforcement",
+        "label": "TopMiddle"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcbeam-sgpset-beamreinforcement-topright-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_BeamReinforcement",
+        "label": "TopRight"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "error"
+    },
+    {
+      "id": "ifcbeam-sgpset-beamreinforcement-sidebar-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_BeamReinforcement",
+        "label": "SideBar"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifcbeam-sgpset-beamreinforcement-stirrupstypeleft-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_BeamReinforcement",
+        "label": "StirrupsTypeLeft"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifcbeam-sgpset-beamreinforcement-stirrupstypemiddle-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_BeamReinforcement",
+        "label": "StirrupsTypeMiddle"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifcbeam-sgpset-beamreinforcement-stirrupstyperight-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_BeamReinforcement",
+        "label": "StirrupsTypeRight"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifcbeam-sgpset-beamreinforcement-beamcage-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_BeamReinforcement",
+        "label": "BeamCage"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    },
+    {
+      "id": "ifcbeam-sgpset-beamreinforcement-prefabricationreinforcementcage-required",
+      "ifcType": "IfcBeam",
+      "target": {
+        "kind": "property",
+        "group": "SGPset_BeamReinforcement",
+        "label": "PrefabricationReinforcementCage"
+      },
+      "check": {
+        "kind": "empty"
+      },
+      "failSeverity": "warn"
+    }
+  ]
+}
