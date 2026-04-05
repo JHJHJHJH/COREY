@@ -301,7 +301,11 @@ export function PropertiesPanel({ embedded = false, details }: PropertiesPanelPr
           : "rounded-[1.75rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] shadow-[var(--viewer-shadow)]"
       }`}
     >
-      <div className="border-b border-[color:var(--viewer-border)] px-3 py-3">
+      <div
+        className={`border-b border-[color:var(--viewer-border)] px-3 py-3 ${
+          embedded ? "pl-12" : ""
+        }`}
+      >
         <h1 className="text-lg font-semibold text-[color:var(--foreground)]">Properties</h1>
       </div>
 

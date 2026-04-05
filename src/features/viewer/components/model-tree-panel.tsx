@@ -483,7 +483,11 @@ export function ModelTreePanel({
           : "rounded-[1.75rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] shadow-[var(--viewer-shadow)]"
       }`}
     >
-      <div className="border-b border-[color:var(--viewer-border)] px-3 py-3">
+      <div
+        className={`border-b border-[color:var(--viewer-border)] px-3 py-3 ${
+          embedded ? "pr-16" : ""
+        }`}
+      >
         <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
           Model Tree
         </div>
@@ -496,38 +500,7 @@ export function ModelTreePanel({
           <span>{stats.categoryCount} categories</span>
         </div>
         <div className="mt-3 flex items-start gap-1.5">
-          {showSearch || query ? (
-            <label className="relative min-w-0 flex-1">
-              <span className="sr-only">Search tree</span>
-              <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[color:var(--muted-ink)]" />
-              <input
-                ref={searchInputRef}
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                onBlur={collapseSearch}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") {
-                    if (query.trim().length === 0) {
-                      setShowSearch(false);
-                    }
-                    searchInputRef.current?.blur();
-                  }
-                }}
-                placeholder="Filter names or IFC classes"
-                className="w-full rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] py-2 pl-8 pr-3 text-[13px] text-[color:var(--foreground)] outline-none transition placeholder:text-[color:var(--muted-ink)] focus:border-[color:var(--accent)]"
-              />
-            </label>
-          ) : (
-            <button
-              type="button"
-              aria-label="Search tree"
-              onClick={() => setShowSearch(true)}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
-            >
-              <SearchIcon className="h-4 w-4" />
-            </button>
-          )}
-          <div className="relative ml-auto shrink-0" ref={filterMenuRef}>
+          <div className="relative shrink-0" ref={filterMenuRef}>
             <button
               type="button"
               aria-label="Filter categories"
@@ -548,7 +521,7 @@ export function ModelTreePanel({
             </button>
 
             {showCategoryFilter ? (
-              <div className="absolute right-0 top-full z-20 mt-1.5 w-[min(20rem,calc(100vw-2rem))] rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] p-2.5 shadow-[var(--viewer-shadow)]">
+              <div className="absolute left-0 top-full z-[70] mt-1.5 w-[min(20rem,calc(100vw-4rem))] rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] p-2.5 shadow-[var(--viewer-shadow)]">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
@@ -620,6 +593,37 @@ export function ModelTreePanel({
               </div>
             ) : null}
           </div>
+          {showSearch || query ? (
+            <label className="relative min-w-0 flex-1">
+              <span className="sr-only">Search tree</span>
+              <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[color:var(--muted-ink)]" />
+              <input
+                ref={searchInputRef}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onBlur={collapseSearch}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    if (query.trim().length === 0) {
+                      setShowSearch(false);
+                    }
+                    searchInputRef.current?.blur();
+                  }
+                }}
+                placeholder="Filter names or IFC classes"
+                className="w-full rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] py-2 pl-8 pr-3 text-[13px] text-[color:var(--foreground)] outline-none transition placeholder:text-[color:var(--muted-ink)] focus:border-[color:var(--accent)]"
+              />
+            </label>
+          ) : (
+            <button
+              type="button"
+              aria-label="Search tree"
+              onClick={() => setShowSearch(true)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
+            >
+              <SearchIcon className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 

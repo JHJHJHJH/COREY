@@ -63,7 +63,8 @@ const MIN_DRAWER_WIDTH = 240;
 const MIN_CONSTRAINED_DRAWER_WIDTH = 160;
 const MAX_DRAWER_WIDTH = 520;
 const MIN_VIEWPORT_WIDTH = 420;
-const DRAWER_HANDLE_WIDTH = 18;
+const DRAWER_HANDLE_WIDTH = 0;
+const COLLAPSED_DRAWER_WIDTH = 44;
 const DEFAULT_DATA_TABLE_DIALOG_WIDTH = 1120;
 const DEFAULT_DATA_TABLE_DIALOG_HEIGHT = 560;
 const MIN_DATA_TABLE_DIALOG_WIDTH = 420;
@@ -145,14 +146,6 @@ type ViewerValidationWorkerMessage =
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
-}
-
-function handleToggleGlyph(side: DrawerSide, collapsed: boolean) {
-  if (side === "left") {
-    return collapsed ? ">" : "<";
-  }
-
-  return collapsed ? "<" : ">";
 }
 
 function dataTablePhaseTone(phase: ViewerDataTableState["phase"]) {
@@ -376,28 +369,145 @@ function DrawerResizeHandle({
   onPointerDown?: (event: React.PointerEvent<HTMLDivElement>) => void;
   onToggle: () => void;
 }) {
+  const Icon = side === "left" ? PanelLeftIcon : PanelRightIcon;
+  const togglePositionClass = collapsed
+    ? side === "left"
+      ? "right-2"
+      : "left-2"
+    : side === "left"
+      ? "right-3"
+      : "left-3";
+
   return (
-    <div className="group relative z-10 hidden h-full w-[18px] shrink-0 lg:block">
+    <div className="group relative z-50 h-full w-0 shrink-0 overflow-visible">
       <div
         aria-hidden="true"
         onPointerDown={collapsed ? undefined : onPointerDown}
         title={collapsed ? undefined : dragLabel}
-        className={`absolute inset-0 touch-none border-x border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/85 transition group-hover:bg-[color:var(--surface-soft)] ${
+        className={`absolute left-1/2 top-0 hidden h-full w-3 -translate-x-1/2 touch-none transition lg:block ${
           collapsed ? "" : "cursor-col-resize"
         }`}
       >
-        <span className="absolute inset-y-1/2 left-1/2 h-16 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[color:var(--viewer-border)] transition group-hover:bg-[color:var(--accent)]" />
+        <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-[color:var(--viewer-border)]/70 transition group-hover:bg-[color:var(--accent)]" />
       </div>
       <button
         type="button"
         aria-label={toggleLabel}
         title={toggleLabel}
         onClick={onToggle}
-        className="absolute left-1/2 top-1/2 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] text-xs font-semibold text-[color:var(--foreground)] shadow-sm transition hover:bg-[color:var(--surface-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]"
+        className={`absolute top-3 flex h-9 w-9 items-center justify-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)] ${togglePositionClass} ${
+          collapsed
+            ? "text-[color:var(--foreground)] hover:text-[color:var(--accent)]"
+            : "text-[color:var(--muted-ink)] hover:text-[color:var(--foreground)]"
+        }`}
       >
-        {handleToggleGlyph(side, collapsed)}
+        <Icon className="h-5 w-5" />
       </button>
     </div>
+  );
+}
+
+type ViewerDrawerProps = {
+  side: DrawerSide;
+  open: boolean;
+  width: number;
+  drawerRef: React.RefObject<HTMLDivElement | null>;
+  mobileZIndexClass: string;
+  dragLabel: string;
+  toggleLabel: string;
+  isDragging: boolean;
+  onPointerDown?: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onToggle: () => void;
+  renderPanel: () => React.ReactNode;
+};
+
+function ViewerDrawer({
+  side,
+  open,
+  width,
+  drawerRef,
+  mobileZIndexClass,
+  dragLabel,
+  toggleLabel,
+  isDragging,
+  onPointerDown,
+  onToggle,
+  renderPanel,
+}: ViewerDrawerProps) {
+  const desktopWidth = open ? width : COLLAPSED_DRAWER_WIDTH;
+  const desktopMotionClass = open
+    ? "translate-x-0 opacity-100"
+    : side === "left"
+      ? "-translate-x-4 opacity-0"
+      : "translate-x-4 opacity-0";
+  const mobileMotionClass = open
+    ? "translate-x-0 opacity-100"
+    : side === "left"
+      ? "-translate-x-full opacity-0"
+      : "translate-x-full opacity-0";
+  const desktopDrawerSideClass = side === "left" ? "left-0 border-r" : "right-0 border-l";
+  const mobileDrawerSideClass = side === "left" ? "left-0 border-r" : "right-0 border-l";
+  const desktopTransitionClass = isDragging
+    ? "duration-0"
+    : "duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]";
+
+  const desktopDrawer = (
+    <div
+      ref={drawerRef}
+      className={`relative hidden min-h-0 shrink-0 overflow-visible transition-[width] ${desktopTransitionClass} lg:block`}
+      style={{ width: `${desktopWidth}px` }}
+    >
+      <div
+        className={`absolute inset-y-0 ${desktopDrawerSideClass} w-full overflow-hidden border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/92 transition-[background-color,opacity] duration-200 ${
+          open ? "pointer-events-auto shadow-[var(--viewer-shadow)] opacity-100" : "pointer-events-none opacity-100"
+        }`}
+      >
+        <div
+          className={`h-full w-full transform-gpu transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${desktopMotionClass}`}
+        >
+          {renderPanel()}
+        </div>
+      </div>
+    </div>
+  );
+
+  const mobileDrawer = (
+    <div
+      className={`absolute inset-y-0 ${mobileDrawerSideClass} ${mobileZIndexClass} w-[min(85vw,24rem)] max-w-full transform-gpu shadow-[var(--viewer-shadow)] transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:hidden ${
+        open ? "pointer-events-auto" : "pointer-events-none"
+      } ${mobileMotionClass}`}
+    >
+      {renderPanel()}
+    </div>
+  );
+
+  const handle = (
+    <DrawerResizeHandle
+      dragLabel={dragLabel}
+      toggleLabel={toggleLabel}
+      side={side}
+      collapsed={!open}
+      onPointerDown={open ? onPointerDown : undefined}
+      onToggle={onToggle}
+    />
+  );
+
+  if (side === "left") {
+    return (
+      <>
+        {mobileDrawer}
+        {desktopDrawer}
+        {handle}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {handle}
+      {desktopDrawer}
+      {mobileDrawer}
+    </>
   );
 }
 
@@ -462,6 +572,7 @@ export function ViewerShell() {
     useState<DataTableDialogResizeState | null>(null);
 
   const hasModel = Boolean(metadata && status.phase === "loaded");
+  const activeDrawerResizeSide = drawerDragState?.side ?? null;
   const deferredRules = useDeferredValue(config.rules);
   const compiledValidationRules = useMemo(
     () => compileViewerValidationRules(deferredRules),
@@ -646,10 +757,10 @@ export function ViewerShell() {
       side === "left"
         ? showProperties
           ? propertiesDrawerWidth
-          : 0
+          : COLLAPSED_DRAWER_WIDTH
         : showTree
           ? treeDrawerWidth
-          : 0;
+          : COLLAPSED_DRAWER_WIDTH;
     const handleCount = 2;
     const availableWidth =
       workspaceWidth - otherDrawerWidth - handleCount * DRAWER_HANDLE_WIDTH - MIN_VIEWPORT_WIDTH;
@@ -1342,20 +1453,6 @@ export function ViewerShell() {
               </Link>
               <div className="flex items-center gap-2 rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/72 p-1.5">
                 <HeaderActionButton
-                  label={showTree ? "Hide model tree" : "Show model tree"}
-                  active={showTree}
-                  onClick={() => setShowTree((value) => !value)}
-                >
-                  <PanelLeftIcon className="h-4 w-4" />
-                </HeaderActionButton>
-                <HeaderActionButton
-                  label={showProperties ? "Hide properties" : "Show properties"}
-                  active={showProperties}
-                  onClick={() => setShowProperties((value) => !value)}
-                >
-                  <PanelRightIcon className="h-4 w-4" />
-                </HeaderActionButton>
-                <HeaderActionButton
                   label={showDataTable ? "Hide data table" : "Show data table"}
                   active={showDataTable}
                   onClick={() => setShowDataTable((value) => !value)}
@@ -1425,59 +1522,35 @@ export function ViewerShell() {
             className="relative -mt-px flex min-h-0 flex-1 flex-col overflow-hidden rounded-b-[2rem] border border-t-0 border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/60 shadow-[var(--viewer-shadow)]"
           >
             <div className="relative min-h-0 flex flex-1 overflow-hidden">
-              {showTree ? (
-                <div className="absolute inset-y-0 left-0 z-30 w-[min(85vw,24rem)] max-w-full border-r border-[color:var(--viewer-border)] shadow-[var(--viewer-shadow)] lg:hidden">
-                  <ModelTreePanel
-                    embedded
-                    metadata={metadata}
-                    categories={categories}
-                    nodes={tree}
-                    selection={session.selected}
-                    onSelectNode={(localId) => {
-                      void viewportRef.current?.selectNode(localId);
-                    }}
-                    onHideCategory={(category) => {
-                      void viewportRef.current?.hideCategory(category);
-                    }}
-                    onIsolateCategory={(category) => {
-                      void viewportRef.current?.isolateCategory(category);
-                    }}
-                  />
-                </div>
-              ) : null}
-
-              {showTree ? (
-                <div
-                  ref={treeDrawerRef}
-                  className="hidden min-h-0 shrink-0 lg:block"
-                  style={{ width: `${treeDrawerWidth}px` }}
-                >
-                  <ModelTreePanel
-                    embedded
-                    metadata={metadata}
-                    categories={categories}
-                    nodes={tree}
-                    selection={session.selected}
-                    onSelectNode={(localId) => {
-                      void viewportRef.current?.selectNode(localId);
-                    }}
-                    onHideCategory={(category) => {
-                      void viewportRef.current?.hideCategory(category);
-                    }}
-                    onIsolateCategory={(category) => {
-                      void viewportRef.current?.isolateCategory(category);
-                    }}
-                  />
-                </div>
-              ) : null}
-
-              <DrawerResizeHandle
+              <ViewerDrawer
+                side="left"
+                open={showTree}
+                width={treeDrawerWidth}
+                drawerRef={treeDrawerRef}
+                mobileZIndexClass="z-30"
                 dragLabel="Drag to resize model tree panel"
                 toggleLabel={showTree ? "Hide model tree panel" : "Show model tree panel"}
-                side="left"
-                collapsed={!showTree}
-                onPointerDown={showTree ? startDrawerResize("left") : undefined}
+                isDragging={activeDrawerResizeSide === "left"}
+                onPointerDown={startDrawerResize("left")}
                 onToggle={() => setShowTree((value) => !value)}
+                renderPanel={() => (
+                  <ModelTreePanel
+                    embedded
+                    metadata={metadata}
+                    categories={categories}
+                    nodes={tree}
+                    selection={session.selected}
+                    onSelectNode={(localId) => {
+                      void viewportRef.current?.selectNode(localId);
+                    }}
+                    onHideCategory={(category) => {
+                      void viewportRef.current?.hideCategory(category);
+                    }}
+                    onIsolateCategory={(category) => {
+                      void viewportRef.current?.isolateCategory(category);
+                    }}
+                  />
+                )}
               />
 
               <section className="relative min-w-0 flex-1">
@@ -1555,30 +1628,21 @@ export function ViewerShell() {
                 />
               </section>
 
-              <DrawerResizeHandle
+              <ViewerDrawer
+                side="right"
+                open={showProperties}
+                width={propertiesDrawerWidth}
+                drawerRef={propertiesDrawerRef}
+                mobileZIndexClass="z-40"
                 dragLabel="Drag to resize properties panel"
                 toggleLabel={showProperties ? "Hide properties panel" : "Show properties panel"}
-                side="right"
-                collapsed={!showProperties}
-                onPointerDown={showProperties ? startDrawerResize("right") : undefined}
+                isDragging={activeDrawerResizeSide === "right"}
+                onPointerDown={startDrawerResize("right")}
                 onToggle={() => setShowProperties((value) => !value)}
+                renderPanel={() => (
+                  <PropertiesPanel embedded details={validatedSelectionDetails} />
+                )}
               />
-
-              {showProperties ? (
-                <div
-                  ref={propertiesDrawerRef}
-                  className="hidden min-h-0 shrink-0 lg:block"
-                  style={{ width: `${propertiesDrawerWidth}px` }}
-                >
-                  <PropertiesPanel embedded details={validatedSelectionDetails} />
-                </div>
-              ) : null}
-
-              {showProperties ? (
-                <div className="absolute inset-y-0 right-0 z-40 w-[min(85vw,24rem)] max-w-full border-l border-[color:var(--viewer-border)] shadow-[var(--viewer-shadow)] lg:hidden">
-                  <PropertiesPanel embedded details={validatedSelectionDetails} />
-                </div>
-              ) : null}
             </div>
 
             {showDataTable && dataTableDialogLayout.initialized ? (
