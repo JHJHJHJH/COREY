@@ -3,8 +3,10 @@ import type * as OBC from "@thatopen/components";
 import type {
   ViewerCategorySummary,
   ViewerDataTableCell,
+  ViewerDataTableColumnBinding,
   ViewerDataTableColumn,
   ViewerDataTableData,
+  ViewerDataTableEditableValueKind,
   ViewerDataTableFilters,
   ViewerDataTableRow,
   ViewerDataTableSort,
@@ -39,18 +41,39 @@ const VIEWER_DATA_TABLE_BASE_COLUMNS = [
     label: "IFC Type",
     kind: "base",
     group: null,
+    editable: false,
+    editableReason: "Identity columns are read-only.",
+    binding: {
+      kind: "attribute",
+      name: "type",
+    } satisfies ViewerDataTableColumnBinding,
+    valueKind: "string" satisfies ViewerDataTableEditableValueKind,
   },
   {
     key: "globalId",
     label: "GlobalId",
     kind: "base",
     group: null,
+    editable: false,
+    editableReason: "Identity columns are read-only.",
+    binding: {
+      kind: "attribute",
+      name: "GlobalId",
+    } satisfies ViewerDataTableColumnBinding,
+    valueKind: "string" satisfies ViewerDataTableEditableValueKind,
   },
   {
     key: "name",
     label: "Name",
     kind: "base",
     group: null,
+    editable: false,
+    editableReason: "Identity columns are read-only.",
+    binding: {
+      kind: "attribute",
+      name: "Name",
+    } satisfies ViewerDataTableColumnBinding,
+    valueKind: "string" satisfies ViewerDataTableEditableValueKind,
   },
 ] satisfies ReadonlyArray<Omit<ViewerDataTableColumn, "populatedRowCount">>;
 
@@ -148,6 +171,24 @@ function normalizeValue(value: unknown): unknown {
   }
 
   return value;
+}
+
+function getViewerDataTableValueKind(value: unknown): ViewerDataTableEditableValueKind | null {
+  const normalized = normalizeValue(value);
+
+  if (typeof normalized === "string") {
+    return "string";
+  }
+
+  if (typeof normalized === "number" && Number.isFinite(normalized)) {
+    return "number";
+  }
+
+  if (typeof normalized === "boolean") {
+    return "boolean";
+  }
+
+  return null;
 }
 
 function formatValue(value: unknown): string {
@@ -501,6 +542,21 @@ function ensureViewerDataTableColumn(
 ) {
   const existing = columnMap.get(column.key);
   if (existing) {
+    if (!existing.valueKind && column.valueKind) {
+      existing.valueKind = column.valueKind;
+    }
+
+    if (!existing.binding && column.binding) {
+      existing.binding = column.binding;
+    }
+
+    if (!existing.editable && column.editable) {
+      existing.editable = true;
+      existing.editableReason = column.editableReason;
+    } else if (existing.editableReason === null && column.editableReason) {
+      existing.editableReason = column.editableReason;
+    }
+
     return existing;
   }
 
@@ -536,6 +592,10 @@ function mergeViewerDataTableCell(
     raw: [current.raw, next.raw],
     text,
     state,
+    source: current.source,
+    binding: current.binding ?? next.binding,
+    valueKind: current.valueKind ?? next.valueKind,
+    original: null,
   };
 }
 
@@ -551,8 +611,41 @@ function buildViewerDataTableCell(
   exists: boolean,
   value: unknown,
   missingText = "Missing",
+  options?: {
+    binding?: ViewerDataTableColumnBinding | null;
+    valueKind?: ViewerDataTableEditableValueKind | null;
+  },
 ): ViewerDataTableCell {
-  return buildInspectionValue(exists, value, missingText);
+  const inspectionValue = buildInspectionValue(exists, value, missingText);
+
+  return {
+    raw: inspectionValue.raw,
+    text: inspectionValue.text,
+    state: inspectionValue.state,
+    source: "ifc",
+    binding: options?.binding ?? null,
+    valueKind: options?.valueKind ?? getViewerDataTableValueKind(value),
+    original: null,
+  };
+}
+
+function buildViewerDataTableSearchText(
+  columns: ViewerDataTableColumn[],
+  cells: Record<string, ViewerDataTableCell>,
+) {
+  const columnMap = new Map(columns.map((column) => [column.key, column]));
+  const searchParts: string[] = [];
+
+  for (const [columnKey, cell] of Object.entries(cells)) {
+    const column = columnMap.get(columnKey);
+    if (!column || cell.state !== "present") {
+      continue;
+    }
+
+    searchParts.push(toViewerDataTableSearchPart(column, cell));
+  }
+
+  return searchParts.join(" ");
 }
 
 function toViewerDataTableSearchPart(column: ViewerDataTableColumn, cell: ViewerDataTableCell) {
@@ -579,19 +672,46 @@ function buildViewerDataTableRow(
     hasIfcCategory(data),
     readIfcCategory(data),
     "Missing",
+    {
+      binding: {
+        kind: "attribute",
+        name: "type",
+      },
+      valueKind: "string",
+    },
   );
   if (cells.ifcType.state !== "present" && fallbackIfcType) {
-    cells.ifcType = buildViewerDataTableCell(true, fallbackIfcType, "Missing");
+    cells.ifcType = buildViewerDataTableCell(true, fallbackIfcType, "Missing", {
+      binding: {
+        kind: "attribute",
+        name: "type",
+      },
+      valueKind: "string",
+    });
   }
   cells.globalId = buildViewerDataTableCell(
     hasAttribute(data, "GlobalId"),
     readAttribute(data, "GlobalId"),
     "Missing",
+    {
+      binding: {
+        kind: "attribute",
+        name: "GlobalId",
+      },
+      valueKind: "string",
+    },
   );
   cells.name = buildViewerDataTableCell(
     hasAttribute(data, "Name"),
     readAttribute(data, "Name"),
     "Missing",
+    {
+      binding: {
+        kind: "attribute",
+        name: "Name",
+      },
+      valueKind: "string",
+    },
   );
 
   for (const [key, value] of Object.entries(data)) {
@@ -604,26 +724,59 @@ function buildViewerDataTableRow(
       label: humanizeKey(key),
       kind: "attribute",
       group: "IFC Attributes",
+      editable: getViewerDataTableValueKind(value.value) !== null,
+      editableReason:
+        getViewerDataTableValueKind(value.value) !== null
+          ? null
+          : "Only scalar IFC attribute values can be edited.",
+      binding: {
+        kind: "attribute",
+        name: key,
+      },
+      valueKind: getViewerDataTableValueKind(value.value),
     });
     cells[column.key] = mergeViewerDataTableCell(
       cells[column.key],
-      buildViewerDataTableCell(true, value.value, "Missing"),
+      buildViewerDataTableCell(true, value.value, "Missing", {
+        binding: column.binding,
+        valueKind: column.valueKind,
+      }),
     );
   }
 
   for (const group of buildPropertyGroups(data)) {
     for (const row of group.rows) {
+      const rowValueKind = getViewerDataTableValueKind(row.value.raw);
       const column = ensureViewerDataTableColumn(columnMap, {
         key: buildViewerDataTablePropertyColumnKey(group.title, row.label),
         label: row.label,
         kind: "property",
         group: group.title,
+        editable: rowValueKind !== null,
+        editableReason:
+          rowValueKind !== null ? null : "Only scalar property values can be edited.",
+        binding: {
+          kind: "property",
+          group: group.title,
+          label: row.label,
+        },
+        valueKind: rowValueKind,
       });
-      cells[column.key] = mergeViewerDataTableCell(cells[column.key], row.value);
+      cells[column.key] = mergeViewerDataTableCell(
+        cells[column.key],
+        {
+          raw: row.value.raw,
+          text: row.value.text,
+          state: row.value.state,
+          source: "ifc",
+          binding: column.binding,
+          valueKind: column.valueKind,
+          original: null,
+        },
+      );
     }
   }
 
-  const searchParts: string[] = [];
   for (const [columnKey, cell] of Object.entries(cells)) {
     const column = columnMap.get(columnKey);
     if (!column || cell.state !== "present") {
@@ -631,7 +784,6 @@ function buildViewerDataTableRow(
     }
 
     column.populatedRowCount += 1;
-    searchParts.push(toViewerDataTableSearchPart(column, cell));
   }
 
   const ifcType = cells.ifcType.state === "present" ? cells.ifcType.text : null;
@@ -652,7 +804,7 @@ function buildViewerDataTableRow(
       category: ifcType,
     },
     cells,
-    searchText: searchParts.join(" "),
+    searchText: buildViewerDataTableSearchText([...columnMap.values()], cells),
     ifcType,
   };
 }

@@ -28,6 +28,7 @@ type DataTableUiState = {
   dataSignature: string;
   query: string;
   ifcTypeFilter: string;
+  showEditedOnly: boolean;
   sort: ViewerDataTableSort | null;
   visibleColumnKeys: string[];
   selectedRowKeys: Set<string>;
@@ -95,10 +96,15 @@ function buildDefaultUiState(dataSignature: string, state: ViewerDataTableState[
     dataSignature,
     query: "",
     ifcTypeFilter: "",
+    showEditedOnly: false,
     sort: null,
     visibleColumnKeys: state ? getDefaultViewerDataTableColumnKeys(state.columns) : [],
     selectedRowKeys: new Set<string>(),
   };
+}
+
+function rowHasImportedEdits(row: NonNullable<ViewerDataTableState["data"]>["rows"][number]) {
+  return Object.values(row.cells).some((cell) => cell.source === "draft");
 }
 
 const DataTablePanelComponent = function DataTablePanel({
@@ -146,11 +152,17 @@ const DataTablePanelComponent = function DataTablePanel({
       return [];
     }
 
-    return filterViewerDataTableRows(data.rows, {
+    const nextRows = filterViewerDataTableRows(data.rows, {
       query: deferredQuery,
       ifcType: deferredIfcTypeFilter,
     });
-  }, [data, deferredIfcTypeFilter, deferredQuery]);
+    return activeUiState.showEditedOnly ? nextRows.filter(rowHasImportedEdits) : nextRows;
+  }, [activeUiState.showEditedOnly, data, deferredIfcTypeFilter, deferredQuery]);
+
+  const editedRowCount = useMemo(
+    () => (data ? data.rows.filter(rowHasImportedEdits).length : 0),
+    [data],
+  );
 
   const visibleRows = useMemo(
     () => sortViewerDataTableRows(filteredRows, activeUiState.sort),
@@ -261,6 +273,7 @@ const DataTablePanelComponent = function DataTablePanel({
           <span>{data?.rows.length ?? 0} elements</span>
           <span>{data?.columns.length ?? 0} columns discovered</span>
           <span>{visibleRows.length} visible rows</span>
+          <span>{editedRowCount} edited rows</span>
           <span>{activeUiState.selectedRowKeys.size} checked rows</span>
         </div>
 
@@ -307,6 +320,24 @@ const DataTablePanelComponent = function DataTablePanel({
               ))}
             </select>
           </label>
+
+          <button
+            type="button"
+            disabled={!data || editedRowCount === 0}
+            onClick={() =>
+              updateUiState((current) => ({
+                ...current,
+                showEditedOnly: !current.showEditedOnly,
+              }))
+            }
+            className={`rounded-2xl border px-4 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+              activeUiState.showEditedOnly
+                ? "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
+                : "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
+            }`}
+          >
+            Show edited only
+          </button>
 
           <details className="relative">
             <summary className="list-none rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-4 py-3 text-sm font-medium text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]">
@@ -441,8 +472,8 @@ const DataTablePanelComponent = function DataTablePanel({
                 The current filters hide every element
               </div>
               <p className="mt-2 text-sm leading-6 text-[color:var(--muted-ink)]">
-                Adjust the text filter, IFC type filter, or visible columns to bring matching rows
-                back into view.
+                Adjust the text filter, IFC type filter, edited-only toggle, or visible columns to
+                bring matching rows back into view.
               </p>
             </div>
           </div>
@@ -525,17 +556,27 @@ const DataTablePanelComponent = function DataTablePanel({
                       </td>
                       {visibleColumns.map((column) => {
                         const cell = row.cells[column.key];
+                        const draftCell = cell?.source === "draft";
 
                         return (
                           <td
                             key={column.key}
                             className={`border-b border-[color:var(--viewer-border)] px-3 py-3 align-top text-sm ${
-                              cell ? cellTone(column, cell.state) : "text-[color:var(--muted-ink)]"
+                              draftCell
+                                ? "bg-[#edf7f1] text-[#1e6b45]"
+                                : cell
+                                  ? cellTone(column, cell.state)
+                                  : "text-[color:var(--muted-ink)]"
                             }`}
                           >
                             <div className="min-w-0 break-words font-mono text-[12px] leading-5">
                               {cell?.text ?? "Missing"}
                             </div>
+                            {draftCell ? (
+                              <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1e6b45]">
+                                Imported
+                              </div>
+                            ) : null}
                           </td>
                         );
                       })}

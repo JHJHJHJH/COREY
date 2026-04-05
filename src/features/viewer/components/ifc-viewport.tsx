@@ -21,9 +21,9 @@ import {
   getPrimarySelection,
   readNameMaps,
 } from "@/features/viewer/lib/ifc-data";
-import { LocalFileModelSource } from "@/features/viewer/lib/model-source";
 import type {
   ModelMetadata,
+  ModelSourceResult,
   ViewerDataTableState,
   ViewerValidationHighlights,
   ViewerSelectionDetails,
@@ -64,7 +64,6 @@ type ViewerRuntime = {
   hiddenItems: OBC.ModelIdMap | null;
 };
 
-const source = new LocalFileModelSource();
 const fragmentsWorkerUrl = new URL("@thatopen/fragments/worker", import.meta.url);
 const validationWarnMaterial = {
   color: new THREE.Color("#d29a2f"),
@@ -309,7 +308,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
   }, [validationHighlights]);
 
   useImperativeHandle(ref, () => ({
-    async loadIfc(file) {
+    async loadIfc(source) {
       const runtime = runtimeRef.current;
       if (!runtime) {
         return;
@@ -318,7 +317,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       await this.clearModel();
       const loadSequence = ++loadSequenceRef.current;
 
-      const { bytes, metadata } = await source.read(file);
+      const { bytes, metadata } = source as ModelSourceResult;
 
       emitStatusChange({
         phase: "loading",

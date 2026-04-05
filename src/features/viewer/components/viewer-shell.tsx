@@ -23,10 +23,28 @@ import { ModelTreePanel } from "@/features/viewer/components/model-tree-panel";
 import { IfcViewport } from "@/features/viewer/components/ifc-viewport";
 import { PropertiesPanel } from "@/features/viewer/components/properties-panel";
 import { ViewerToolbar } from "@/features/viewer/components/viewer-toolbar";
+import {
+  applyViewerDataTableDraft,
+  clearPersistedViewerDataTableDraft,
+  readPersistedViewerDataTableDraft,
+  writePersistedViewerDataTableDraft,
+} from "@/features/viewer/lib/data-table-draft";
+import {
+  buildViewerDataTableExcelFileName,
+  buildViewerDataTableIfcFileName,
+  exportViewerDataTableToExcel,
+  importViewerDataTableFromExcel,
+} from "@/features/viewer/lib/data-table-excel";
 import { formatBytes } from "@/features/viewer/lib/ifc-data";
+import { LocalFileModelSource } from "@/features/viewer/lib/model-source";
+import { exportEditedIfc } from "@/features/viewer/lib/ifc-writeback";
 import type {
   ModelMetadata,
+  ModelSourceResult,
   ViewerCategorySummary,
+  ViewerDataTableDraft,
+  ViewerDataTableExportStatus,
+  ViewerDataTableImportReport,
   ViewerDataTableState,
   ViewerSelectionDetails,
   ViewerSessionState,
@@ -74,10 +92,17 @@ const MAX_DATA_TABLE_DIALOG_HEIGHT = Number.POSITIVE_INFINITY;
 const DATA_TABLE_DIALOG_MARGIN = 12;
 
 const validationWorkerUrl = new URL("../../rules/workers/validation-worker.ts", import.meta.url);
+const source = new LocalFileModelSource();
 
 const emptyValidationHighlights: ViewerValidationHighlights = {
   warn: {},
   error: {},
+};
+
+const initialDataTableActionStatus: ViewerDataTableExportStatus = {
+  phase: "idle",
+  message: "",
+  issues: [],
 };
 
 type ViewerValidationPhase = "idle" | "running" | "ready" | "error";
@@ -515,10 +540,12 @@ export function ViewerShell() {
   const { config } = useViewerRules();
   const viewportRef = useRef<ViewerViewportHandle | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const dataTableImportInputRef = useRef<HTMLInputElement | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const treeDrawerRef = useRef<HTMLDivElement | null>(null);
   const propertiesDrawerRef = useRef<HTMLDivElement | null>(null);
   const dataTableDialogRef = useRef<HTMLDivElement | null>(null);
+  const activeSourceRef = useRef<ModelSourceResult | null>(null);
   const validationWorkerRef = useRef<Worker | null>(null);
   const validationAbortControllerRef = useRef<AbortController | null>(null);
   const validationRunIdRef = useRef(0);
@@ -542,6 +569,12 @@ export function ViewerShell() {
   const [tree, setTree] = useState<ViewerTreeNode[]>([]);
   const [categories, setCategories] = useState<ViewerCategorySummary[]>([]);
   const [dataTableState, setDataTableState] = useState(initialDataTableState);
+  const [dataTableDraft, setDataTableDraft] = useState<ViewerDataTableDraft | null>(null);
+  const [dataTableImportReport, setDataTableImportReport] =
+    useState<ViewerDataTableImportReport | null>(null);
+  const [dataTableActionStatus, setDataTableActionStatus] = useState<ViewerDataTableExportStatus>(
+    initialDataTableActionStatus,
+  );
   const [selectionDetails, setSelectionDetails] = useState<ViewerSelectionDetails>({
     selection: null,
     inspection: null,
@@ -596,7 +629,20 @@ export function ViewerShell() {
       ),
     [compiledValidationRules],
   );
-  const indexedIfcTypes = useMemo(() => dataTableState.data?.ifcTypes ?? [], [dataTableState.data]);
+  const effectiveDataTableData = useMemo(
+    () =>
+      dataTableState.data ? applyViewerDataTableDraft(dataTableState.data, dataTableDraft) : null,
+    [dataTableDraft, dataTableState.data],
+  );
+  const effectiveDataTableState = useMemo(
+    () => ({
+      ...dataTableState,
+      data: effectiveDataTableData,
+    }),
+    [dataTableState, effectiveDataTableData],
+  );
+  const indexedIfcTypes = useMemo(() => effectiveDataTableData?.ifcTypes ?? [], [effectiveDataTableData]);
+  const draftEditCount = dataTableDraft?.edits.length ?? 0;
   const validatedSelectionDetails = useMemo<ViewerSelectionDetails>(
     () => ({
       ...selectionDetails,
@@ -608,7 +654,7 @@ export function ViewerShell() {
     if (
       !metadata ||
       status.phase !== "loaded" ||
-      !dataTableState.data ||
+      !effectiveDataTableData ||
       deferredRules.length === 0 ||
       runnableRuleCount === 0
     ) {
@@ -619,9 +665,51 @@ export function ViewerShell() {
       version: VIEWER_VALIDATION_CONFIG_VERSION,
       sourceId: metadata.sourceId ?? metadata.name,
       rules: deferredRules,
-      rows: buildViewerValidationRows(dataTableState.data, deferredRules),
+      rows: buildViewerValidationRows(effectiveDataTableData, deferredRules),
     };
-  }, [dataTableState.data, deferredRules, metadata, runnableRuleCount, status.phase]);
+  }, [deferredRules, effectiveDataTableData, metadata, runnableRuleCount, status.phase]);
+
+  useEffect(() => {
+    const sourceId = metadata?.sourceId;
+    if (!sourceId || !dataTableState.data) {
+      setDataTableDraft(null);
+      return;
+    }
+
+    const persistedDraft = readPersistedViewerDataTableDraft(sourceId);
+    setDataTableDraft(persistedDraft);
+    setDataTableImportReport(null);
+    setDataTableActionStatus(
+      persistedDraft && persistedDraft.edits.length > 0
+        ? {
+            phase: "success",
+            message: `Restored ${persistedDraft.edits.length} imported edits from local draft storage.`,
+            issues: [],
+          }
+        : initialDataTableActionStatus,
+    );
+  }, [dataTableState.data, metadata?.sourceId]);
+
+  useEffect(() => {
+    const sourceId = metadata?.sourceId;
+    if (!sourceId) {
+      return;
+    }
+
+    if (dataTableDraft) {
+      const persisted = writePersistedViewerDataTableDraft(dataTableDraft);
+      if (!persisted.ok) {
+        setDataTableActionStatus((current) => ({
+          phase: current.phase === "error" ? current.phase : "success",
+          message: `${current.message || `Imported ${dataTableDraft.edits.length} edits.`} Local draft restore is unavailable: ${persisted.message}`,
+          issues: current.issues,
+        }));
+      }
+      return;
+    }
+
+    clearPersistedViewerDataTableDraft(sourceId);
+  }, [dataTableDraft, metadata?.sourceId]);
 
   const stopValidationWorker = useCallback(() => {
     validationWorkerRef.current?.terminate();
@@ -1077,7 +1165,7 @@ export function ViewerShell() {
     stopValidationWorker();
     stopValidationRequest();
 
-    if (!metadata || status.phase !== "loaded" || !dataTableState.data) {
+    if (!metadata || status.phase !== "loaded" || !effectiveDataTableData) {
       startTransition(() => {
         setValidationHighlights(emptyValidationHighlights);
         setValidationState({
@@ -1289,7 +1377,7 @@ export function ViewerShell() {
       stopValidationRequest();
     };
   }, [
-    dataTableState.data,
+    effectiveDataTableData,
     deferredRules.length,
     metadata,
     runnableRuleCount,
@@ -1304,6 +1392,21 @@ export function ViewerShell() {
   const openFilePicker = () => {
     inputRef.current?.click();
   };
+
+  const openDataTableImportPicker = () => {
+    dataTableImportInputRef.current?.click();
+  };
+
+  const loadModelFromFile = useCallback(async (file: File) => {
+    const sourceResult = await source.read(file);
+    activeSourceRef.current = sourceResult;
+    startTransition(() => {
+      setDataTableDraft(null);
+      setDataTableImportReport(null);
+      setDataTableActionStatus(initialDataTableActionStatus);
+    });
+    await viewportRef.current?.loadIfc(sourceResult);
+  }, []);
 
   const handleLoadBundledModel = async () => {
     startTransition(() => {
@@ -1324,7 +1427,7 @@ export function ViewerShell() {
         type: "application/octet-stream",
       });
 
-      await viewportRef.current?.loadIfc(file);
+      await loadModelFromFile(file);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown fetch error";
 
@@ -1343,9 +1446,143 @@ export function ViewerShell() {
       return;
     }
 
-    await viewportRef.current?.loadIfc(file);
+    await loadModelFromFile(file);
     event.target.value = "";
   };
+
+  const handleDataTableImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    if (!metadata?.sourceId || !dataTableState.data || !effectiveDataTableData) {
+      startTransition(() => {
+        setDataTableActionStatus({
+          phase: "error",
+          message: "Load and index a model before importing Excel edits.",
+          issues: [],
+        });
+      });
+      event.target.value = "";
+      return;
+    }
+
+    startTransition(() => {
+      setDataTableActionStatus({
+        phase: "running",
+        message: `Importing ${file.name}...`,
+        issues: [],
+      });
+    });
+
+    try {
+      const result = await importViewerDataTableFromExcel({
+        file,
+        sourceId: metadata.sourceId,
+        baseData: dataTableState.data,
+        currentData: effectiveDataTableData,
+      });
+
+      startTransition(() => {
+        setDataTableDraft(result.draft);
+        setDataTableImportReport(result.report);
+        setDataTableActionStatus({
+          phase: "success",
+          message:
+            result.report.skippedCellCount > 0
+              ? `Imported ${result.report.appliedEditCount} edits and skipped ${result.report.skippedCellCount} cells.`
+              : `Imported ${result.report.appliedEditCount} edits from ${file.name}.`,
+          issues: result.report.issues,
+        });
+      });
+    } catch (error) {
+      startTransition(() => {
+        setDataTableActionStatus({
+          phase: "error",
+          message: error instanceof Error ? error.message : "Excel import failed.",
+          issues: [],
+        });
+      });
+    } finally {
+      event.target.value = "";
+    }
+  };
+
+  const handleExportExcel = useCallback(async () => {
+    if (!metadata?.sourceId || !effectiveDataTableData) {
+      setDataTableActionStatus({
+        phase: "error",
+        message: "Load and index a model before exporting Excel.",
+        issues: [],
+      });
+      return;
+    }
+
+    setDataTableActionStatus({
+      phase: "running",
+      message: "Preparing Excel export...",
+      issues: [],
+    });
+
+    try {
+      await exportViewerDataTableToExcel({
+        data: effectiveDataTableData,
+        sourceId: metadata.sourceId,
+        fileName: buildViewerDataTableExcelFileName(metadata.name),
+      });
+      setDataTableActionStatus({
+        phase: "success",
+        message: `Exported ${effectiveDataTableData.rows.length} rows to Excel.`,
+        issues: [],
+      });
+    } catch (error) {
+      setDataTableActionStatus({
+        phase: "error",
+        message: error instanceof Error ? error.message : "Excel export failed.",
+        issues: [],
+      });
+    }
+  }, [effectiveDataTableData, metadata]);
+
+  const handleClearImportedEdits = useCallback(() => {
+    const sourceId = metadata?.sourceId;
+    setDataTableDraft(null);
+    setDataTableImportReport(null);
+    if (sourceId) {
+      clearPersistedViewerDataTableDraft(sourceId);
+    }
+    setDataTableActionStatus({
+      phase: "success",
+      message: "Cleared imported data-table edits.",
+      issues: [],
+    });
+  }, [metadata?.sourceId]);
+
+  const handleExportEditedIfc = useCallback(async () => {
+    if (!dataTableState.data || !metadata || !activeSourceRef.current) {
+      setDataTableActionStatus({
+        phase: "error",
+        message: "Load a model before exporting an edited IFC.",
+        issues: [],
+      });
+      return;
+    }
+
+    setDataTableActionStatus({
+      phase: "running",
+      message: "Preparing edited IFC export...",
+      issues: [],
+    });
+
+    const result = await exportEditedIfc({
+      baseData: dataTableState.data,
+      draft: dataTableDraft,
+      bytes: activeSourceRef.current.bytes,
+      fileName: buildViewerDataTableIfcFileName(metadata.name),
+    });
+    setDataTableActionStatus(result);
+  }, [dataTableDraft, dataTableState.data, metadata]);
 
   const startDrawerResize = (side: DrawerSide) => (event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -1425,6 +1662,13 @@ export function ViewerShell() {
                 type="file"
                 accept=".ifc,application/octet-stream"
                 onChange={handleFileChange}
+                className="hidden"
+              />
+              <input
+                ref={dataTableImportInputRef}
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={handleDataTableImport}
                 className="hidden"
               />
               <button
@@ -1688,10 +1932,68 @@ export function ViewerShell() {
                             {formatBytes(metadata.size)}
                           </span>
                         ) : null}
+                        {draftEditCount > 0 ? (
+                          <span className="inline-flex items-center rounded-full border border-[color:var(--viewer-border)] bg-[#edf7f1] px-2.5 py-1 text-[#1e6b45]">
+                            {draftEditCount} imported edits
+                          </span>
+                        ) : null}
                       </div>
+                      {dataTableActionStatus.message ? (
+                        <div className="mt-2 max-w-3xl text-xs text-[color:var(--muted-ink)]">
+                          {dataTableActionStatus.message}
+                        </div>
+                      ) : null}
+                      {dataTableImportReport?.issues.length ? (
+                        <div className="mt-1 max-w-3xl text-xs text-[#8a3e1f]">
+                          {dataTableImportReport.issues[0]?.message}
+                          {dataTableImportReport.issues.length > 1
+                            ? ` (+${dataTableImportReport.issues.length - 1} more)`
+                            : ""}
+                        </div>
+                      ) : null}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={() => {
+                          void handleExportExcel();
+                        }}
+                        disabled={!effectiveDataTableData || dataTableActionStatus.phase === "running"}
+                        className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Export Excel
+                      </button>
+                      <button
+                        type="button"
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={openDataTableImportPicker}
+                        disabled={!effectiveDataTableData || dataTableActionStatus.phase === "running"}
+                        className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Import Excel
+                      </button>
+                      <button
+                        type="button"
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={handleClearImportedEdits}
+                        disabled={draftEditCount === 0 || dataTableActionStatus.phase === "running"}
+                        className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Clear Edits
+                      </button>
+                      <button
+                        type="button"
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={() => {
+                          void handleExportEditedIfc();
+                        }}
+                        disabled={draftEditCount === 0 || dataTableActionStatus.phase === "running"}
+                        className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Export IFC
+                      </button>
                       <button
                         type="button"
                         onPointerDown={(event) => event.stopPropagation()}
@@ -1715,7 +2017,7 @@ export function ViewerShell() {
                     <DataTablePanel
                       embedded
                       metadata={metadata}
-                      tableState={dataTableState}
+                      tableState={effectiveDataTableState}
                       activeSelection={session.selected}
                       onSelectRow={handleDataTableRowSelect}
                       showMetaHeader={false}

@@ -142,10 +142,35 @@ export interface ViewerInspectionValue {
   validation: ViewerValidationMatch | null;
 }
 
+export type ViewerDataTableEditableValueKind = "string" | "number" | "boolean";
+
+export type ViewerDataTableColumnBinding =
+  | {
+      kind: "attribute";
+      name: string;
+    }
+  | {
+      kind: "property";
+      group: string;
+      label: string;
+    };
+
+export type ViewerDataTableCellSource = "ifc" | "draft";
+
+export interface ViewerDataTableCellSnapshot {
+  raw: unknown;
+  text: string;
+  state: ViewerInspectionValueState;
+}
+
 export interface ViewerDataTableCell {
   raw: unknown;
   text: string;
   state: ViewerInspectionValueState;
+  source: ViewerDataTableCellSource;
+  binding: ViewerDataTableColumnBinding | null;
+  valueKind: ViewerDataTableEditableValueKind | null;
+  original: ViewerDataTableCellSnapshot | null;
 }
 
 export type ViewerDataTableColumnKind = "base" | "attribute" | "property";
@@ -156,6 +181,10 @@ export interface ViewerDataTableColumn {
   kind: ViewerDataTableColumnKind;
   group: string | null;
   populatedRowCount: number;
+  editable: boolean;
+  editableReason: string | null;
+  binding: ViewerDataTableColumnBinding | null;
+  valueKind: ViewerDataTableEditableValueKind | null;
 }
 
 export interface ViewerDataTableRow {
@@ -190,6 +219,44 @@ export interface ViewerDataTableState {
   phase: LoadStatus;
   message: string;
   data: ViewerDataTableData | null;
+}
+
+export interface ViewerDataTableDraftValue extends ViewerDataTableCellSnapshot {
+  valueKind: ViewerDataTableEditableValueKind | null;
+}
+
+export interface ViewerDataTableEdit {
+  rowKey: string;
+  columnKey: string;
+  value: ViewerDataTableDraftValue;
+}
+
+export interface ViewerDataTableDraft {
+  version: 1;
+  sourceId: string;
+  updatedAt: string;
+  edits: ViewerDataTableEdit[];
+}
+
+export interface ViewerDataTableIssue {
+  rowKey: string | null;
+  columnKey: string | null;
+  message: string;
+}
+
+export interface ViewerDataTableImportReport {
+  fileName: string;
+  appliedEditCount: number;
+  skippedCellCount: number;
+  issues: ViewerDataTableIssue[];
+}
+
+export type ViewerDataTableExportPhase = "idle" | "running" | "success" | "error";
+
+export interface ViewerDataTableExportStatus {
+  phase: ViewerDataTableExportPhase;
+  message: string;
+  issues: ViewerDataTableIssue[];
 }
 
 export interface ViewerInspectionRow {
@@ -237,7 +304,7 @@ export interface ViewerStatus {
 }
 
 export interface ViewerViewportHandle {
-  loadIfc(file: File): Promise<void>;
+  loadIfc(source: ModelSourceResult): Promise<void>;
   clearModel(): Promise<void>;
   selectNode(localId: number): Promise<void>;
   showAll(): Promise<void>;
