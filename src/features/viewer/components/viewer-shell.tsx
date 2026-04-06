@@ -1645,13 +1645,9 @@ export function ViewerShell() {
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0">
-                  <h1 className="mt-1 text-lg font-semibold tracking-tight text-[color:var(--foreground)] sm:text-xl">
+                  <h1 className="mt-1 text-lg font-extrabold tracking-tight text-[color:var(--foreground)] sm:text-xl">
                     COREY
                   </h1>
-                </div>
-                <div className="inline-flex min-w-0 items-center gap-2 rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/80 px-3 py-1.5 text-xs text-[color:var(--muted-ink)]">
-                  <StatusDot phase={status.phase} />
-                  <span className="max-w-[min(26rem,70vw)] truncate">{status.message}</span>
                 </div>
               </div>
             </div>
@@ -1709,6 +1705,9 @@ export function ViewerShell() {
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <div className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/72 px-3 py-1.5 text-[color:var(--muted-ink)]">
+              <span className="inline-flex items-center gap-2">
+                <StatusDot phase={metadata ? "loaded" : "idle"} />
+              </span>{" "}
               <span className="font-semibold text-[color:var(--foreground)]">File:</span>{" "}
               <span className="max-w-[18rem] truncate align-bottom inline-block">
                 {metadata?.name ?? "No file loaded"}
