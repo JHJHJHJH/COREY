@@ -1645,7 +1645,7 @@ export function ViewerShell() {
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0">
-                  <h1 className="mt-1 text-lg font-extrabold tracking-tight text-[color:var(--foreground)] sm:text-xl">
+                  <h1 className="mt-1 text-lg font-extrabold tracking-tight text-[#4f7dc8] text-shadow-sm sm:text-xl">
                     COREY
                   </h1>
                 </div>
