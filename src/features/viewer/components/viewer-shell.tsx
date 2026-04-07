@@ -19,6 +19,7 @@ import {
 } from "@/features/rules/lib/validation";
 import { useViewerRules } from "@/features/rules/rules-provider";
 import { DataTablePanel } from "@/features/viewer/components/data-table-panel";
+import { DetachedWindow } from "@/features/viewer/components/detached-window";
 import { ModelTreePanel } from "@/features/viewer/components/model-tree-panel";
 import { IfcViewport } from "@/features/viewer/components/ifc-viewport";
 import { PropertiesPanel } from "@/features/viewer/components/properties-panel";
@@ -251,6 +252,16 @@ function TableIcon({ className }: { className?: string }) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
       <rect x="4.5" y="5" width="15" height="14" rx="2.5" />
       <path d="M4.5 10h15M9.5 10v9M14.5 10v9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PopOutIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <path d="M14 5h5v5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="m10 14 9-9" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M19 14v4.5a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 18.5v-12A1.5 1.5 0 0 1 5.5 5H10" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -587,6 +598,7 @@ export function ViewerShell() {
   const [showTree, setShowTree] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
   const [showDataTable, setShowDataTable] = useState(false);
+  const [showDataTableInWindow, setShowDataTableInWindow] = useState(false);
   const [treeDrawerWidth, setTreeDrawerWidth] = useState(DEFAULT_TREE_DRAWER_WIDTH);
   const [propertiesDrawerWidth, setPropertiesDrawerWidth] = useState(
     DEFAULT_PROPERTIES_DRAWER_WIDTH,
@@ -605,6 +617,7 @@ export function ViewerShell() {
     useState<DataTableDialogResizeState | null>(null);
 
   const hasModel = Boolean(metadata && status.phase === "loaded");
+  const isDataTableDetached = showDataTable && showDataTableInWindow;
   const activeDrawerResizeSide = drawerDragState?.side ?? null;
   const deferredRules = useDeferredValue(config.rules);
   const compiledValidationRules = useMemo(
@@ -980,6 +993,12 @@ export function ViewerShell() {
       "resize",
     );
   }, [clampDataTableDialogLayout, dataTableDialogResizeState, scheduleDataTableDialogPreview]);
+
+  useEffect(() => {
+    if (!showDataTable) {
+      setShowDataTableInWindow(false);
+    }
+  }, [showDataTable]);
 
   useEffect(() => {
     syncWorkspaceLayout();
@@ -1637,6 +1656,159 @@ export function ViewerShell() {
     void viewportRef.current?.selectNode(localId);
   }, []);
 
+  const showDataTableDialog = useCallback(() => {
+    setShowDataTable(true);
+    setShowDataTableInWindow(false);
+  }, []);
+
+  const showDataTableWindow = useCallback(() => {
+    setShowDataTable(true);
+    setShowDataTableInWindow(true);
+  }, []);
+
+  const hideDataTable = useCallback(() => {
+    setShowDataTable(false);
+    setShowDataTableInWindow(false);
+  }, []);
+
+  const dataTableHeader = (
+    <div className="flex items-start justify-between gap-3 border-b border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)]/90 px-4 py-2.5">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="truncate text-sm font-semibold text-[color:var(--foreground)]">
+            Data table
+          </div>
+          <span
+            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${dataTablePhaseTone(dataTableState.phase)}`}
+          >
+            {dataTableState.phase}
+          </span>
+          {isDataTableDetached ? (
+            <span className="inline-flex items-center rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)]">
+              Detached window
+            </span>
+          ) : null}
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[color:var(--muted-ink)]">
+          {metadata ? (
+            <span className="inline-flex items-center rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-2.5 py-1">
+              {metadata.name}
+            </span>
+          ) : null}
+          {metadata ? (
+            <span className="inline-flex items-center rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-2.5 py-1">
+              {formatBytes(metadata.size)}
+            </span>
+          ) : null}
+          {draftEditCount > 0 ? (
+            <span className="inline-flex items-center rounded-full border border-[color:var(--viewer-border)] bg-[#edf7f1] px-2.5 py-1 text-[#1e6b45]">
+              {draftEditCount} imported edits
+            </span>
+          ) : null}
+        </div>
+        {dataTableActionStatus.message ? (
+          <div className="mt-2 max-w-3xl text-xs text-[color:var(--muted-ink)]">
+            {dataTableActionStatus.message}
+          </div>
+        ) : null}
+        {dataTableImportReport?.issues.length ? (
+          <div className="mt-1 max-w-3xl text-xs text-[#8a3e1f]">
+            {dataTableImportReport.issues[0]?.message}
+            {dataTableImportReport.issues.length > 1
+              ? ` (+${dataTableImportReport.issues.length - 1} more)`
+              : ""}
+          </div>
+        ) : null}
+      </div>
+
+      <div
+        className="flex flex-wrap items-center justify-end gap-2"
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            void handleExportExcel();
+          }}
+          disabled={!effectiveDataTableData || dataTableActionStatus.phase === "running"}
+          className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Export Excel
+        </button>
+        <button
+          type="button"
+          onClick={openDataTableImportPicker}
+          disabled={!effectiveDataTableData || dataTableActionStatus.phase === "running"}
+          className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Import Excel
+        </button>
+        <button
+          type="button"
+          onClick={handleClearImportedEdits}
+          disabled={draftEditCount === 0 || dataTableActionStatus.phase === "running"}
+          className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Clear Edits
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            void handleExportEditedIfc();
+          }}
+          disabled={draftEditCount === 0 || dataTableActionStatus.phase === "running"}
+          className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Export IFC
+        </button>
+        <button
+          type="button"
+          onClick={isDataTableDetached ? showDataTableDialog : showDataTableWindow}
+          className="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)]"
+        >
+          <PopOutIcon className="h-3.5 w-3.5" />
+          <span>{isDataTableDetached ? "Dock" : "Pop Out"}</span>
+        </button>
+        {!isDataTableDetached ? (
+          <button
+            type="button"
+            onClick={resetDataTableDialogLayout}
+            className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)]"
+          >
+            Reset
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={hideDataTable}
+          className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)]"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+
+  const dataTablePanelContent = (
+    <div className="min-h-0 flex-1">
+      <DataTablePanel
+        embedded
+        metadata={metadata}
+        tableState={effectiveDataTableState}
+        activeSelection={session.selected}
+        onSelectRow={handleDataTableRowSelect}
+        showMetaHeader={false}
+      />
+    </div>
+  );
+
+  const dataTableSurface = (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      {dataTableHeader}
+      {dataTablePanelContent}
+    </div>
+  );
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-[color:var(--background)] text-[color:var(--foreground)]">
       <header className="w-full border-b border-[color:var(--viewer-border)] bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(234,242,255,0.94))] shadow-[var(--viewer-shadow)]">
@@ -1695,9 +1867,28 @@ export function ViewerShell() {
                 <HeaderActionButton
                   label={showDataTable ? "Hide data table" : "Show data table"}
                   active={showDataTable}
-                  onClick={() => setShowDataTable((value) => !value)}
+                  onClick={() => {
+                    if (showDataTable) {
+                      hideDataTable();
+                    } else {
+                      showDataTableDialog();
+                    }
+                  }}
                 >
                   <TableIcon className="h-4 w-4" />
+                </HeaderActionButton>
+                <HeaderActionButton
+                  label={isDataTableDetached ? "Dock data table" : "Open data table in a new window"}
+                  active={isDataTableDetached}
+                  onClick={() => {
+                    if (isDataTableDetached) {
+                      showDataTableDialog();
+                    } else {
+                      showDataTableWindow();
+                    }
+                  }}
+                >
+                  <PopOutIcon className="h-4 w-4" />
                 </HeaderActionButton>
               </div>
             </div>
@@ -1888,7 +2079,7 @@ export function ViewerShell() {
               />
             </div>
 
-            {showDataTable && dataTableDialogLayout.initialized ? (
+            {showDataTable && !isDataTableDetached && dataTableDialogLayout.initialized ? (
               <div className="pointer-events-none absolute inset-0 z-50">
                 <div
                   ref={dataTableDialogRef}
@@ -1907,121 +2098,12 @@ export function ViewerShell() {
                   <div
                     onPointerDown={startDataTableDialogMove}
                     title="Drag to move data table window"
-                    className="flex cursor-move items-start justify-between gap-3 border-b border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)]/90 px-4 py-2.5"
+                    className="cursor-move"
                   >
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="truncate text-sm font-semibold text-[color:var(--foreground)]">
-                          Data table
-                        </div>
-                        <span
-                          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${dataTablePhaseTone(dataTableState.phase)}`}
-                        >
-                          {dataTableState.phase}
-                        </span>
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[color:var(--muted-ink)]">
-                        {metadata ? (
-                          <span className="inline-flex items-center rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-2.5 py-1">
-                            {metadata.name}
-                          </span>
-                        ) : null}
-                        {metadata ? (
-                          <span className="inline-flex items-center rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-2.5 py-1">
-                            {formatBytes(metadata.size)}
-                          </span>
-                        ) : null}
-                        {draftEditCount > 0 ? (
-                          <span className="inline-flex items-center rounded-full border border-[color:var(--viewer-border)] bg-[#edf7f1] px-2.5 py-1 text-[#1e6b45]">
-                            {draftEditCount} imported edits
-                          </span>
-                        ) : null}
-                      </div>
-                      {dataTableActionStatus.message ? (
-                        <div className="mt-2 max-w-3xl text-xs text-[color:var(--muted-ink)]">
-                          {dataTableActionStatus.message}
-                        </div>
-                      ) : null}
-                      {dataTableImportReport?.issues.length ? (
-                        <div className="mt-1 max-w-3xl text-xs text-[#8a3e1f]">
-                          {dataTableImportReport.issues[0]?.message}
-                          {dataTableImportReport.issues.length > 1
-                            ? ` (+${dataTableImportReport.issues.length - 1} more)`
-                            : ""}
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-end gap-2">
-                      <button
-                        type="button"
-                        onPointerDown={(event) => event.stopPropagation()}
-                        onClick={() => {
-                          void handleExportExcel();
-                        }}
-                        disabled={!effectiveDataTableData || dataTableActionStatus.phase === "running"}
-                        className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Export Excel
-                      </button>
-                      <button
-                        type="button"
-                        onPointerDown={(event) => event.stopPropagation()}
-                        onClick={openDataTableImportPicker}
-                        disabled={!effectiveDataTableData || dataTableActionStatus.phase === "running"}
-                        className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Import Excel
-                      </button>
-                      <button
-                        type="button"
-                        onPointerDown={(event) => event.stopPropagation()}
-                        onClick={handleClearImportedEdits}
-                        disabled={draftEditCount === 0 || dataTableActionStatus.phase === "running"}
-                        className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Clear Edits
-                      </button>
-                      <button
-                        type="button"
-                        onPointerDown={(event) => event.stopPropagation()}
-                        onClick={() => {
-                          void handleExportEditedIfc();
-                        }}
-                        disabled={draftEditCount === 0 || dataTableActionStatus.phase === "running"}
-                        className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Export IFC
-                      </button>
-                      <button
-                        type="button"
-                        onPointerDown={(event) => event.stopPropagation()}
-                        onClick={resetDataTableDialogLayout}
-                        className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)]"
-                      >
-                        Reset
-                      </button>
-                      <button
-                        type="button"
-                        onPointerDown={(event) => event.stopPropagation()}
-                        onClick={() => setShowDataTable(false)}
-                        className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)]"
-                      >
-                        Close
-                      </button>
-                    </div>
+                    {dataTableHeader}
                   </div>
 
-                  <div className="min-h-0 flex-1">
-                    <DataTablePanel
-                      embedded
-                      metadata={metadata}
-                      tableState={effectiveDataTableState}
-                      activeSelection={session.selected}
-                      onSelectRow={handleDataTableRowSelect}
-                      showMetaHeader={false}
-                    />
-                  </div>
+                  {dataTablePanelContent}
 
                   <div
                     aria-hidden="true"
@@ -2034,6 +2116,20 @@ export function ViewerShell() {
                   </div>
                 </div>
               </div>
+            ) : null}
+            {isDataTableDetached ? (
+              <DetachedWindow
+                title={`Data Table${metadata ? ` · ${metadata.name}` : ""}`}
+                name="corey-data-table"
+                width={Math.max(dataTableDialogLayout.width, DEFAULT_DATA_TABLE_DIALOG_WIDTH)}
+                height={Math.max(dataTableDialogLayout.height, DEFAULT_DATA_TABLE_DIALOG_HEIGHT)}
+                onClose={hideDataTable}
+                onOpenBlocked={showDataTableDialog}
+              >
+                <div className="flex h-screen min-h-0 flex-col bg-[color:var(--panel-bg)] text-[color:var(--foreground)]">
+                  {dataTableSurface}
+                </div>
+              </DetachedWindow>
             ) : null}
           </div>
         </main>
