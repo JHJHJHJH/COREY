@@ -265,7 +265,7 @@ const DataTablePanelComponent = function DataTablePanel({
           : "rounded-[1.75rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] shadow-[var(--viewer-shadow)]"
       }`}
     >
-      <div className="border-b border-[color:var(--viewer-border)] px-4 py-3">
+      <div id="dev-stats" className="border-b border-[color:var(--viewer-border)] px-4 py-3">
         {showMetaHeader ? (
           <div className="flex flex-wrap gap-2 text-[11px] font-medium tracking-[0.08em]">
             <span
@@ -296,9 +296,10 @@ const DataTablePanelComponent = function DataTablePanel({
           <span>{visibleRows.length} visible rows</span>
           <span>{editedRowCount} edited rows</span>
           <span>{activeUiState.selectedRowKeys.size} checked rows</span>
+          <span>{tableState.message}</span>
         </div>
 
-        <div className="mt-1.5 text-xs text-[color:var(--muted-ink)]">{tableState.message}</div>
+        
       </div>
 
       <div className="border-b border-[color:var(--viewer-border)] px-4 py-3">
