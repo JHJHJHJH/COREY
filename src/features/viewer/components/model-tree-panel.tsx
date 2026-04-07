@@ -1,6 +1,15 @@
 "use client";
 
-import { ArrowUp, ChevronRight, EyeOff, ListFilter, ScanSearch, Search } from "lucide-react";
+import {
+  ArrowUp,
+  ChevronDown,
+  ChevronRight,
+  ChevronsDownUp,
+  EyeOff,
+  ListFilter,
+  ScanSearch,
+  Search,
+} from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { filterTree, formatBytes, formatTreeNodeCount } from "@/features/viewer/lib/ifc-data";
 import type {
@@ -23,6 +32,7 @@ type ModelTreePanelProps = {
 
 type TreeNodeRowProps = {
   node: ViewerTreeNode;
+  indentLevel: number;
   selection: ViewerSelection | null;
   selectedPathKeys: Set<string>;
   expandedKeys: Set<string>;
@@ -89,6 +99,7 @@ function collectSelectedPathKeys(
 
 function TreeNodeRow({
   node,
+  indentLevel,
   selection,
   selectedPathKeys,
   expandedKeys,
@@ -101,56 +112,74 @@ function TreeNodeRow({
   const expanded = hasChildren ? expandedKeys.has(node.key) : false;
   const showChildren = hasChildren && (forceExpanded || expanded);
   const selected = selection?.localId === node.localId;
+  const isCategoryRow = node.localId === null && typeof node.category === "string" && node.category.length > 0;
+  const rowClassName = selected
+    ? "border-[color:var(--accent)]/40 bg-[color:var(--surface-strong)] text-[color:var(--foreground)]"
+    : isCategoryRow
+      ? "border-[color:var(--accent)]/18 bg-[linear-gradient(135deg,rgba(10,92,255,0.08),rgba(255,255,255,0.88))] text-[color:var(--foreground)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.35)] hover:border-[color:var(--accent)]/30 hover:bg-[linear-gradient(135deg,rgba(10,92,255,0.12),rgba(255,255,255,0.96))]"
+      : "border-transparent text-[color:var(--muted-ink)] hover:border-[color:var(--viewer-border)] hover:bg-[color:var(--surface-soft)] hover:text-[color:var(--foreground)]";
+  const badgeClassName = isCategoryRow
+    ? "hidden rounded-full border border-[color:var(--accent)]/20 bg-white/80 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] text-[color:var(--accent)] md:inline-flex"
+    : "hidden rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] text-[color:var(--muted-ink)] md:inline-flex";
+  const rowIndentStyle = indentLevel > 0 ? { paddingLeft: `${indentLevel * 0.875}rem` } : undefined;
 
   return (
     <div className="space-y-0.5">
-      <div
-        className={`flex items-center gap-1.5 rounded-lg border px-1.5 py-1 text-[13px] transition ${
-          selected
-            ? "border-[color:var(--accent)]/40 bg-[color:var(--surface-strong)] text-[color:var(--foreground)]"
-            : "border-transparent text-[color:var(--muted-ink)] hover:border-[color:var(--viewer-border)] hover:bg-[color:var(--surface-soft)] hover:text-[color:var(--foreground)]"
-        }`}
-        role="treeitem"
-        aria-expanded={hasChildren ? showChildren : undefined}
-        aria-selected={selected}
-      >
-        <button
-          type="button"
-          onClick={() => hasChildren && onToggle(node.key)}
-          disabled={!hasChildren}
-          className="flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-md text-xs text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-default disabled:opacity-40"
-          aria-label={showChildren ? "Collapse node" : "Expand node"}
+      <div style={rowIndentStyle}>
+        <div
+          className={`flex items-center gap-1.5 rounded-lg border px-1.5 py-1 text-[13px] transition ${rowClassName}`}
+          role="treeitem"
+          aria-expanded={hasChildren ? showChildren : undefined}
+          aria-selected={selected}
         >
-          {hasChildren ? (
-            <ChevronRight
-              className={`h-3.5 w-3.5 transition ${showChildren ? "rotate-90" : ""}`}
-              aria-hidden="true"
-            />
-          ) : (
-            <span className="text-[11px]">•</span>
-          )}
-        </button>
-        <button
-          ref={(element) => registerRowButton(node.localId, element)}
-          type="button"
-          disabled={node.localId === null}
-          onClick={() => node.localId !== null && onSelectNode(node.localId)}
-          className="flex min-w-0 flex-1 items-center justify-between gap-1.5 rounded-md px-1.5 py-0.5 text-left disabled:cursor-default"
-        >
-          <span className="truncate font-medium">{node.label}</span>
-          {node.category ? (
-            <span className="hidden rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] text-[color:var(--muted-ink)] md:inline-flex">
-              {node.category}
+          <button
+            type="button"
+            onClick={() => hasChildren && onToggle(node.key)}
+            disabled={!hasChildren}
+            className="flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-md text-xs text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-default disabled:opacity-40"
+            aria-label={showChildren ? "Collapse node" : "Expand node"}
+          >
+            {hasChildren ? (
+              <ChevronRight
+                className={`h-3.5 w-3.5 transition ${showChildren ? "rotate-90" : ""}`}
+                aria-hidden="true"
+              />
+            ) : (
+              <span className="text-[11px]">•</span>
+            )}
+          </button>
+          <button
+            ref={(element) => registerRowButton(node.localId, element)}
+            type="button"
+            disabled={node.localId === null}
+            onClick={() => node.localId !== null && onSelectNode(node.localId)}
+            className="flex min-w-0 flex-1 items-center justify-between gap-1.5 rounded-md px-1.5 py-0.5 text-left disabled:cursor-default"
+          >
+            <span className={`truncate font-medium ${isCategoryRow ? "tracking-[0.01em]" : ""}`}>
+              {node.label}
             </span>
-          ) : null}
-        </button>
+            {node.category ? (
+              <span className={badgeClassName}>
+                {node.category}
+              </span>
+            ) : null}
+          </button>
+        </div>
       </div>
 
       {showChildren
         ? node.children.map((child) => (
-            <div key={child.key} className="relative pl-3.5">
+            <div key={child.key} className="relative">
               <TreeNodeRow
                 node={child}
+                indentLevel={
+                  indentLevel +
+                  (child.localId === null &&
+                  typeof child.category === "string" &&
+                  child.category.length > 0
+                    ? 1
+                    : 0)
+                }
                 selection={selection}
                 selectedPathKeys={selectedPathKeys}
                 expandedKeys={expandedKeys}
@@ -335,6 +364,14 @@ export function ModelTreePanel({
 
   const scrollTreeToTop = () => {
     treeScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const collapseAll = () => {
+    setExpandedKeys(new Set());
+  };
+
+  const expandAll = () => {
+    setExpandedKeys(collectExpandableKeys(filteredNodes));
   };
 
   useEffect(() => {
@@ -550,6 +587,7 @@ export function ModelTreePanel({
                 <TreeNodeRow
                   key={node.key}
                   node={node}
+                  indentLevel={0}
                   selection={selection}
                   selectedPathKeys={selectedPathKeys}
                   expandedKeys={effectiveExpandedKeys}
@@ -564,17 +602,41 @@ export function ModelTreePanel({
         </section>
       </div>
 
-      {showScrollTop ? (
+      {(showScrollTop || filteredNodes.length > 0) ? (
         <div className="pointer-events-none absolute bottom-3 right-3">
-          <button
-            type="button"
-            aria-label="Scroll tree to top"
-            title="Scroll tree to top"
-            onClick={scrollTreeToTop}
-            className="pointer-events-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/95 text-[color:var(--muted-ink)] shadow-[var(--viewer-shadow)] backdrop-blur transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
-          >
-            <ArrowUp className="h-4 w-4" />
-          </button>
+          <div className="pointer-events-auto flex items-center gap-2">
+            <button
+              type="button"
+              aria-label="Collapse all tree nodes"
+              title={forceExpanded ? "Collapse is unavailable while filtering the tree" : "Collapse all"}
+              onClick={collapseAll}
+              disabled={forceExpanded || filteredNodes.length === 0}
+              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/95 text-[color:var(--muted-ink)] shadow-[var(--viewer-shadow)] backdrop-blur transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)] disabled:cursor-default disabled:opacity-45"
+            >
+              <ChevronsDownUp className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              aria-label="Expand all tree nodes"
+              title={forceExpanded ? "Expand is unavailable while filtering the tree" : "Expand all"}
+              onClick={expandAll}
+              disabled={forceExpanded || filteredNodes.length === 0}
+              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/95 text-[color:var(--muted-ink)] shadow-[var(--viewer-shadow)] backdrop-blur transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)] disabled:cursor-default disabled:opacity-45"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </button>
+            {showScrollTop ? (
+              <button
+                type="button"
+                aria-label="Scroll tree to top"
+                title="Scroll tree to top"
+                onClick={scrollTreeToTop}
+                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/95 text-[color:var(--muted-ink)] shadow-[var(--viewer-shadow)] backdrop-blur transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
+              >
+                <ArrowUp className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : null}
     </aside>

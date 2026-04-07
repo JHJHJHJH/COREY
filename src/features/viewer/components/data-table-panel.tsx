@@ -1,5 +1,6 @@
 "use client";
 
+import { RefreshCw } from "lucide-react";
 import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   filterViewerDataTableRows,
@@ -20,6 +21,8 @@ type DataTablePanelProps = {
   metadata: ModelMetadata | null;
   tableState: ViewerDataTableState;
   activeSelection: ViewerSelection | null;
+  visibleRowKeysInView: Set<string> | null;
+  onSyncToView: () => Promise<void>;
   onSelectRow: (localId: number) => void;
   showMetaHeader?: boolean;
 };
@@ -112,6 +115,8 @@ const DataTablePanelComponent = function DataTablePanel({
   metadata,
   tableState,
   activeSelection,
+  visibleRowKeysInView,
+  onSyncToView,
   onSelectRow,
   showMetaHeader = true,
 }: DataTablePanelProps) {
@@ -125,6 +130,7 @@ const DataTablePanelComponent = function DataTablePanel({
     uiState.dataSignature === dataSignature ? uiState : buildDefaultUiState(dataSignature, data);
   const deferredQuery = useDeferredValue(activeUiState.query);
   const deferredIfcTypeFilter = useDeferredValue(activeUiState.ifcTypeFilter);
+  const [isSyncingToView, setIsSyncingToView] = useState(false);
 
   const updateUiState = (updater: (current: DataTableUiState) => DataTableUiState) => {
     setUiState((current) => {
@@ -152,12 +158,18 @@ const DataTablePanelComponent = function DataTablePanel({
       return [];
     }
 
-    const nextRows = filterViewerDataTableRows(data.rows, {
+    let nextRows = filterViewerDataTableRows(data.rows, {
       query: deferredQuery,
       ifcType: deferredIfcTypeFilter,
     });
-    return activeUiState.showEditedOnly ? nextRows.filter(rowHasImportedEdits) : nextRows;
-  }, [activeUiState.showEditedOnly, data, deferredIfcTypeFilter, deferredQuery]);
+    if (activeUiState.showEditedOnly) {
+      nextRows = nextRows.filter(rowHasImportedEdits);
+    }
+    if (visibleRowKeysInView) {
+      nextRows = nextRows.filter((row) => visibleRowKeysInView.has(row.key));
+    }
+    return nextRows;
+  }, [activeUiState.showEditedOnly, data, deferredIfcTypeFilter, deferredQuery, visibleRowKeysInView]);
 
   const editedRowCount = useMemo(
     () => (data ? data.rows.filter(rowHasImportedEdits).length : 0),
@@ -234,6 +246,15 @@ const DataTablePanelComponent = function DataTablePanel({
       }
       return { ...current, visibleColumnKeys: [...next] };
     });
+  };
+
+  const handleSyncToView = async () => {
+    setIsSyncingToView(true);
+    try {
+      await onSyncToView();
+    } finally {
+      setIsSyncingToView(false);
+    }
   };
 
   return (
@@ -337,6 +358,22 @@ const DataTablePanelComponent = function DataTablePanel({
             }`}
           >
             Show edited only
+          </button>
+
+          <button
+            type="button"
+            disabled={!data || isSyncingToView}
+            onClick={() => {
+              void handleSyncToView();
+            }}
+            className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+              visibleRowKeysInView
+                ? "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
+                : "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
+            }`}
+          >
+            <RefreshCw className={`h-4 w-4 ${isSyncingToView ? "animate-spin" : ""}`} />
+            {isSyncingToView ? "Syncing view..." : "Sync to view"}
           </button>
 
           <details className="relative">

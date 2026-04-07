@@ -221,6 +221,8 @@ export interface ViewerDataTableState {
   data: ViewerDataTableData | null;
 }
 
+export type ViewerElementIdMap = Record<string, Set<number>>;
+
 export interface ViewerDataTableDraftValue extends ViewerDataTableCellSnapshot {
   valueKind: ViewerDataTableEditableValueKind | null;
 }
@@ -307,6 +309,7 @@ export interface ViewerViewportHandle {
   loadIfc(source: ModelSourceResult): Promise<void>;
   clearModel(): Promise<void>;
   selectNode(localId: number): Promise<void>;
+  getHiddenElements(): ViewerElementIdMap | null;
   showAll(): Promise<void>;
   hideSelection(): Promise<void>;
   isolateSelection(): Promise<void>;

@@ -1,6 +1,18 @@
 "use client";
 
-import { Box, PanelLeftOpen, PanelRightOpen, SquareArrowOutUpRight, Upload } from "lucide-react";
+import {
+  Box,
+  Download,
+  FileOutput,
+  FileSpreadsheet,
+  Import,
+  PanelLeftOpen,
+  PanelRightOpen,
+  RotateCcw,
+  SquareArrowOutUpRight,
+  Upload,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import {
   startTransition,
@@ -77,7 +89,7 @@ const initialSession: ViewerSessionState = {
   hiddenItemCount: 0,
 };
 
-const DEFAULT_TREE_DRAWER_WIDTH = 336;
+const DEFAULT_TREE_DRAWER_WIDTH = 520;
 const DEFAULT_PROPERTIES_DRAWER_WIDTH = 368;
 const MIN_DRAWER_WIDTH = 240;
 const MIN_CONSTRAINED_DRAWER_WIDTH = 160;
@@ -227,6 +239,7 @@ function StatusDot({ phase }: { phase: ViewerStatus["phase"] }) {
 type HeaderActionButtonProps = {
   label: string;
   active?: boolean;
+  disabled?: boolean;
   onClick: () => void;
   children: React.ReactNode;
 };
@@ -234,6 +247,7 @@ type HeaderActionButtonProps = {
 function HeaderActionButton({
   label,
   active = false,
+  disabled = false,
   onClick,
   children,
 }: HeaderActionButtonProps) {
@@ -242,12 +256,13 @@ function HeaderActionButton({
       type="button"
       aria-label={label}
       title={label}
+      disabled={disabled}
       onClick={onClick}
       className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border transition ${
         active
           ? "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
           : "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
-      }`}
+      } disabled:cursor-not-allowed disabled:opacity-50`}
     >
       {children}
     </button>
@@ -531,6 +546,8 @@ export function ViewerShell() {
   const [dataTableActionStatus, setDataTableActionStatus] = useState<ViewerDataTableExportStatus>(
     initialDataTableActionStatus,
   );
+  const [dataTableVisibleRowKeysInView, setDataTableVisibleRowKeysInView] =
+    useState<Set<string> | null>(null);
   const [selectionDetails, setSelectionDetails] = useState<ViewerSelectionDetails>({
     selection: null,
     inspection: null,
@@ -599,6 +616,7 @@ export function ViewerShell() {
     }),
     [dataTableState, effectiveDataTableData],
   );
+  const isDataTableSyncedToView = dataTableVisibleRowKeysInView !== null;
   const indexedIfcTypes = useMemo(() => effectiveDataTableData?.ifcTypes ?? [], [effectiveDataTableData]);
   const draftEditCount = dataTableDraft?.edits.length ?? 0;
   const validatedSelectionDetails = useMemo<ViewerSelectionDetails>(
@@ -1601,6 +1619,44 @@ export function ViewerShell() {
     void viewportRef.current?.selectNode(localId);
   }, []);
 
+  const syncDataTableToView = useCallback(() => {
+    if (!effectiveDataTableData) {
+      setDataTableVisibleRowKeysInView(null);
+      return;
+    }
+
+    const hiddenElements = viewportRef.current?.getHiddenElements() ?? null;
+    const visibleRowKeys = new Set<string>();
+
+    for (const row of effectiveDataTableData.rows) {
+      if (!hiddenElements?.[row.modelId]?.has(row.localId)) {
+        visibleRowKeys.add(row.key);
+      }
+    }
+
+    setDataTableVisibleRowKeysInView(visibleRowKeys);
+  }, [effectiveDataTableData]);
+
+  const handleSyncDataTableToView = useCallback(async () => {
+    if (dataTableVisibleRowKeysInView) {
+      setDataTableVisibleRowKeysInView(null);
+      return;
+    }
+
+    syncDataTableToView();
+  }, [dataTableVisibleRowKeysInView, syncDataTableToView]);
+
+  const runViewportVisibilityAction = useCallback(
+    async (action: () => Promise<void>) => {
+      await action();
+
+      if (dataTableVisibleRowKeysInView) {
+        syncDataTableToView();
+      }
+    },
+    [dataTableVisibleRowKeysInView, syncDataTableToView],
+  );
+
   const showDataTableDialog = useCallback(() => {
     setShowDataTable(true);
     setShowDataTableInWindow(false);
@@ -1615,6 +1671,18 @@ export function ViewerShell() {
     setShowDataTable(false);
     setShowDataTableInWindow(false);
   }, []);
+
+  useEffect(() => {
+    setDataTableVisibleRowKeysInView(null);
+  }, [metadata?.sourceId]);
+
+  useEffect(() => {
+    if (!isDataTableSyncedToView) {
+      return;
+    }
+
+    syncDataTableToView();
+  }, [effectiveDataTableData, isDataTableSyncedToView, syncDataTableToView]);
 
   const dataTableHeader = (
     <div className="flex items-start justify-between gap-3 border-b border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)]/90 px-4 py-2.5">
@@ -1670,66 +1738,62 @@ export function ViewerShell() {
         className="flex flex-wrap items-center justify-end gap-2"
         onPointerDown={(event) => event.stopPropagation()}
       >
-        <button
-          type="button"
+        <HeaderActionButton
+          label="Export Excel"
           onClick={() => {
             void handleExportExcel();
           }}
           disabled={!effectiveDataTableData || dataTableActionStatus.phase === "running"}
-          className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Export Excel
-        </button>
-        <button
-          type="button"
+          <FileSpreadsheet className="h-4 w-4" />
+        </HeaderActionButton>
+        <HeaderActionButton
+          label="Import Excel"
           onClick={openDataTableImportPicker}
           disabled={!effectiveDataTableData || dataTableActionStatus.phase === "running"}
-          className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Import Excel
-        </button>
-        <button
-          type="button"
+          <Import className="h-4 w-4" />
+        </HeaderActionButton>
+        <HeaderActionButton
+          label="Clear edits"
           onClick={handleClearImportedEdits}
           disabled={draftEditCount === 0 || dataTableActionStatus.phase === "running"}
-          className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Clear Edits
-        </button>
-        <button
-          type="button"
+          <RotateCcw className="h-4 w-4" />
+        </HeaderActionButton>
+        <HeaderActionButton
+          label="Export IFC"
           onClick={() => {
             void handleExportEditedIfc();
           }}
           disabled={draftEditCount === 0 || dataTableActionStatus.phase === "running"}
-          className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Export IFC
-        </button>
-        <button
-          type="button"
+          <FileOutput className="h-4 w-4" />
+        </HeaderActionButton>
+        <HeaderActionButton
+          label={isDataTableDetached ? "Dock" : "Pop out"}
           onClick={isDataTableDetached ? showDataTableDialog : showDataTableWindow}
-          className="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)]"
         >
-          <SquareArrowOutUpRight className="h-3.5 w-3.5" />
-          <span>{isDataTableDetached ? "Dock" : "Pop Out"}</span>
-        </button>
+          {isDataTableDetached ? (
+            <Download className="h-4 w-4" />
+          ) : (
+            <SquareArrowOutUpRight className="h-4 w-4" />
+          )}
+        </HeaderActionButton>
         {!isDataTableDetached ? (
-          <button
-            type="button"
+          <HeaderActionButton
+            label="Reset layout"
             onClick={resetDataTableDialogLayout}
-            className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)]"
           >
-            Reset
-          </button>
+            <RotateCcw className="h-4 w-4" />
+          </HeaderActionButton>
         ) : null}
-        <button
-          type="button"
+        <HeaderActionButton
+          label="Close"
           onClick={hideDataTable}
-          className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)]"
         >
-          Close
-        </button>
+          <X className="h-4 w-4" />
+        </HeaderActionButton>
       </div>
     </div>
   );
@@ -1741,6 +1805,8 @@ export function ViewerShell() {
         metadata={metadata}
         tableState={effectiveDataTableState}
         activeSelection={session.selected}
+        visibleRowKeysInView={dataTableVisibleRowKeysInView}
+        onSyncToView={handleSyncDataTableToView}
         onSelectRow={handleDataTableRowSelect}
         showMetaHeader={false}
       />
@@ -1908,10 +1974,14 @@ export function ViewerShell() {
                       void viewportRef.current?.selectNode(localId);
                     }}
                     onHideCategory={(category) => {
-                      void viewportRef.current?.hideCategory(category);
+                      void runViewportVisibilityAction(async () => {
+                        await viewportRef.current?.hideCategory(category);
+                      });
                     }}
                     onIsolateCategory={(category) => {
-                      void viewportRef.current?.isolateCategory(category);
+                      void runViewportVisibilityAction(async () => {
+                        await viewportRef.current?.isolateCategory(category);
+                      });
                     }}
                   />
                 )}
@@ -1975,13 +2045,19 @@ export function ViewerShell() {
                     void viewportRef.current?.focusSelection();
                   }}
                   onShowAll={() => {
-                    void viewportRef.current?.showAll();
+                    void runViewportVisibilityAction(async () => {
+                      await viewportRef.current?.showAll();
+                    });
                   }}
                   onHideSelection={() => {
-                    void viewportRef.current?.hideSelection();
+                    void runViewportVisibilityAction(async () => {
+                      await viewportRef.current?.hideSelection();
+                    });
                   }}
                   onIsolateSelection={() => {
-                    void viewportRef.current?.isolateSelection();
+                    void runViewportVisibilityAction(async () => {
+                      await viewportRef.current?.isolateSelection();
+                    });
                   }}
                   onClearSections={() => {
                     viewportRef.current?.clearSections();

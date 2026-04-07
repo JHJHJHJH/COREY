@@ -22,6 +22,7 @@ import {
   readNameMaps,
 } from "@/features/viewer/lib/ifc-data";
 import type {
+  ViewerElementIdMap,
   ModelMetadata,
   ModelSourceResult,
   ViewerDataTableState,
@@ -93,6 +94,16 @@ function hasRenderableBox(box: THREE.Box3) {
 function toModelIdMap(highlights: ViewerValidationHighlights["warn"]) {
   return Object.fromEntries(
     Object.entries(highlights).map(([modelId, ids]) => [modelId, new Set(ids)]),
+  );
+}
+
+function cloneElementIdMap(map: ViewerElementIdMap | null): ViewerElementIdMap | null {
+  if (!map) {
+    return null;
+  }
+
+  return Object.fromEntries(
+    Object.entries(map).map(([modelId, ids]) => [modelId, new Set(ids)]),
   );
 }
 
@@ -606,6 +617,9 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
 
       const selection = buildSingleItemMap(runtime.model.modelId, localId);
       await runtime.highlighter.highlightByID("select", selection);
+    },
+    getHiddenElements() {
+      return cloneElementIdMap(runtimeRef.current?.hiddenItems ?? null);
     },
     async showAll() {
       const runtime = runtimeRef.current;
