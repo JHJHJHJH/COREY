@@ -12,7 +12,7 @@ export function RulesModal() {
       onClick={() => router.back()}
     >
       <div
-        className="h-[min(90vh,56rem)] w-[min(80rem,100%)]"
+        className="h-[min(94vh,64rem)] w-[min(96vw,112rem)]"
         onClick={(event) => event.stopPropagation()}
       >
         <RulesScreen mode="modal" onClose={() => router.back()} />

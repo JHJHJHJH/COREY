@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { X } from "lucide-react";
-import { useRef, useState, type ChangeEvent } from "react";
+import { Trash2, X } from "lucide-react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useViewerRules } from "@/features/rules/rules-provider";
 import {
   createEmptyViewerValidationConfig,
@@ -37,11 +37,7 @@ const STARTER_TEMPLATES = [
 ] as const;
 
 function inputClassName() {
-  return "w-full rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 py-2.5 text-sm text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent)]";
-}
-
-function labelClassName() {
-  return "mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-ink)]";
+  return "w-full rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-2 text-sm text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent)] disabled:cursor-not-allowed disabled:bg-[color:var(--panel-bg)] disabled:text-[color:var(--muted-ink)] disabled:opacity-80";
 }
 
 function secondaryButtonClassName() {
@@ -49,7 +45,7 @@ function secondaryButtonClassName() {
 }
 
 function compactButtonClassName() {
-  return "rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1.5 text-xs font-medium text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]";
+  return "inline-flex h-8 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 text-xs font-medium text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]";
 }
 
 function enumText(check: ViewerValidationCheck) {
@@ -86,7 +82,62 @@ function parseEnumValues(value: string) {
     .filter(Boolean);
 }
 
-function RuleCard({
+function headerCellClassName(widthClassName: string) {
+  return `${widthClassName} border-b border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-3 align-bottom`;
+}
+
+function bodyCellClassName(widthClassName: string, subdued = false) {
+  return `${widthClassName} border-b border-[color:var(--viewer-border)] px-3 py-3 align-top ${subdued ? "bg-[color:var(--panel-bg)]/45" : "bg-white/45"}`;
+}
+
+function EnumValuesInput({
+  check,
+  disabled,
+  onCommit,
+}: {
+  check: ViewerValidationCheck;
+  disabled: boolean;
+  onCommit: (allowedValues: string[]) => void;
+}) {
+  const serializedValue = enumText(check);
+  const [draftValue, setDraftValue] = useState(serializedValue);
+  const previewValues = disabled ? [] : parseEnumValues(draftValue);
+
+  useEffect(() => {
+    setDraftValue(serializedValue);
+  }, [serializedValue]);
+
+  return (
+    <div className="space-y-2">
+      <input
+        type="text"
+        value={draftValue}
+        onChange={(event) => setDraftValue(event.target.value)}
+        onBlur={() => onCommit(parseEnumValues(draftValue))}
+        className={inputClassName()}
+        placeholder="A, B, C"
+        aria-label="Allowed values"
+        disabled={disabled}
+      />
+      <div className="flex min-h-6 flex-wrap gap-1">
+        {previewValues.length > 0 ? (
+          previewValues.map((value) => (
+            <span
+              key={value}
+              className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2 py-0.5 text-[11px] font-medium text-[color:var(--foreground)]"
+            >
+              {value}
+            </span>
+          ))
+        ) : (
+          <span className="text-[11px] text-[color:var(--muted-ink)]">Comma-separated values</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RuleRow({
   rule,
   onChange,
   onRemove,
@@ -95,218 +146,201 @@ function RuleCard({
   onChange: (rule: ViewerValidationRule) => void;
   onRemove: () => void;
 }) {
+  const attributeTarget = rule.target.kind === "attribute" ? rule.target : null;
   const propertyTarget = rule.target.kind === "property" ? rule.target : null;
   const numberRangeCheck = rule.check.kind === "numberRange" ? rule.check : null;
+  const isAttributeTarget = rule.target.kind === "attribute";
+  const isPropertyTarget = rule.target.kind === "property";
+  const isEnumCheck = rule.check.kind === "enum";
+  const isNumberRangeCheck = rule.check.kind === "numberRange";
 
   return (
-    <section className="rounded-[1.5rem] border border-[color:var(--viewer-border)] bg-white/65 p-4 shadow-[0_12px_30px_rgba(10,48,128,0.08)]">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <label>
-            <span className={labelClassName()}>IFC Type</span>
-            <input
-              value={rule.ifcType}
-              onChange={(event) => onChange({ ...rule, ifcType: event.target.value })}
-              className={inputClassName()}
-              placeholder="IFCWALL"
-            />
-          </label>
-        </div>
-
-        <div className="w-full min-w-[12rem] sm:w-auto sm:min-w-[11rem]">
-          <label>
-            <span className={labelClassName()}>Fail Severity</span>
-            <select
-              value={rule.failSeverity}
-              onChange={(event) =>
-                onChange({
-                  ...rule,
-                  failSeverity: event.target.value as ViewerValidationRule["failSeverity"],
-                })
-              }
-              className={inputClassName()}
-            >
-              <option value="error">Error</option>
-              <option value="warn">Warn</option>
-            </select>
-          </label>
-        </div>
-
-        <button type="button" onClick={onRemove} className={secondaryButtonClassName()}>
-          Remove
+    <tr className="transition hover:bg-white/25">
+      <td className={bodyCellClassName("min-w-[12rem]")}>
+        <input
+          value={rule.ifcType}
+          onChange={(event) => onChange({ ...rule, ifcType: event.target.value })}
+          className={inputClassName()}
+          placeholder="IFCWALL"
+          aria-label="IFC type"
+        />
+      </td>
+      <td className={bodyCellClassName("min-w-[9rem]")}>
+        <select
+          value={rule.failSeverity}
+          onChange={(event) =>
+            onChange({
+              ...rule,
+              failSeverity: event.target.value as ViewerValidationRule["failSeverity"],
+            })
+          }
+          className={inputClassName()}
+          aria-label="Fail severity"
+        >
+          <option value="error">Error</option>
+          <option value="warn">Warn</option>
+        </select>
+      </td>
+      <td className={bodyCellClassName("min-w-[10rem]")}>
+        <select
+          value={rule.target.kind}
+          onChange={(event) => {
+            const kind = event.target.value as ViewerValidationRule["target"]["kind"];
+            onChange({
+              ...rule,
+              target:
+                kind === "attribute"
+                  ? { kind: "attribute", name: "Name" }
+                  : { kind: "property", group: "Pset_WallCommon", label: "Reference" },
+            });
+          }}
+          className={inputClassName()}
+          aria-label="Target kind"
+        >
+          <option value="attribute">Attribute</option>
+          <option value="property">Property</option>
+        </select>
+      </td>
+      <td className={bodyCellClassName("min-w-[12rem]", !isAttributeTarget)}>
+        <input
+          value={attributeTarget?.name ?? ""}
+          onChange={(event) =>
+            onChange({
+              ...rule,
+              target: {
+                kind: "attribute",
+                name: event.target.value,
+              },
+            })
+          }
+          className={inputClassName()}
+          placeholder="Name"
+          aria-label="Attribute name"
+          disabled={!isAttributeTarget}
+        />
+      </td>
+      <td className={bodyCellClassName("min-w-[13rem]", !isPropertyTarget)}>
+        <input
+          value={propertyTarget?.group ?? ""}
+          onChange={(event) =>
+            onChange({
+              ...rule,
+              target: {
+                kind: "property",
+                group: event.target.value,
+                label: propertyTarget?.label ?? "Reference",
+              },
+            })
+          }
+          className={inputClassName()}
+          placeholder="Pset_WallCommon"
+          aria-label="Property set"
+          disabled={!isPropertyTarget}
+        />
+      </td>
+      <td className={bodyCellClassName("min-w-[12rem]", !isPropertyTarget)}>
+        <input
+          value={propertyTarget?.label ?? ""}
+          onChange={(event) =>
+            onChange({
+              ...rule,
+              target: {
+                kind: "property",
+                group: propertyTarget?.group ?? "Pset_WallCommon",
+                label: event.target.value,
+              },
+            })
+          }
+          className={inputClassName()}
+          placeholder="Reference"
+          aria-label="Property label"
+          disabled={!isPropertyTarget}
+        />
+      </td>
+      <td className={bodyCellClassName("min-w-[11rem]")}>
+        <select
+          value={rule.check.kind}
+          onChange={(event) =>
+            onChange({
+              ...rule,
+              check: nextCheckForKind(event.target.value as ViewerValidationCheck["kind"]),
+            })
+          }
+          className={inputClassName()}
+          aria-label="Check kind"
+        >
+          <option value="empty">Required value</option>
+          <option value="enum">Enum</option>
+          <option value="numberRange">Number range</option>
+        </select>
+      </td>
+      <td className={bodyCellClassName("min-w-[16rem]", !isEnumCheck)}>
+        <EnumValuesInput
+          check={rule.check}
+          disabled={!isEnumCheck}
+          onCommit={(allowedValues) =>
+            onChange({
+              ...rule,
+              check: {
+                kind: "enum",
+                allowedValues,
+              },
+            })
+          }
+        />
+      </td>
+      <td className={bodyCellClassName("min-w-[8rem]", !isNumberRangeCheck)}>
+        <input
+          type="number"
+          value={numberValue(numberRangeCheck?.min ?? null)}
+          onChange={(event) =>
+            onChange({
+              ...rule,
+              check: {
+                kind: "numberRange",
+                max: numberRangeCheck?.max ?? null,
+                min: event.target.value === "" ? null : Number(event.target.value),
+              },
+            })
+          }
+          className={inputClassName()}
+          placeholder="0"
+          aria-label="Minimum value"
+          disabled={!isNumberRangeCheck}
+        />
+      </td>
+      <td className={bodyCellClassName("min-w-[8rem]", !isNumberRangeCheck)}>
+        <input
+          type="number"
+          value={numberValue(numberRangeCheck?.max ?? null)}
+          onChange={(event) =>
+            onChange({
+              ...rule,
+              check: {
+                kind: "numberRange",
+                min: numberRangeCheck?.min ?? null,
+                max: event.target.value === "" ? null : Number(event.target.value),
+              },
+            })
+          }
+          className={inputClassName()}
+          placeholder="100"
+          aria-label="Maximum value"
+          disabled={!isNumberRangeCheck}
+        />
+      </td>
+      <td className={bodyCellClassName("min-w-[7rem]")}>
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label="Remove rule"
+          title="Remove rule"
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#d9a89d] bg-[#fff0ea] text-[#b5432f] transition hover:bg-[#ffe5dc] hover:text-[#962f1f]"
+        >
+          <Trash2 className="h-4 w-4" />
         </button>
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_minmax(0,1fr)]">
-        <label>
-          <span className={labelClassName()}>Target Kind</span>
-          <select
-            value={rule.target.kind}
-            onChange={(event) => {
-              const kind = event.target.value as ViewerValidationRule["target"]["kind"];
-              onChange({
-                ...rule,
-                target:
-                  kind === "attribute"
-                    ? { kind: "attribute", name: "Name" }
-                    : { kind: "property", group: "Pset_WallCommon", label: "Reference" },
-              });
-            }}
-            className={inputClassName()}
-          >
-            <option value="attribute">Attribute</option>
-            <option value="property">Property</option>
-          </select>
-        </label>
-
-        {rule.target.kind === "attribute" ? (
-          <label className="lg:col-span-2">
-            <span className={labelClassName()}>Attribute Name</span>
-            <input
-              value={rule.target.name}
-              onChange={(event) =>
-                onChange({
-                  ...rule,
-                  target: {
-                    kind: "attribute",
-                    name: event.target.value,
-                  },
-                })
-              }
-              className={inputClassName()}
-              placeholder="Name"
-            />
-          </label>
-        ) : propertyTarget ? (
-          <>
-            <label>
-              <span className={labelClassName()}>Property Set</span>
-              <input
-                value={propertyTarget.group}
-                onChange={(event) =>
-                  onChange({
-                    ...rule,
-                    target: {
-                      kind: "property",
-                      label: propertyTarget.label,
-                      group: event.target.value,
-                    },
-                  })
-                }
-                className={inputClassName()}
-                placeholder="Pset_WallCommon"
-              />
-            </label>
-
-            <label>
-              <span className={labelClassName()}>Property Label</span>
-              <input
-                value={propertyTarget.label}
-                onChange={(event) =>
-                  onChange({
-                    ...rule,
-                    target: {
-                      kind: "property",
-                      group: propertyTarget.group,
-                      label: event.target.value,
-                    },
-                  })
-                }
-                className={inputClassName()}
-                placeholder="Reference"
-              />
-            </label>
-          </>
-        ) : null}
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_minmax(0,1fr)]">
-        <label>
-          <span className={labelClassName()}>Check</span>
-          <select
-            value={rule.check.kind}
-            onChange={(event) =>
-              onChange({
-                ...rule,
-                check: nextCheckForKind(event.target.value as ViewerValidationCheck["kind"]),
-              })
-            }
-            className={inputClassName()}
-          >
-            <option value="empty">Required value</option>
-            <option value="enum">Enum</option>
-            <option value="numberRange">Number range</option>
-          </select>
-        </label>
-
-        {rule.check.kind === "enum" ? (
-          <label className="lg:col-span-2">
-            <span className={labelClassName()}>Allowed Values</span>
-            <textarea
-              rows={3}
-              value={enumText(rule.check)}
-              onChange={(event) =>
-                onChange({
-                  ...rule,
-                  check: {
-                    kind: "enum",
-                    allowedValues: parseEnumValues(event.target.value),
-                  },
-                })
-              }
-              className={inputClassName()}
-              placeholder="A, B, C"
-            />
-          </label>
-        ) : numberRangeCheck ? (
-          <>
-            <label>
-              <span className={labelClassName()}>Minimum</span>
-              <input
-                type="number"
-                value={numberValue(numberRangeCheck.min)}
-                onChange={(event) =>
-                  onChange({
-                    ...rule,
-                    check: {
-                      kind: "numberRange",
-                      max: numberRangeCheck.max,
-                      min: event.target.value === "" ? null : Number(event.target.value),
-                    },
-                  })
-                }
-                className={inputClassName()}
-                placeholder="0"
-              />
-            </label>
-
-            <label>
-              <span className={labelClassName()}>Maximum</span>
-              <input
-                type="number"
-                value={numberValue(numberRangeCheck.max)}
-                onChange={(event) =>
-                  onChange({
-                    ...rule,
-                    check: {
-                      kind: "numberRange",
-                      min: numberRangeCheck.min,
-                      max: event.target.value === "" ? null : Number(event.target.value),
-                    },
-                  })
-                }
-                className={inputClassName()}
-                placeholder="100"
-              />
-            </label>
-          </>
-        ) : (
-          <div className="lg:col-span-2 rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 py-3 text-sm text-[color:var(--muted-ink)]">
-            The value must exist and must not be missing, empty, null, or undefined.
-          </div>
-        )}
-      </div>
-    </section>
+      </td>
+    </tr>
   );
 }
 
@@ -371,7 +405,7 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
 
   return (
     <section
-      className={`flex min-h-0 flex-col overflow-hidden rounded-[1.75rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] shadow-[var(--viewer-shadow)] ${
+      className={`flex min-h-0 w-full flex-col overflow-hidden rounded-[1.75rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] shadow-[var(--viewer-shadow)] ${
         mode === "modal" ? "h-full" : "min-h-[calc(100vh-5rem)]"
       }`}
     >
@@ -525,15 +559,34 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {config.rules.map((rule) => (
-              <RuleCard
-                key={rule.id}
-                rule={rule}
-                onChange={(nextRule) => updateRule(rule.id, nextRule)}
-                onRemove={() => removeRule(rule.id)}
-              />
-            ))}
+          <div className="overflow-auto rounded-[1.5rem] border border-[color:var(--viewer-border)] bg-white/50 shadow-[0_12px_30px_rgba(10,48,128,0.08)]">
+            <table className="min-w-full border-separate border-spacing-0 text-left">
+              <thead className="sticky top-0 z-10 bg-[color:var(--panel-bg)]">
+                <tr>
+                  <th className={headerCellClassName("min-w-[12rem]")}>IFC Type</th>
+                  <th className={headerCellClassName("min-w-[9rem]")}>Severity</th>
+                  <th className={headerCellClassName("min-w-[10rem]")}>Target Kind</th>
+                  <th className={headerCellClassName("min-w-[12rem]")}>Attribute Name</th>
+                  <th className={headerCellClassName("min-w-[13rem]")}>Property Set</th>
+                  <th className={headerCellClassName("min-w-[12rem]")}>Property Label</th>
+                  <th className={headerCellClassName("min-w-[11rem]")}>Check Kind</th>
+                  <th className={headerCellClassName("min-w-[16rem]")}>Allowed Values</th>
+                  <th className={headerCellClassName("min-w-[8rem]")}>Min</th>
+                  <th className={headerCellClassName("min-w-[8rem]")}>Max</th>
+                  <th className={headerCellClassName("min-w-[7rem]")}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {config.rules.map((rule) => (
+                  <RuleRow
+                    key={rule.id}
+                    rule={rule}
+                    onChange={(nextRule) => updateRule(rule.id, nextRule)}
+                    onRemove={() => removeRule(rule.id)}
+                  />
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
