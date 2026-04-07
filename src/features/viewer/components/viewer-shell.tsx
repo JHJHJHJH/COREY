@@ -247,15 +247,6 @@ function PanelRightIcon({ className }: { className?: string }) {
   );
 }
 
-function TableIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <rect x="4.5" y="5" width="15" height="14" rx="2.5" />
-      <path d="M4.5 10h15M9.5 10v9M14.5 10v9" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 function PopOutIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
@@ -1863,26 +1854,12 @@ export function ViewerShell() {
               >
                 <span>Rules</span>
               </Link>
-              <div className="flex items-center gap-2 rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/72 p-1.5">
                 <HeaderActionButton
-                  label={showDataTable ? "Hide data table" : "Show data table"}
+                  label={isDataTableDetached ? "Dock data table" : "Open data table in a new window"}
                   active={showDataTable}
                   onClick={() => {
                     if (showDataTable) {
                       hideDataTable();
-                    } else {
-                      showDataTableDialog();
-                    }
-                  }}
-                >
-                  <TableIcon className="h-4 w-4" />
-                </HeaderActionButton>
-                <HeaderActionButton
-                  label={isDataTableDetached ? "Dock data table" : "Open data table in a new window"}
-                  active={isDataTableDetached}
-                  onClick={() => {
-                    if (isDataTableDetached) {
-                      showDataTableDialog();
                     } else {
                       showDataTableWindow();
                     }
@@ -1890,7 +1867,6 @@ export function ViewerShell() {
                 >
                   <PopOutIcon className="h-4 w-4" />
                 </HeaderActionButton>
-              </div>
             </div>
           </div>
 
