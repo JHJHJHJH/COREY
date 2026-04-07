@@ -59,7 +59,7 @@ function ActionButton({ label, disabled, onClick, children }: ActionButtonProps)
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className="group flex h-9 w-9 items-center justify-center rounded-xl bg-[color:var(--surface-strong)] text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+      className="group flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl bg-[color:var(--surface-strong)] text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40"
     >
       {children}
     </button>
@@ -93,7 +93,7 @@ export function ViewerToolbar({
               title={label}
               disabled={disabled}
               onClick={() => onToolChange(tool as ViewerTool)}
-              className={`group flex h-9 w-9 items-center justify-center rounded-xl transition ${
+              className={`group flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl transition ${
                 selected
                   ? "bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
                   : "bg-transparent text-[color:var(--muted-ink)] hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"

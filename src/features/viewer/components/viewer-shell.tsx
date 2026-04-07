@@ -243,7 +243,7 @@ function HeaderActionButton({
       aria-label={label}
       title={label}
       onClick={onClick}
-      className={`flex h-10 w-10 items-center justify-center rounded-xl border transition ${
+      className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border transition ${
         active
           ? "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
           : "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
@@ -376,7 +376,7 @@ function DrawerResizeHandle({
         aria-label={toggleLabel}
         title={toggleLabel}
         onClick={onToggle}
-        className={`absolute top-3 flex h-9 w-9 items-center justify-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)] ${togglePositionClass} ${
+        className={`absolute top-3 flex h-9 w-9 cursor-pointer items-center justify-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)] ${togglePositionClass} ${
           collapsed
             ? "text-[color:var(--foreground)] hover:text-[color:var(--accent)]"
             : "text-[color:var(--muted-ink)] hover:text-[color:var(--foreground)]"

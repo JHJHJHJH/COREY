@@ -118,7 +118,7 @@ function TreeNodeRow({
           type="button"
           onClick={() => hasChildren && onToggle(node.key)}
           disabled={!hasChildren}
-          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-xs text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-default disabled:opacity-40"
+          className="flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-md text-xs text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-default disabled:opacity-40"
           aria-label={showChildren ? "Collapse node" : "Expand node"}
         >
           {hasChildren ? (
@@ -398,7 +398,7 @@ export function ModelTreePanel({
               aria-label="Filter categories"
               aria-expanded={showCategoryFilter}
               onClick={() => setShowCategoryFilter((current) => !current)}
-              className={`relative flex h-10 w-10 items-center justify-center rounded-xl border bg-[color:var(--surface-soft)] transition ${
+              className={`relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border bg-[color:var(--surface-soft)] transition ${
                 hasActiveCategoryFilter
                   ? "border-[color:var(--accent)]/50"
                   : "border-[color:var(--viewer-border)] hover:bg-[color:var(--surface-strong)]"
@@ -467,7 +467,7 @@ export function ModelTreePanel({
                             aria-label={`Hide ${category.category}`}
                             title={`Hide ${category.category}`}
                             onClick={() => onHideCategory(category.category)}
-                            className="flex h-7 w-7 items-center justify-center rounded-full text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
+                            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
                           >
                             <EyeOff className="h-3.5 w-3.5" />
                           </button>
@@ -476,7 +476,7 @@ export function ModelTreePanel({
                             aria-label={`Isolate ${category.category}`}
                             title={`Isolate ${category.category}`}
                             onClick={() => onIsolateCategory(category.category)}
-                            className="flex h-7 w-7 items-center justify-center rounded-full text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
+                            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
                           >
                             <ScanSearch className="h-3.5 w-3.5" />
                           </button>
@@ -514,7 +514,7 @@ export function ModelTreePanel({
               type="button"
               aria-label="Search tree"
               onClick={() => setShowSearch(true)}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
+              className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
             >
               <Search className="h-4 w-4" />
             </button>
@@ -571,7 +571,7 @@ export function ModelTreePanel({
             aria-label="Scroll tree to top"
             title="Scroll tree to top"
             onClick={scrollTreeToTop}
-            className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/95 text-[color:var(--muted-ink)] shadow-[var(--viewer-shadow)] backdrop-blur transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
+            className="pointer-events-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/95 text-[color:var(--muted-ink)] shadow-[var(--viewer-shadow)] backdrop-blur transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
           >
             <ArrowUp className="h-4 w-4" />
           </button>
