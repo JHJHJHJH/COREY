@@ -235,40 +235,20 @@ function TreeNodeRow({
       </div>
 
       {showChildren
-        ? node.children.map((child) => {
-            const branchActive = selectedPathKeys.has(child.key);
-
-            return (
-              <div key={child.key} className="group/tree-branch relative pl-3.5">
-                <span
-                  aria-hidden="true"
-                  className={`pointer-events-none absolute bottom-0 left-1.5 top-0 border-l border-dotted transition-colors ${
-                    branchActive
-                      ? "border-[color:var(--accent)]"
-                      : "border-[color:var(--viewer-border)]/70 group-hover/tree-branch:border-[color:var(--accent)]"
-                  }`}
-                />
-                <span
-                  aria-hidden="true"
-                  className={`pointer-events-none absolute left-1.5 top-4 w-2.5 border-t border-dotted transition-colors ${
-                    branchActive
-                      ? "border-[color:var(--accent)]"
-                      : "border-[color:var(--viewer-border)]/70 group-hover/tree-branch:border-[color:var(--accent)]"
-                  }`}
-                />
-                <TreeNodeRow
-                  node={child}
-                  selection={selection}
-                  selectedPathKeys={selectedPathKeys}
-                  expandedKeys={expandedKeys}
-                  forceExpanded={forceExpanded}
-                  registerRowButton={registerRowButton}
-                  onToggle={onToggle}
-                  onSelectNode={onSelectNode}
-                />
-              </div>
-            );
-          })
+        ? node.children.map((child) => (
+            <div key={child.key} className="relative pl-3.5">
+              <TreeNodeRow
+                node={child}
+                selection={selection}
+                selectedPathKeys={selectedPathKeys}
+                expandedKeys={expandedKeys}
+                forceExpanded={forceExpanded}
+                registerRowButton={registerRowButton}
+                onToggle={onToggle}
+                onSelectNode={onSelectNode}
+              />
+            </div>
+          ))
         : null}
     </div>
   );
