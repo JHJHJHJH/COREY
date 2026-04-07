@@ -1696,11 +1696,6 @@ export function ViewerShell() {
           >
             {dataTableState.phase}
           </span>
-          {isDataTableDetached ? (
-            <span className="inline-flex items-center rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)]">
-              Detached window
-            </span>
-          ) : null}
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[color:var(--muted-ink)]">
           {metadata ? (
