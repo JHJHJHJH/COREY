@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { X } from "lucide-react";
 import { useRef, useState, type ChangeEvent } from "react";
 import { useViewerRules } from "@/features/rules/rules-provider";
 import {
@@ -45,6 +46,10 @@ function labelClassName() {
 
 function secondaryButtonClassName() {
   return "rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 py-2 text-sm font-medium text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]";
+}
+
+function compactButtonClassName() {
+  return "rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1.5 text-xs font-medium text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]";
 }
 
 function enumText(check: ViewerValidationCheck) {
@@ -370,46 +375,105 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
         mode === "modal" ? "h-full" : "min-h-[calc(100vh-5rem)]"
       }`}
     >
-      <div className="border-b border-[color:var(--viewer-border)] bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(234,242,255,0.94))] px-5 py-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="border-b border-[color:var(--viewer-border)] bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(234,242,255,0.94))] px-5 py-3">
+        <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-4">
           <div className="min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-ink)]">
-              COREY Rules
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-ink)]">
+                  COREY Rules
+                </div>
+                <h1 className="mt-1 text-xl font-semibold tracking-tight text-[color:var(--foreground)]">
+                  Validation rules workspace
+                </h1>
+                <p className="mt-1.5 max-w-2xl text-sm leading-5 text-[color:var(--muted-ink)]">
+                  Configure entity checks for required values, enums, and numeric ranges.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {mode === "page" ? (
+                  <Link href="/" className={secondaryButtonClassName()}>
+                    Open COREY
+                  </Link>
+                ) : null}
+              </div>
             </div>
-            <h1 className="mt-1 text-xl font-semibold tracking-tight text-[color:var(--foreground)]">
-              Validation rules workspace
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-[color:var(--muted-ink)]">
-              Configure per-entity checks for required values, enums, and numeric ranges. Passing
-              rows show as ok, failing rows show as warn or error based on the selected rule.
-            </p>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted-ink)]">
+              <span className="rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-3 py-1.5">
+                {config.rules.length} rules
+              </span>
+              <span className="rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-3 py-1.5">
+                Auto-saved locally
+              </span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {mode === "page" ? (
-              <Link href="/" className={secondaryButtonClassName()}>
-                Open COREY
-              </Link>
-            ) : null}
-            {mode === "modal" && onClose ? (
-              <button type="button" onClick={onClose} className={secondaryButtonClassName()}>
-                Close
-              </button>
-            ) : null}
-          </div>
-        </div>
+          <aside className="w-full rounded-[1.2rem] border border-[color:var(--viewer-border)] bg-white/55 p-2.5 lg:max-w-[34rem] lg:justify-self-start">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+                  Starter Templates
+                </div>
+                <p className="mt-0.5 text-[11px] leading-4 text-[color:var(--muted-ink)]">
+                  Quick presets
+                </p>
+              </div>
+              {mode === "modal" && onClose ? (
+                <button
+                  type="button"
+                  aria-label="Close"
+                  title="Close"
+                  onClick={onClose}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              ) : null}
+            </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted-ink)]">
-          <span className="rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-3 py-1.5">
-            {config.rules.length} rules
-          </span>
-          <span className="rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-3 py-1.5">
-            Auto-saved locally
-          </span>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {STARTER_TEMPLATES.map((template) => {
+                const isLoading = loadingTemplateId === template.id;
+
+                return (
+                  <section
+                    key={template.id}
+                    className="rounded-[1rem] border border-[color:var(--viewer-border)] bg-white/70 px-2.5 py-2.5"
+                  >
+                    <div className="flex h-full items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h2 className="text-sm font-semibold text-[color:var(--foreground)]">
+                          {template.name}
+                        </h2>
+                        <p className="mt-0.5 text-[11px] leading-4 text-[color:var(--muted-ink)]">
+                          {template.ruleCount} rules
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5 self-center">
+                        <button
+                          type="button"
+                          onClick={() => void handleLoadStarterTemplate(template)}
+                          disabled={loadingTemplateId !== null}
+                          className={`${compactButtonClassName()} disabled:cursor-wait disabled:opacity-60`}
+                        >
+                          {isLoading ? "..." : "Load"}
+                        </button>
+                        <a href={template.href} download className={compactButtonClassName()}>
+                          JSON
+                        </a>
+                      </div>
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          </aside>
         </div>
       </div>
 
-      <div className="border-b border-[color:var(--viewer-border)] px-5 py-4">
+      <div className="border-b border-[color:var(--viewer-border)] px-5 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <input
             ref={fileInputRef}
@@ -445,55 +509,6 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
             {importError}
           </div>
         ) : null}
-
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          {STARTER_TEMPLATES.map((template) => {
-            const isLoading = loadingTemplateId === template.id;
-
-            return (
-              <section
-                key={template.id}
-                className="rounded-[1.5rem] border border-[color:var(--viewer-border)] bg-white/55 px-4 py-4"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-ink)]">
-                      Starter Template
-                    </div>
-                    <h2 className="mt-1 text-base font-semibold text-[color:var(--foreground)]">
-                      {template.name}
-                    </h2>
-                    <p className="mt-2 text-sm leading-6 text-[color:var(--muted-ink)]">
-                      {template.description}
-                    </p>
-                  </div>
-
-                  <span className="shrink-0 rounded-full border border-[color:var(--viewer-border)] bg-white/75 px-3 py-1 text-xs font-medium text-[color:var(--muted-ink)]">
-                    {template.ruleCount} rules
-                  </span>
-                </div>
-
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void handleLoadStarterTemplate(template)}
-                    disabled={loadingTemplateId !== null}
-                    className={`${secondaryButtonClassName()} disabled:cursor-wait disabled:opacity-60`}
-                  >
-                    {isLoading ? "Loading..." : "Load template"}
-                  </button>
-                  <a
-                    href={template.href}
-                    download
-                    className={secondaryButtonClassName()}
-                  >
-                    Download JSON
-                  </a>
-                </div>
-              </section>
-            );
-          })}
-        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
