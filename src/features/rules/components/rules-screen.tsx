@@ -376,7 +376,7 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
       }`}
     >
       <div className="border-b border-[color:var(--viewer-border)] bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(234,242,255,0.94))] px-5 py-3">
-        <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-4">
+        <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(36rem,42rem)] lg:items-start lg:gap-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
@@ -410,7 +410,7 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
             </div>
           </div>
 
-          <aside className="w-full rounded-[1.2rem] border border-[color:var(--viewer-border)] bg-white/55 p-2.5 lg:max-w-[34rem] lg:justify-self-start">
+          <aside className="w-full rounded-[1.2rem] border border-[color:var(--viewer-border)] bg-white/55 p-2.5 lg:justify-self-stretch">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
