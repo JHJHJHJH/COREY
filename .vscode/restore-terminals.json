@@ -1,0 +1,25 @@
+{
+  "artificialDelayMilliseconds": 700,
+  "keepExistingTerminalsOpen": false,
+  "runOnStartup": true,
+  "terminals": [
+    {
+      "splitTerminals": [
+        {
+          "name": "bca-frontend",
+          "commands": ["pnpm dev"]
+        }
+      ]
+    },
+    {
+      "splitTerminals": [
+        {
+          "name": "bca-codex",
+          "commands": [
+            "codex"
+          ]
+        }
+      ]
+    }
+  ]
+}   

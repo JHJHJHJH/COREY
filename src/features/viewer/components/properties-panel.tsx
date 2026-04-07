@@ -5,31 +5,11 @@ import type {
   ViewerInspectionGroup,
   ViewerInspectionRow,
   ViewerInspectionValue,
-  ViewerInspectionValueState,
   ViewerSelection,
   ViewerSelectionDetails,
   ViewerValidationMatch,
   ViewerValidationSummary,
 } from "@/features/viewer/types";
-
-function isIssueState(state: ViewerInspectionValueState) {
-  return state !== "present";
-}
-
-function issueLabel(state: ViewerInspectionValueState) {
-  switch (state) {
-    case "missing":
-      return "Missing";
-    case "empty":
-      return "Empty";
-    case "null":
-      return "Null";
-    case "undefined":
-      return "Undefined";
-    default:
-      return null;
-  }
-}
 
 function validationLabel(validation: ViewerValidationMatch | null) {
   if (!validation) {
@@ -59,10 +39,6 @@ function rowClass(value: ViewerInspectionValue) {
     return "bg-[#fff0ea]";
   }
 
-  if (isIssueState(value.state)) {
-    return "bg-[#fff7ed]";
-  }
-
   return "bg-white/30";
 }
 
@@ -77,10 +53,6 @@ function valueClass(value: ViewerInspectionValue) {
 
   if (value.validation?.result === "error") {
     return "text-[#8a3e1f]";
-  }
-
-  if (isIssueState(value.state)) {
-    return "text-[#7d4414]";
   }
 
   return "text-[color:var(--foreground)]";
@@ -99,10 +71,6 @@ function badgeClass(value: ViewerInspectionValue) {
     return "border-[#d3a08e] bg-[#fff0ea] text-[#8a3e1f]";
   }
 
-  if (isIssueState(value.state)) {
-    return "border-[#d8af80] bg-[#fff1df] text-[#915217]";
-  }
-
   return "border-[color:var(--viewer-border)] bg-white/70 text-[color:var(--muted-ink)]";
 }
 
@@ -113,7 +81,7 @@ function InspectionValueRow({
   label: string;
   value: ViewerInspectionValue;
 }) {
-  const badge = validationLabel(value.validation) ?? issueLabel(value.state);
+  const badge = validationLabel(value.validation);
 
   return (
     <div
