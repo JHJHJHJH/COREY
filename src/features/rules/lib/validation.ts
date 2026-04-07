@@ -103,7 +103,7 @@ function cloneValidationValue(
 
 function missingValidationValue(): ViewerValidationValue {
   return {
-    text: "Missing",
+    text: "MISSING",
     state: "missing",
   };
 }
@@ -118,7 +118,7 @@ function sanitizeValidationValue(value: unknown): ViewerValidationValue {
     : "missing";
 
   return {
-    text: typeof value.text === "string" ? value.text : "Missing",
+    text: typeof value.text === "string" ? value.text : "MISSING",
     state,
   };
 }

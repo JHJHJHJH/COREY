@@ -224,7 +224,7 @@ function formatValue(value: unknown): string {
 function buildInspectionValue(
   exists: boolean,
   value: unknown,
-  missingText = "Missing",
+  missingText = "MISSING",
 ): ViewerInspectionValue {
   if (!exists) {
     return { raw: undefined, text: missingText, state: "missing", validation: null };
@@ -324,7 +324,7 @@ function extractPropertyValue(item: ItemData) {
 
   if (directEntries.length === 1) {
     const [key, value] = directEntries[0];
-    return buildInspectionValue(true, value.value, `Missing ${humanizeKey(key)}`);
+    return buildInspectionValue(true, value.value, `MISSING ${humanizeKey(key)}`);
   }
 
   if (directEntries.length > 1) {
@@ -338,7 +338,7 @@ function extractPropertyValue(item: ItemData) {
 
   if (fallbackEntries.length === 1) {
     const [key, value] = fallbackEntries[0];
-    return buildInspectionValue(true, value.value, `Missing ${humanizeKey(key)}`);
+    return buildInspectionValue(true, value.value, `MISSING ${humanizeKey(key)}`);
   }
 
   if (fallbackEntries.length > 1) {
@@ -348,7 +348,7 @@ function extractPropertyValue(item: ItemData) {
     );
   }
 
-  return buildInspectionValue(false, undefined, "Missing value");
+  return buildInspectionValue(false, undefined, "MISSING value");
 }
 
 function isPropertyContainer(item: ItemData) {
@@ -484,7 +484,7 @@ export function buildSelectionInspection(
       "type",
       hasIfcCategory(data),
       readIfcCategory(data),
-      "Missing IFC type",
+      "MISSING IFC type",
       { kind: "attribute", name: "type" },
     ),
     buildRow(
@@ -492,7 +492,7 @@ export function buildSelectionInspection(
       "GlobalId",
       hasAttribute(data, "GlobalId"),
       readAttribute(data, "GlobalId"),
-      "Missing GlobalId",
+      "MISSING GlobalId",
       { kind: "attribute", name: "GlobalId" },
     ),
     buildRow(
@@ -500,7 +500,7 @@ export function buildSelectionInspection(
       "Name",
       hasAttribute(data, "Name"),
       readAttribute(data, "Name"),
-      "Missing name",
+      "MISSING name",
       { kind: "attribute", name: "Name" },
     ),
     buildRow(
@@ -508,7 +508,7 @@ export function buildSelectionInspection(
       "Description",
       hasAttribute(data, "Description"),
       readAttribute(data, "Description"),
-      "Missing description",
+      "MISSING description",
       { kind: "attribute", name: "Description" },
     ),
     buildRow(
@@ -516,7 +516,7 @@ export function buildSelectionInspection(
       "ObjectType",
       hasAttribute(data, "ObjectType"),
       readAttribute(data, "ObjectType"),
-      "Missing object type",
+      "MISSING object type",
       { kind: "attribute", name: "ObjectType" },
     ),
   ];
@@ -610,7 +610,7 @@ function buildViewerDataTablePropertyColumnKey(group: string, label: string) {
 function buildViewerDataTableCell(
   exists: boolean,
   value: unknown,
-  missingText = "Missing",
+  missingText = "MISSING",
   options?: {
     binding?: ViewerDataTableColumnBinding | null;
     valueKind?: ViewerDataTableEditableValueKind | null;
@@ -671,7 +671,7 @@ function buildViewerDataTableRow(
   cells.ifcType = buildViewerDataTableCell(
     hasIfcCategory(data),
     readIfcCategory(data),
-    "Missing",
+    "MISSING",
     {
       binding: {
         kind: "attribute",
@@ -681,7 +681,7 @@ function buildViewerDataTableRow(
     },
   );
   if (cells.ifcType.state !== "present" && fallbackIfcType) {
-    cells.ifcType = buildViewerDataTableCell(true, fallbackIfcType, "Missing", {
+    cells.ifcType = buildViewerDataTableCell(true, fallbackIfcType, "MISSING", {
       binding: {
         kind: "attribute",
         name: "type",
@@ -692,7 +692,7 @@ function buildViewerDataTableRow(
   cells.globalId = buildViewerDataTableCell(
     hasAttribute(data, "GlobalId"),
     readAttribute(data, "GlobalId"),
-    "Missing",
+    "MISSING",
     {
       binding: {
         kind: "attribute",
@@ -704,7 +704,7 @@ function buildViewerDataTableRow(
   cells.name = buildViewerDataTableCell(
     hasAttribute(data, "Name"),
     readAttribute(data, "Name"),
-    "Missing",
+    "MISSING",
     {
       binding: {
         kind: "attribute",
@@ -737,7 +737,7 @@ function buildViewerDataTableRow(
     });
     cells[column.key] = mergeViewerDataTableCell(
       cells[column.key],
-      buildViewerDataTableCell(true, value.value, "Missing", {
+      buildViewerDataTableCell(true, value.value, "MISSING", {
         binding: column.binding,
         valueKind: column.valueKind,
       }),

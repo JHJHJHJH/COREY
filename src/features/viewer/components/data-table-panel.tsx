@@ -570,7 +570,7 @@ const DataTablePanelComponent = function DataTablePanel({
                             }`}
                           >
                             <div className="min-w-0 break-words font-mono text-[12px] leading-5">
-                              {cell?.text ?? "Missing"}
+                              {cell?.text ?? "MISSING"}
                             </div>
                             {draftCell ? (
                               <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1e6b45]">

@@ -101,7 +101,7 @@ function buildValueState(value: unknown): ViewerInspectionValueState {
 
 function buildValueText(value: unknown, state: ViewerInspectionValueState) {
   if (state === "missing") {
-    return "Missing";
+    return "MISSING";
   }
 
   if (state === "null") {
