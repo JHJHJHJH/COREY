@@ -1,5 +1,6 @@
 "use client";
 
+import { Box, PanelLeftOpen, PanelRightOpen, SquareArrowOutUpRight, Upload } from "lucide-react";
 import Link from "next/link";
 import {
   startTransition,
@@ -210,53 +211,6 @@ function summarizeIfcTypes(ifcTypes: string[], max = 6) {
   return `${visible.join(", ")}${suffix}`;
 }
 
-function UploadIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <path d="M12 16V5" strokeLinecap="round" />
-      <path d="m8 9 4-4 4 4" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M5 19h14" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function CubeIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z" strokeLinejoin="round" />
-      <path d="M12 12 4 7.5M12 12l8-4.5M12 12v9" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function PanelLeftIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <rect x="4.5" y="4.5" width="15" height="15" rx="2.5" />
-      <path d="M9 5v14" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function PanelRightIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <rect x="4.5" y="4.5" width="15" height="15" rx="2.5" />
-      <path d="M15 5v14" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function PopOutIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <path d="M14 5h5v5" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="m10 14 9-9" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M19 14v4.5a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 18.5v-12A1.5 1.5 0 0 1 5.5 5H10" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 function StatusDot({ phase }: { phase: ViewerStatus["phase"] }) {
   const tone =
     phase === "loaded"
@@ -396,7 +350,7 @@ function DrawerResizeHandle({
   onPointerDown?: (event: React.PointerEvent<HTMLDivElement>) => void;
   onToggle: () => void;
 }) {
-  const Icon = side === "left" ? PanelLeftIcon : PanelRightIcon;
+  const Icon = side === "left" ? PanelLeftOpen : PanelRightOpen;
   const togglePositionClass = collapsed
     ? side === "left"
       ? "right-2"
@@ -1757,7 +1711,7 @@ export function ViewerShell() {
           onClick={isDataTableDetached ? showDataTableDialog : showDataTableWindow}
           className="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)]"
         >
-          <PopOutIcon className="h-3.5 w-3.5" />
+          <SquareArrowOutUpRight className="h-3.5 w-3.5" />
           <span>{isDataTableDetached ? "Dock" : "Pop Out"}</span>
         </button>
         {!isDataTableDetached ? (
@@ -1835,7 +1789,7 @@ export function ViewerShell() {
                 onClick={openFilePicker}
                 className="inline-flex h-10 items-center gap-2 rounded-xl bg-[color:var(--accent)] px-4 text-sm font-semibold text-[color:var(--accent-ink)] transition hover:brightness-95"
               >
-                <UploadIcon className="h-4 w-4" />
+                <Upload className="h-4 w-4" />
                 <span>Open IFC</span>
               </button>
               <button
@@ -1845,7 +1799,7 @@ export function ViewerShell() {
                 }}
                 className="inline-flex h-10 items-center gap-2 rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-4 text-sm font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]"
               >
-                <CubeIcon className="h-4 w-4" />
+                <Box className="h-4 w-4" />
                 <span>Test model</span>
               </button>
               <Link
@@ -1865,7 +1819,7 @@ export function ViewerShell() {
                     }
                   }}
                 >
-                  <PopOutIcon className="h-4 w-4" />
+                  <SquareArrowOutUpRight className="h-4 w-4" />
                 </HeaderActionButton>
             </div>
           </div>

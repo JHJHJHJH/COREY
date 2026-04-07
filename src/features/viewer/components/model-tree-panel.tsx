@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowUp, ChevronRight, EyeOff, ListFilter, ScanSearch, Search } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { filterTree, formatBytes, formatTreeNodeCount } from "@/features/viewer/lib/ifc-data";
 import type {
@@ -30,102 +31,6 @@ type TreeNodeRowProps = {
   onToggle: (key: string) => void;
   onSelectNode: (localId: number) => void;
 };
-
-function ChevronIcon({ expanded }: { expanded: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      className={`h-3.5 w-3.5 transition ${expanded ? "rotate-90" : ""}`}
-      aria-hidden="true"
-    >
-      <path d="m7 4 6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function FilterIcon({ active }: { active: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      className={`h-4 w-4 ${active ? "text-[color:var(--accent)]" : ""}`}
-      aria-hidden="true"
-    >
-      <path d="M4 6h16" strokeLinecap="round" />
-      <path d="M7 12h10" strokeLinecap="round" />
-      <path d="M10 18h4" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function SearchIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      className={className}
-      aria-hidden="true"
-    >
-      <circle cx="11" cy="11" r="6.5" />
-      <path d="m16 16 4 4" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function HideIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M4 12s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="m4 4 16 16" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function IsolateIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      className={className}
-      aria-hidden="true"
-    >
-      <rect x="4.5" y="4.5" width="15" height="15" rx="2.5" />
-      <rect x="9" y="9" width="6" height="6" rx="1.25" />
-    </svg>
-  );
-}
-
-function ArrowUpIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="m12 18 0-12" strokeLinecap="round" />
-      <path d="m7 11 5-5 5 5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
 
 function collectExpandableKeys(nodes: ViewerTreeNode[]) {
   const keys = new Set<string>();
@@ -216,7 +121,14 @@ function TreeNodeRow({
           className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-xs text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-default disabled:opacity-40"
           aria-label={showChildren ? "Collapse node" : "Expand node"}
         >
-          {hasChildren ? <ChevronIcon expanded={showChildren} /> : <span className="text-[11px]">•</span>}
+          {hasChildren ? (
+            <ChevronRight
+              className={`h-3.5 w-3.5 transition ${showChildren ? "rotate-90" : ""}`}
+              aria-hidden="true"
+            />
+          ) : (
+            <span className="text-[11px]">•</span>
+          )}
         </button>
         <button
           ref={(element) => registerRowButton(node.localId, element)}
@@ -492,7 +404,10 @@ export function ModelTreePanel({
                   : "border-[color:var(--viewer-border)] hover:bg-[color:var(--surface-strong)]"
               }`}
             >
-              <FilterIcon active={hasActiveCategoryFilter} />
+              <ListFilter
+                className={`h-4 w-4 ${hasActiveCategoryFilter ? "text-[color:var(--accent)]" : ""}`}
+                aria-hidden="true"
+              />
               {hasActiveCategoryFilter ? (
                 <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[color:var(--accent)] px-1 text-[10px] font-semibold text-[color:var(--accent-ink)]">
                   {activeCategoryCount}
@@ -554,7 +469,7 @@ export function ModelTreePanel({
                             onClick={() => onHideCategory(category.category)}
                             className="flex h-7 w-7 items-center justify-center rounded-full text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
                           >
-                            <HideIcon className="h-3.5 w-3.5" />
+                            <EyeOff className="h-3.5 w-3.5" />
                           </button>
                           <button
                             type="button"
@@ -563,7 +478,7 @@ export function ModelTreePanel({
                             onClick={() => onIsolateCategory(category.category)}
                             className="flex h-7 w-7 items-center justify-center rounded-full text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
                           >
-                            <IsolateIcon className="h-3.5 w-3.5" />
+                            <ScanSearch className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       );
@@ -576,7 +491,7 @@ export function ModelTreePanel({
           {showSearch || query ? (
             <label className="relative min-w-0 flex-1">
               <span className="sr-only">Search tree</span>
-              <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[color:var(--muted-ink)]" />
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[color:var(--muted-ink)]" />
               <input
                 ref={searchInputRef}
                 value={query}
@@ -601,7 +516,7 @@ export function ModelTreePanel({
               onClick={() => setShowSearch(true)}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
             >
-              <SearchIcon className="h-4 w-4" />
+              <Search className="h-4 w-4" />
             </button>
           )}
         </div>
@@ -658,7 +573,7 @@ export function ModelTreePanel({
             onClick={scrollTreeToTop}
             className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/95 text-[color:var(--muted-ink)] shadow-[var(--viewer-shadow)] backdrop-blur transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
           >
-            <ArrowUpIcon className="h-4 w-4" />
+            <ArrowUp className="h-4 w-4" />
           </button>
         </div>
       ) : null}

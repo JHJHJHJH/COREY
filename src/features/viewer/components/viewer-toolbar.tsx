@@ -1,5 +1,16 @@
 "use client";
 
+import {
+  CircleOff,
+  EyeOff,
+  Focus,
+  LayoutGrid,
+  type LucideIcon,
+  MousePointer2,
+  Ruler,
+  ScanSearch,
+  Slice,
+} from "lucide-react";
 import type { ViewerSessionState, ViewerStatus, ViewerTool } from "@/features/viewer/types";
 
 type ViewerToolbarProps = {
@@ -27,94 +38,10 @@ function iconClassName(selected = false) {
     : "text-[color:var(--muted-ink)] group-hover:text-[color:var(--foreground)]";
 }
 
-function SelectIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <path d="m6 4 11 7-6 1.5L9.5 18z" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function MeasureIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <path d="M5 15.5 15.5 5 19 8.5 8.5 19H5z" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="m11 9 4 4" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function SectionIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <path d="M4 18 18 4" strokeLinecap="round" />
-      <path d="M7 19h10a2 2 0 0 0 2-2V7" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M5 5h6" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function FocusIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <path d="M9 5H5v4M15 5h4v4M19 15v4h-4M9 19H5v-4" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="12" cy="12" r="2.5" />
-    </svg>
-  );
-}
-
-function HideIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <path d="M4 12s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="m4 4 16 16" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function IsolateIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <rect x="4.5" y="4.5" width="15" height="15" rx="2.5" />
-      <rect x="9" y="9" width="6" height="6" rx="1.25" />
-    </svg>
-  );
-}
-
-function ShowAllIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <rect x="4.5" y="4.5" width="6" height="6" rx="1.25" />
-      <rect x="13.5" y="4.5" width="6" height="6" rx="1.25" />
-      <rect x="4.5" y="13.5" width="6" height="6" rx="1.25" />
-      <rect x="13.5" y="13.5" width="6" height="6" rx="1.25" />
-    </svg>
-  );
-}
-
-function ClearSectionIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <path d="M4 18 18 4" strokeLinecap="round" />
-      <path d="m7 17 3-3M14 10l3-3" strokeLinecap="round" />
-      <path d="m6 6 12 12" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function ClearMeasureIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
-      <path d="M5 15.5 15.5 5 19 8.5 8.5 19H5z" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M6 6l12 12" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-const toolIcons: Record<ViewerTool, (props: { className?: string }) => React.JSX.Element> = {
-  select: SelectIcon,
-  measure: MeasureIcon,
-  section: SectionIcon,
+const toolIcons: Record<ViewerTool, LucideIcon> = {
+  select: MousePointer2,
+  measure: Ruler,
+  section: Slice,
 };
 
 type ActionButtonProps = {
@@ -184,38 +111,38 @@ export function ViewerToolbar({
           disabled={disabled || !session.selected}
           onClick={onFocusSelection}
         >
-          <FocusIcon className="h-4 w-4" />
+          <Focus className="h-4 w-4" />
         </ActionButton>
         <ActionButton
           label="Hide selection"
           disabled={disabled || !session.selected}
           onClick={onHideSelection}
         >
-          <HideIcon className="h-4 w-4" />
+          <EyeOff className="h-4 w-4" />
         </ActionButton>
         <ActionButton
           label="Isolate selection"
           disabled={disabled || !session.selected}
           onClick={onIsolateSelection}
         >
-          <IsolateIcon className="h-4 w-4" />
+          <ScanSearch className="h-4 w-4" />
         </ActionButton>
         <ActionButton label="Show all" disabled={disabled} onClick={onShowAll}>
-          <ShowAllIcon className="h-4 w-4" />
+          <LayoutGrid className="h-4 w-4" />
         </ActionButton>
         <ActionButton
           label="Clear sections"
           disabled={disabled || session.sectionCount === 0}
           onClick={onClearSections}
         >
-          <ClearSectionIcon className="h-4 w-4" />
+          <CircleOff className="h-4 w-4" />
         </ActionButton>
         <ActionButton
           label="Clear measurements"
           disabled={disabled || session.measurementCount === 0}
           onClick={onClearMeasurements}
         >
-          <ClearMeasureIcon className="h-4 w-4" />
+          <CircleOff className="h-4 w-4" />
         </ActionButton>
       </div>
 
