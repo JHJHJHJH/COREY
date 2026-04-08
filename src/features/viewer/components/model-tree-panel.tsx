@@ -280,15 +280,15 @@ export function ModelTreePanel({
     [deferredQuery, nodes, selectedCategories],
   );
   const selectedPathKeys = useMemo(
-    () => collectSelectedPathKeys(filteredNodes, selection?.localId),
-    [filteredNodes, selection?.localId],
+    () => collectSelectedPathKeys(nodes, selection?.localId),
+    [nodes, selection?.localId],
   );
   const effectiveExpandedKeys = useMemo(
     () =>
       deferredQuery.trim() || hasActiveCategoryFilter
         ? collectExpandableKeys(filteredNodes)
-        : new Set([...expandedKeys, ...selectedPathKeys]),
-    [deferredQuery, expandedKeys, filteredNodes, hasActiveCategoryFilter, selectedPathKeys],
+        : expandedKeys,
+    [deferredQuery, expandedKeys, filteredNodes, hasActiveCategoryFilter],
   );
 
   const stats = useMemo(
@@ -373,6 +373,28 @@ export function ModelTreePanel({
   const expandAll = () => {
     setExpandedKeys(collectExpandableKeys(filteredNodes));
   };
+
+  useEffect(() => {
+    if (forceExpanded || selectedPathKeys.size === 0) {
+      return;
+    }
+
+    setExpandedKeys((current) => {
+      let changed = false;
+      const next = new Set(current);
+
+      for (const key of selectedPathKeys) {
+        if (next.has(key)) {
+          continue;
+        }
+
+        next.add(key);
+        changed = true;
+      }
+
+      return changed ? next : current;
+    });
+  }, [forceExpanded, selectedPathKeys]);
 
   useEffect(() => {
     syncScrollTopVisibility();
