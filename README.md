@@ -11,6 +11,18 @@ Browser-based IFC viewer built with `Next.js`, `@thatopen/components`, and `@tha
 - Hide, isolate, and show-all visibility controls
 - Section plane placement
 - Length measurement placement
+- In-viewport IFC debug panel for inspecting parsed sample data
+
+## IFC Debug Panel
+
+The viewer includes a small debug panel in the viewport with four sample payloads:
+
+- `Raw IFC`: sanitized output from `model.getItemsData(...)` for either the selected element or the first indexed sample element. This is the closest view to the parsed IFC item shape used by the app.
+- `Selection`: the normalized `ViewerSelectionDetails` payload used by the properties panel. It is built from the raw item through `buildSelectionInspection(...)`.
+- `Row`: the normalized `ViewerDataTableRow` payload from the indexed element table built by `buildViewerDataTable(...)`.
+- `Tree`: a trimmed sample of the `ViewerTreeNode[]` structure produced by `buildViewerTree(...)` from the model spatial structure.
+
+All debug payloads are passed through a sanitizer before display so circular references, deep nesting, and very large arrays remain readable in the UI.
 
 ## Development
 

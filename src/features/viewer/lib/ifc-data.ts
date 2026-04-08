@@ -138,6 +138,14 @@ function hasIfcCategory(data: ItemData) {
   return hasAttribute(data, "_category") || hasAttribute(data, "type");
 }
 
+function readIfcGuid(data: ItemData) {
+  return readAttribute(data, "_guid") ?? readAttribute(data, "GlobalId");
+}
+
+function hasIfcGuid(data: ItemData) {
+  return hasAttribute(data, "_guid") || hasAttribute(data, "GlobalId");
+}
+
 function readFirstText(data: ItemData, keys: string[]) {
   for (const key of keys) {
     const value = readAttributeText(data, key);
@@ -491,10 +499,10 @@ export function buildSelectionInspection(
     buildRow(
       "GlobalId",
       "GlobalId",
-      hasAttribute(data, "GlobalId"),
-      readAttribute(data, "GlobalId"),
+      hasIfcGuid(data),
+      readIfcGuid(data),
       "MISSING GlobalId",
-      { kind: "attribute", name: "GlobalId" },
+      { kind: "attribute", name: "guid" },
     ),
     buildRow(
       "Name",
