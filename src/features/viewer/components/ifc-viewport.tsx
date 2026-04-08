@@ -528,7 +528,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
                 message:
                   dataTable.rows.length > 0
                   ? `Indexed ${dataTable.rows.length} elements across ${dataTable.columns.length} columns.`
-                    : "No IFC elements with geometry were available for tabular review.",
+                    : "No IFC items were available for tabular review.",
                 data: dataTable,
               });
 

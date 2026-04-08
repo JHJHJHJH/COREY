@@ -1,7 +1,7 @@
 "use client";
 
 import { RefreshCw } from "lucide-react";
-import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   filterViewerDataTableRows,
   formatBytes,
@@ -22,6 +22,8 @@ type DataTablePanelProps = {
   tableState: ViewerDataTableState;
   activeSelection: ViewerSelection | null;
   visibleRowKeysInView: Set<string> | null;
+  importRevision?: number;
+  importedColumnKeys?: string[];
   onSyncToView: () => Promise<void>;
   onSelectRow: (localId: number) => void;
   showMetaHeader?: boolean;
@@ -116,6 +118,8 @@ const DataTablePanelComponent = function DataTablePanel({
   tableState,
   activeSelection,
   visibleRowKeysInView,
+  importRevision = 0,
+  importedColumnKeys = [],
   onSyncToView,
   onSelectRow,
   showMetaHeader = true,
@@ -132,7 +136,7 @@ const DataTablePanelComponent = function DataTablePanel({
   const deferredIfcTypeFilter = useDeferredValue(activeUiState.ifcTypeFilter);
   const [isSyncingToView, setIsSyncingToView] = useState(false);
 
-  const updateUiState = (updater: (current: DataTableUiState) => DataTableUiState) => {
+  const updateUiState = useCallback((updater: (current: DataTableUiState) => DataTableUiState) => {
     setUiState((current) => {
       const base =
         current.dataSignature === dataSignature
@@ -140,7 +144,7 @@ const DataTablePanelComponent = function DataTablePanel({
           : buildDefaultUiState(dataSignature, data);
       return updater(base);
     });
-  };
+  }, [data, dataSignature]);
 
   const visibleColumns = useMemo(() => {
     if (!data) {
@@ -193,6 +197,28 @@ const DataTablePanelComponent = function DataTablePanel({
       selectAllRef.current.indeterminate = !allVisibleSelected && someVisibleSelected;
     }
   }, [allVisibleSelected, someVisibleSelected]);
+
+  useEffect(() => {
+    if (importRevision === 0 || importedColumnKeys.length === 0) {
+      return;
+    }
+
+    updateUiState((current) => {
+      const nextVisibleColumnKeys = new Set(current.visibleColumnKeys);
+      for (const columnKey of importedColumnKeys) {
+        nextVisibleColumnKeys.add(columnKey);
+      }
+
+      return {
+        ...current,
+        query: "",
+        ifcTypeFilter: "",
+        showEditedOnly: true,
+        visibleColumnKeys: [...nextVisibleColumnKeys],
+        selectedRowKeys: new Set<string>(),
+      };
+    });
+  }, [importRevision, importedColumnKeys, updateUiState]);
 
   const toggleSort = (columnKey: string) => {
     updateUiState((current) => {

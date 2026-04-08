@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Box,
   Download,
   FileOutput,
   FileSpreadsheet,
@@ -257,6 +256,14 @@ type HeaderActionButtonProps = {
   children: React.ReactNode;
 };
 
+type HeaderActionFileButtonProps = {
+  label: string;
+  disabled?: boolean;
+  accept: string;
+  onFileSelect: (file: File) => Promise<void> | void;
+  children: React.ReactNode;
+};
+
 function HeaderActionButton({
   label,
   active = false,
@@ -279,6 +286,55 @@ function HeaderActionButton({
     >
       {children}
     </button>
+  );
+}
+
+function HeaderActionFileButton({
+  label,
+  disabled = false,
+  accept,
+  onFileSelect,
+  children,
+}: HeaderActionFileButtonProps) {
+  const className =
+    "flex h-10 w-10 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]";
+
+  if (disabled) {
+    return (
+      <button
+        type="button"
+        aria-label={label}
+        title={label}
+        disabled
+        className={`${className} cursor-not-allowed opacity-50`}
+      >
+        {children}
+      </button>
+    );
+  }
+
+  return (
+    <label
+      aria-label={label}
+      title={label}
+      className={`${className} cursor-pointer`}
+    >
+      <input
+        type="file"
+        accept={accept}
+        className="sr-only"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (!file) {
+            return;
+          }
+
+          void onFileSelect(file);
+        }}
+      />
+      {children}
+    </label>
   );
 }
 
@@ -524,7 +580,6 @@ export function ViewerShell() {
   const { config } = useViewerRules();
   const viewportRef = useRef<ViewerViewportHandle | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const dataTableImportInputRef = useRef<HTMLInputElement | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const treeDrawerRef = useRef<HTMLDivElement | null>(null);
   const propertiesDrawerRef = useRef<HTMLDivElement | null>(null);
@@ -559,6 +614,13 @@ export function ViewerShell() {
   const [dataTableActionStatus, setDataTableActionStatus] = useState<ViewerDataTableExportStatus>(
     initialDataTableActionStatus,
   );
+  const [dataTableImportFocus, setDataTableImportFocus] = useState<{
+    revision: number;
+    columnKeys: string[];
+  }>({
+    revision: 0,
+    columnKeys: [],
+  });
   const [dataTableVisibleRowKeysInView, setDataTableVisibleRowKeysInView] =
     useState<Set<string> | null>(null);
   const [selectionDetails, setSelectionDetails] = useState<ViewerSelectionDetails>({
@@ -1428,10 +1490,6 @@ export function ViewerShell() {
     inputRef.current?.click();
   };
 
-  const openDataTableImportPicker = () => {
-    dataTableImportInputRef.current?.click();
-  };
-
   const loadModelFromFile = useCallback(async (file: File) => {
     const sourceResult = await source.read(file);
     activeSourceRef.current = sourceResult;
@@ -1485,12 +1543,7 @@ export function ViewerShell() {
     event.target.value = "";
   };
 
-  const handleDataTableImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
-
+  const handleDataTableImport = async (file: File) => {
     if (!metadata?.sourceId || !dataTableState.data || !effectiveDataTableData) {
       startTransition(() => {
         setDataTableActionStatus({
@@ -1499,7 +1552,6 @@ export function ViewerShell() {
           issues: [],
         });
       });
-      event.target.value = "";
       return;
     }
 
@@ -1518,16 +1570,35 @@ export function ViewerShell() {
         baseData: dataTableState.data,
         currentData: effectiveDataTableData,
       });
+      const importedColumnKeys = [
+        ...new Set(result.draft?.edits.map((edit) => edit.columnKey) ?? []),
+      ];
+      const importedEditCount = result.report.appliedEditCount;
+      const skippedCellCount = result.report.skippedCellCount;
 
       startTransition(() => {
         setDataTableDraft(result.draft);
         setDataTableImportReport(result.report);
+        setDataTableImportFocus((current) => ({
+          revision: current.revision + Number(importedEditCount > 0),
+          columnKeys: importedColumnKeys,
+        }));
+        setDataTableVisibleRowKeysInView(null);
         setDataTableActionStatus({
-          phase: "success",
+          phase:
+            importedEditCount > 0
+              ? "success"
+              : skippedCellCount > 0
+                ? "error"
+                : "success",
           message:
-            result.report.skippedCellCount > 0
-              ? `Imported ${result.report.appliedEditCount} edits and skipped ${result.report.skippedCellCount} cells.`
-              : `Imported ${result.report.appliedEditCount} edits from ${file.name}.`,
+            importedEditCount === 0
+              ? skippedCellCount > 0
+                ? `No edits were applied from ${file.name}; skipped ${skippedCellCount} cells.`
+                : `No editable cell changes were detected in ${file.name}.`
+              : skippedCellCount > 0
+                ? `Imported ${importedEditCount} edits and skipped ${skippedCellCount} cells.`
+                : `Imported ${importedEditCount} edits from ${file.name}.`,
           issues: result.report.issues,
         });
       });
@@ -1539,8 +1610,6 @@ export function ViewerShell() {
           issues: [],
         });
       });
-    } finally {
-      event.target.value = "";
     }
   };
 
@@ -1561,14 +1630,14 @@ export function ViewerShell() {
     });
 
     try {
-      await exportViewerDataTableToExcel({
+      const result = await exportViewerDataTableToExcel({
         data: effectiveDataTableData,
         sourceId: metadata.sourceId,
         fileName: buildViewerDataTableExcelFileName(metadata.name),
       });
       setDataTableActionStatus({
         phase: "success",
-        message: `Exported ${effectiveDataTableData.rows.length} rows to Excel.`,
+        message: `Exported ${effectiveDataTableData.rows.length} rows to ${result.fileName}.`,
         issues: [],
       });
     } catch (error) {
@@ -1795,13 +1864,14 @@ export function ViewerShell() {
         >
           <FileSpreadsheet className="h-4 w-4" />
         </HeaderActionButton>
-        <HeaderActionButton
+        <HeaderActionFileButton
           label="Import Excel"
-          onClick={openDataTableImportPicker}
+          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          onFileSelect={handleDataTableImport}
           disabled={!effectiveDataTableData || dataTableActionStatus.phase === "running"}
         >
           <Import className="h-4 w-4" />
-        </HeaderActionButton>
+        </HeaderActionFileButton>
         <HeaderActionButton
           label="Clear edits"
           onClick={handleClearImportedEdits}
@@ -1854,6 +1924,8 @@ export function ViewerShell() {
         tableState={effectiveDataTableState}
         activeSelection={session.selected}
         visibleRowKeysInView={dataTableVisibleRowKeysInView}
+        importRevision={dataTableImportFocus.revision}
+        importedColumnKeys={dataTableImportFocus.columnKeys}
         onSyncToView={handleSyncDataTableToView}
         onSelectRow={handleDataTableRowSelect}
         showMetaHeader={false}
@@ -1891,13 +1963,6 @@ export function ViewerShell() {
                 onChange={handleFileChange}
                 className="hidden"
               />
-              <input
-                ref={dataTableImportInputRef}
-                type="file"
-                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                onChange={handleDataTableImport}
-                className="hidden"
-              />
               <button
                 type="button"
                 onClick={openFilePicker}
@@ -1906,35 +1971,12 @@ export function ViewerShell() {
                 <Upload className="h-4 w-4" />
                 <span>Open IFC</span>
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  void handleLoadBundledModel();
-                }}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-4 text-sm font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]"
-              >
-                <Box className="h-4 w-4" />
-                <span>Test model</span>
-              </button>
               <Link
                 href="/rules"
                 className="inline-flex h-10 items-center gap-2 rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-4 text-sm font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]"
               >
                 <span>Rules</span>
               </Link>
-                <HeaderActionButton
-                  label={isDataTableDetached ? "Dock data table" : "Open data table in a new window"}
-                  active={showDataTable}
-                  onClick={() => {
-                    if (showDataTable) {
-                      hideDataTable();
-                    } else {
-                      showDataTableWindow();
-                    }
-                  }}
-                >
-                  <SquareArrowOutUpRight className="h-4 w-4" />
-                </HeaderActionButton>
             </div>
           </div>
 
@@ -2089,8 +2131,16 @@ export function ViewerShell() {
 
                 <ViewerToolbar
                   disabled={!hasModel}
+                  dataTableOpen={showDataTable}
                   session={session}
                   status={status}
+                  onToggleDataTable={() => {
+                    if (showDataTable) {
+                      hideDataTable();
+                    } else {
+                      showDataTableWindow();
+                    }
+                  }}
                   onToolChange={(tool) => {
                     setSession((current) => ({ ...current, activeTool: tool }));
                     viewportRef.current?.setTool(tool);
@@ -2121,14 +2171,6 @@ export function ViewerShell() {
                   }}
                 />
 
-                <DebugPanel
-                  metadata={metadata}
-                  rawItemSample={activeRawDebugItem}
-                  rawItemLabel={activeRawDebugLabel}
-                  selectionSample={debugSelectionSample}
-                  rowSample={debugRowSample}
-                  treeSample={debugTreeSample}
-                />
               </section>
 
               <ViewerDrawer
@@ -2147,6 +2189,18 @@ export function ViewerShell() {
                 )}
               />
             </div>
+
+            <DebugPanel
+              metadata={metadata}
+              rawItemSample={activeRawDebugItem}
+              rawItemLabel={activeRawDebugLabel}
+              selectionSample={debugSelectionSample}
+              rowSample={debugRowSample}
+              treeSample={debugTreeSample}
+              onLoadBundledModel={() => {
+                void handleLoadBundledModel();
+              }}
+            />
 
             {showDataTable && !isDataTableDetached && dataTableDialogLayout.initialized ? (
               <div className="pointer-events-none absolute inset-0 z-50">

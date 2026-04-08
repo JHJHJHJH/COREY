@@ -59,7 +59,7 @@ const VIEWER_DATA_TABLE_BASE_COLUMNS = [
     editableReason: "Identity columns are read-only.",
     binding: {
       kind: "attribute",
-      name: "GlobalId",
+      name: "_guid",
     } satisfies ViewerDataTableColumnBinding,
     valueKind: "string" satisfies ViewerDataTableEditableValueKind,
   },
@@ -80,6 +80,7 @@ const VIEWER_DATA_TABLE_BASE_COLUMNS = [
 
 const VIEWER_DATA_TABLE_ATTRIBUTE_EXCLUSIONS = new Set([
   "type",
+  "_guid",
   "GlobalId",
   "Name",
   "id",
@@ -699,13 +700,13 @@ function buildViewerDataTableRow(
     });
   }
   cells.globalId = buildViewerDataTableCell(
-    hasAttribute(data, "GlobalId"),
-    readAttribute(data, "GlobalId"),
+    hasIfcGuid(data),
+    readIfcGuid(data),
     "MISSING",
     {
       binding: {
         kind: "attribute",
-        name: "GlobalId",
+        name: "_guid",
       },
       valueKind: "string",
     },
@@ -949,7 +950,7 @@ export async function buildViewerDataTable(
     }
   }
 
-  if (orderedIdSet.size === 0 && model.getSpatialStructure) {
+  if (model.getSpatialStructure) {
     try {
       const spatialTree = await model.getSpatialStructure();
       collectLocalIds(spatialTree, orderedIdSet);

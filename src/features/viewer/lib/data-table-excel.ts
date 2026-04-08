@@ -19,7 +19,7 @@ const META_SHEET_NAME = "_corey_meta";
 const TECHNICAL_COLUMNS = ["__rowKey", "__modelId", "__localId"] as const;
 
 type SheetJsModule = {
-  read: (data: ArrayBuffer, options: Record<string, unknown>) => Workbook;
+  read: (data: ArrayBuffer | Uint8Array, options: Record<string, unknown>) => Workbook;
   write: (workbook: Workbook, options: Record<string, unknown>) => ArrayBuffer;
   utils: {
     aoa_to_sheet: (data: unknown[][]) => Worksheet;
@@ -62,14 +62,27 @@ async function loadSheetJs(): Promise<SheetJsModule> {
   return (await import("xlsx")) as unknown as SheetJsModule;
 }
 
-function downloadArrayBuffer(bytes: ArrayBuffer, fileName: string, type: string) {
-  const blob = new Blob([bytes], { type });
+async function saveArrayBuffer(bytes: ArrayBuffer, fileName: string, type: string) {
+  const payload = new Uint8Array(bytes);
+  const blob = new Blob([payload], { type });
   const href = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = href;
   anchor.download = fileName;
+  anchor.rel = "noopener";
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
   anchor.click();
-  URL.revokeObjectURL(href);
+  anchor.remove();
+  window.setTimeout(() => {
+    URL.revokeObjectURL(href);
+  }, 60_000);
+}
+
+function formatByteSignature(bytes: Uint8Array, length = 8) {
+  return [...bytes.slice(0, length)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join(" ");
 }
 
 function toWorkbookCellValue(row: ViewerDataTableData["rows"][number], column: ViewerDataTableColumn) {
@@ -220,13 +233,35 @@ export async function exportViewerDataTableToExcel(input: {
   const bytes = XLSX.write(workbook, {
     bookType: "xlsx",
     type: "array",
+    compression: true,
   });
+  const verificationWorkbook = XLSX.read(bytes, {
+    type: "array",
+    raw: true,
+  });
+  const verificationSheetNames = verificationWorkbook.SheetNames.join(", ");
 
-  downloadArrayBuffer(
+  if (
+    !verificationWorkbook.Sheets[DATA_SHEET_NAME] ||
+    !verificationWorkbook.Sheets[META_SHEET_NAME]
+  ) {
+    throw new Error(
+      `Exported workbook verification failed. Found sheets: ${verificationSheetNames || "none"}.`,
+    );
+  }
+
+  const fileName =
+    input.fileName.toLowerCase().endsWith(".xlsx") ? input.fileName : `${input.fileName}.xlsx`;
+
+  await saveArrayBuffer(
     bytes,
-    input.fileName.toLowerCase().endsWith(".xlsx") ? input.fileName : `${input.fileName}.xlsx`,
+    fileName,
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   );
+
+  return {
+    fileName,
+  };
 }
 
 export async function importViewerDataTableFromExcel(input: {
@@ -236,7 +271,8 @@ export async function importViewerDataTableFromExcel(input: {
   currentData: ViewerDataTableData;
 }) {
   const XLSX = await loadSheetJs();
-  const workbook = XLSX.read(await input.file.arrayBuffer(), {
+  const fileBytes = new Uint8Array(await input.file.arrayBuffer());
+  const workbook = XLSX.read(fileBytes, {
     type: "array",
     raw: true,
   });
@@ -244,7 +280,11 @@ export async function importViewerDataTableFromExcel(input: {
   const metaSheet = workbook.Sheets[META_SHEET_NAME];
 
   if (!dataSheet || !metaSheet) {
-    throw new Error("Workbook is missing the required Data Table or _corey_meta sheet.");
+    const sheetNames = workbook.SheetNames.length > 0 ? workbook.SheetNames.join(", ") : "none";
+    const signature = formatByteSignature(fileBytes);
+    throw new Error(
+      `Workbook is missing the required Data Table or _corey_meta sheet. Found sheets: ${sheetNames}. Signature: ${signature || "none"}. Size: ${fileBytes.byteLength} bytes.`,
+    );
   }
 
   const metaRows = XLSX.utils.sheet_to_json(metaSheet, {
@@ -381,9 +421,15 @@ export async function importViewerDataTableFromExcel(input: {
 }
 
 export function buildViewerDataTableExcelFileName(name: string) {
-  return name.toLowerCase().endsWith(".ifc")
-    ? `${name.slice(0, Math.max(0, name.length - 4))}.xlsx`
-    : `${name}.xlsx`;
+  const baseName = name.toLowerCase().endsWith(".ifc")
+    ? name.slice(0, Math.max(0, name.length - 4))
+    : name;
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}Z$/, "Z");
+
+  return `${baseName}.${timestamp}.xlsx`;
 }
 
 export function buildViewerDataTableIfcFileName(name: string) {
