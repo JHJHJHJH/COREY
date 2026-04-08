@@ -292,6 +292,21 @@ export interface ViewerSelectionDetails {
   loading: boolean;
 }
 
+export type ViewerDebugValue =
+  | null
+  | boolean
+  | number
+  | string
+  | ViewerDebugValue[]
+  | { [key: string]: ViewerDebugValue };
+
+export interface ViewerDebugData {
+  sampleItem: ViewerDebugValue | null;
+  sampleLocalId: number | null;
+  selectedItem: ViewerDebugValue | null;
+  selectedLocalId: number | null;
+}
+
 export interface ViewerSessionState {
   activeTool: ViewerTool;
   selected: ViewerSelection | null;

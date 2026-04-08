@@ -32,6 +32,7 @@ import {
 } from "@/features/rules/lib/validation";
 import { useViewerRules } from "@/features/rules/rules-provider";
 import { DataTablePanel } from "@/features/viewer/components/data-table-panel";
+import { DebugPanel } from "@/features/viewer/components/debug-panel";
 import { DetachedWindow } from "@/features/viewer/components/detached-window";
 import { ModelTreePanel } from "@/features/viewer/components/model-tree-panel";
 import { IfcViewport } from "@/features/viewer/components/ifc-viewport";
@@ -49,13 +50,18 @@ import {
   exportViewerDataTableToExcel,
   importViewerDataTableFromExcel,
 } from "@/features/viewer/lib/data-table-excel";
-import { formatBytes } from "@/features/viewer/lib/ifc-data";
+import {
+  buildViewerTreeDebugSample,
+  formatBytes,
+  sanitizeViewerDebugValue,
+} from "@/features/viewer/lib/ifc-data";
 import { LocalFileModelSource } from "@/features/viewer/lib/model-source";
 import { exportEditedIfc } from "@/features/viewer/lib/ifc-writeback";
 import type {
   ModelMetadata,
   ModelSourceResult,
   ViewerCategorySummary,
+  ViewerDebugData,
   ViewerDataTableDraft,
   ViewerDataTableExportStatus,
   ViewerDataTableImportReport,
@@ -117,6 +123,13 @@ const initialDataTableActionStatus: ViewerDataTableExportStatus = {
   phase: "idle",
   message: "",
   issues: [],
+};
+
+const initialDebugData: ViewerDebugData = {
+  sampleItem: null,
+  sampleLocalId: null,
+  selectedItem: null,
+  selectedLocalId: null,
 };
 
 type ViewerValidationPhase = "idle" | "running" | "ready" | "error";
@@ -553,6 +566,7 @@ export function ViewerShell() {
     inspection: null,
     loading: false,
   });
+  const [debugData, setDebugData] = useState<ViewerDebugData>(initialDebugData);
   const [validationState, setValidationState] = useState(initialValidationState);
   const [validationHighlights, setValidationHighlights] = useState<ViewerValidationHighlights>(
     emptyValidationHighlights,
@@ -626,6 +640,45 @@ export function ViewerShell() {
     }),
     [deferredRules, selectionDetails],
   );
+  const debugTreeSample = useMemo(
+    () => (tree.length > 0 ? buildViewerTreeDebugSample(tree) : null),
+    [tree],
+  );
+  const debugRowSample = useMemo(() => {
+    const rows = dataTableState.data?.rows ?? [];
+    if (rows.length === 0) {
+      return null;
+    }
+
+    const activeRow =
+      (session.selected
+        ? rows.find((row) => row.localId === session.selected?.localId)
+        : null) ?? rows[0];
+
+    return sanitizeViewerDebugValue(activeRow, {
+      maxDepth: 5,
+      maxArrayLength: 10,
+      maxObjectEntries: 14,
+    });
+  }, [dataTableState.data?.rows, session.selected]);
+  const debugSelectionSample = useMemo(
+    () =>
+      selectionDetails.selection || selectionDetails.loading || selectionDetails.inspection
+        ? sanitizeViewerDebugValue(selectionDetails, {
+            maxDepth: 5,
+            maxArrayLength: 10,
+            maxObjectEntries: 14,
+          })
+        : null,
+    [selectionDetails],
+  );
+  const activeRawDebugItem = debugData.selectedItem ?? debugData.sampleItem;
+  const activeRawDebugLabel =
+    debugData.selectedLocalId !== null
+      ? `selected localId ${debugData.selectedLocalId}`
+      : debugData.sampleLocalId !== null
+        ? `sample localId ${debugData.sampleLocalId}`
+        : "no item sample";
   const validationPayload = useMemo<ViewerValidationRunPayload | null>(() => {
     if (
       !metadata ||
@@ -2014,6 +2067,7 @@ export function ViewerShell() {
                       setTree(nextTree);
                       setCategories(nextCategories);
                       setSelectionDetails({ selection: null, inspection: null, loading: false });
+                      setDebugData(initialDebugData);
                     });
                   }}
                   onDataTableChange={(nextDataTableState) => {
@@ -2024,6 +2078,11 @@ export function ViewerShell() {
                   onSelectionDetailsChange={(details) => {
                     startTransition(() => {
                       setSelectionDetails(details);
+                    });
+                  }}
+                  onDebugDataChange={(nextDebugData) => {
+                    startTransition(() => {
+                      setDebugData(nextDebugData);
                     });
                   }}
                 />
@@ -2060,6 +2119,15 @@ export function ViewerShell() {
                   onClearMeasurements={() => {
                     viewportRef.current?.clearMeasurements();
                   }}
+                />
+
+                <DebugPanel
+                  metadata={metadata}
+                  rawItemSample={activeRawDebugItem}
+                  rawItemLabel={activeRawDebugLabel}
+                  selectionSample={debugSelectionSample}
+                  rowSample={debugRowSample}
+                  treeSample={debugTreeSample}
                 />
               </section>
 

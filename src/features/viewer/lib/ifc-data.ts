@@ -11,6 +11,7 @@ import type {
   ViewerDataTableRow,
   ViewerDataTableSort,
   ViewerElementInspection,
+  ViewerDebugValue,
   ViewerInspectionGroup,
   ViewerInspectionRow,
   ViewerInspectionValue,
@@ -1343,4 +1344,158 @@ export function filterTree(
   return nodes
     .map((node) => prune(node))
     .filter((node): node is ViewerTreeNode => node !== null);
+}
+
+function buildDebugTruncationNote(count: number, kind: string) {
+  return `... ${count} more ${kind}`;
+}
+
+export function sanitizeViewerDebugValue(
+  value: unknown,
+  options?: {
+    maxDepth?: number;
+    maxArrayLength?: number;
+    maxObjectEntries?: number;
+  },
+): ViewerDebugValue {
+  const maxDepth = options?.maxDepth ?? 5;
+  const maxArrayLength = options?.maxArrayLength ?? 12;
+  const maxObjectEntries = options?.maxObjectEntries ?? 16;
+  const seen = new WeakSet<object>();
+
+  const visit = (input: unknown, depth: number): ViewerDebugValue => {
+    if (
+      input === null ||
+      typeof input === "string" ||
+      typeof input === "boolean"
+    ) {
+      return input;
+    }
+
+    if (typeof input === "number") {
+      return Number.isFinite(input) ? input : String(input);
+    }
+
+    if (typeof input === "bigint" || typeof input === "symbol" || typeof input === "function") {
+      return String(input);
+    }
+
+    if (depth >= maxDepth) {
+      return `[Max depth ${maxDepth}]`;
+    }
+
+    if (Array.isArray(input)) {
+      const items = input.slice(0, maxArrayLength).map((entry) => visit(entry, depth + 1));
+      if (input.length > maxArrayLength) {
+        items.push(buildDebugTruncationNote(input.length - maxArrayLength, "items"));
+      }
+      return items;
+    }
+
+    if (input instanceof Set) {
+      return visit([...input], depth + 1);
+    }
+
+    if (input instanceof Map) {
+      const output: Record<string, ViewerDebugValue> = {};
+      const entries = [...input.entries()];
+
+      for (const [key, entryValue] of entries.slice(0, maxObjectEntries)) {
+        output[String(key)] = visit(entryValue, depth + 1);
+      }
+
+      if (entries.length > maxObjectEntries) {
+        output.__truncated__ = buildDebugTruncationNote(
+          entries.length - maxObjectEntries,
+          "entries",
+        );
+      }
+
+      return output;
+    }
+
+    if (ArrayBuffer.isView(input)) {
+      if ("length" in input && typeof input.length === "number") {
+        return {
+          type: input.constructor.name,
+          length: input.length,
+        };
+      }
+
+      return {
+        type: input.constructor.name,
+        byteLength: input.byteLength,
+      };
+    }
+
+    if (typeof input === "object") {
+      if (seen.has(input)) {
+        return "[Circular]";
+      }
+
+      seen.add(input);
+
+      const output: Record<string, ViewerDebugValue> = {};
+      const entries = Object.entries(input);
+
+      for (const [key, entryValue] of entries.slice(0, maxObjectEntries)) {
+        output[key] = visit(entryValue, depth + 1);
+      }
+
+      if (entries.length > maxObjectEntries) {
+        output.__truncated__ = buildDebugTruncationNote(
+          entries.length - maxObjectEntries,
+          "fields",
+        );
+      }
+
+      return output;
+    }
+
+    return String(input);
+  };
+
+  return visit(value, 0);
+}
+
+export function buildViewerTreeDebugSample(
+  nodes: ViewerTreeNode[],
+  options?: {
+    maxRoots?: number;
+    maxDepth?: number;
+    maxChildren?: number;
+  },
+): ViewerDebugValue {
+  const maxRoots = options?.maxRoots ?? 1;
+  const maxDepth = options?.maxDepth ?? 2;
+  const maxChildren = options?.maxChildren ?? 4;
+
+  const walk = (node: ViewerTreeNode, depth: number): ViewerDebugValue => {
+    const sampleChildren = node.children.slice(0, maxChildren).map((child) => walk(child, depth + 1));
+
+    return {
+      key: node.key,
+      localId: node.localId,
+      label: node.label,
+      category: node.category,
+      childCount: node.children.length,
+      children:
+        depth >= maxDepth
+          ? node.children.length > 0
+            ? [`[${node.children.length} child nodes omitted]`]
+            : []
+          : sampleChildren,
+      ...(node.children.length > maxChildren
+        ? {
+            truncatedChildCount: node.children.length - maxChildren,
+          }
+        : {}),
+    };
+  };
+
+  if (nodes.length === 0) {
+    return [];
+  }
+
+  return nodes.slice(0, maxRoots).map((node) => walk(node, 0));
 }

@@ -14,6 +14,7 @@ import * as THREE from "three";
 import {
   buildCategorySummary,
   buildViewerDataTable,
+  sanitizeViewerDebugValue,
   buildSelectionInspection,
   buildSingleItemMap,
   buildViewerTree,
@@ -26,6 +27,7 @@ import type {
   ModelMetadata,
   ModelSourceResult,
   ViewerDataTableState,
+  ViewerDebugData,
   ViewerValidationHighlights,
   ViewerSelectionDetails,
   ViewerSessionState,
@@ -48,6 +50,7 @@ type IfcViewportProps = {
   }) => void;
   onDataTableChange: (state: ViewerDataTableState) => void;
   onSelectionDetailsChange: (details: ViewerSelectionDetails) => void;
+  onDebugDataChange: (data: ViewerDebugData) => void;
 };
 
 type ViewerRuntime = {
@@ -127,6 +130,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
     onSelectionDetailsChange,
     onSessionChange,
     onStatusChange,
+    onDebugDataChange,
   },
   ref,
 ) {
@@ -144,6 +148,21 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
   const emitDataTableChange = useEffectEvent(onDataTableChange);
   const emitModelLoaded = useEffectEvent(onModelLoaded);
   const emitSessionChange = useEffectEvent(onSessionChange);
+  const emitDebugDataChange = useEffectEvent(onDebugDataChange);
+  const debugDataRef = useRef<ViewerDebugData>({
+    sampleItem: null,
+    sampleLocalId: null,
+    selectedItem: null,
+    selectedLocalId: null,
+  });
+
+  const syncDebugData = (patch: Partial<ViewerDebugData>) => {
+    debugDataRef.current = {
+      ...debugDataRef.current,
+      ...patch,
+    };
+    emitDebugDataChange(debugDataRef.current);
+  };
 
   const clearSelectionDetailsTimer = () => {
     if (selectionLoadTimerRef.current !== null) {
@@ -197,6 +216,10 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
   const resetSelectionDetails = useEffectEvent(() => {
     selectionLoadSequenceRef.current += 1;
     clearSelectionDetailsTimer();
+    syncDebugData({
+      selectedItem: null,
+      selectedLocalId: null,
+    });
     emitSelectionDetailsChange({
       selection: null,
       inspection: null,
@@ -243,6 +266,17 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
           if (first) {
             readNameMaps(first, selection.localId, activeRuntime.labels, activeRuntime.categories);
           }
+
+          syncDebugData({
+            selectedItem: first
+              ? sanitizeViewerDebugValue(first, {
+                  maxDepth: 5,
+                  maxArrayLength: 10,
+                  maxObjectEntries: 12,
+                })
+              : null,
+            selectedLocalId: first ? selection.localId : null,
+          });
 
           const enrichedSelection = {
             ...selection,
@@ -327,6 +361,13 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
 
       await this.clearModel();
       const loadSequence = ++loadSequenceRef.current;
+      debugDataRef.current = {
+        sampleItem: null,
+        sampleLocalId: null,
+        selectedItem: null,
+        selectedLocalId: null,
+      };
+      emitDebugDataChange(debugDataRef.current);
 
       const { bytes, metadata } = source as ModelSourceResult;
 
@@ -486,10 +527,44 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
                 phase: "loaded",
                 message:
                   dataTable.rows.length > 0
-                    ? `Indexed ${dataTable.rows.length} elements across ${dataTable.columns.length} columns.`
+                  ? `Indexed ${dataTable.rows.length} elements across ${dataTable.columns.length} columns.`
                     : "No IFC elements with geometry were available for tabular review.",
                 data: dataTable,
               });
+
+              if (dataTable.rows.length > 0) {
+                try {
+                  const sampleLocalId = dataTable.rows[0].localId;
+                  const sampleData = await activeRuntime.model.getItemsData(
+                    [sampleLocalId],
+                    selectionDetailsDataConfig,
+                  );
+                  const firstSample = sampleData[0] ?? null;
+
+                  if (
+                    runtimeRef.current?.model?.modelId === model.modelId &&
+                    loadSequenceRef.current === loadSequence
+                  ) {
+                    syncDebugData({
+                      sampleItem: firstSample
+                        ? sanitizeViewerDebugValue(firstSample, {
+                            maxDepth: 5,
+                            maxArrayLength: 10,
+                            maxObjectEntries: 12,
+                          })
+                        : null,
+                      sampleLocalId: firstSample ? sampleLocalId : null,
+                    });
+                  }
+                } catch (error) {
+                  console.error("Failed to build IFC debug sample", error);
+                }
+              } else {
+                syncDebugData({
+                  sampleItem: null,
+                  sampleLocalId: null,
+                });
+              }
             } else {
               const dataTableMessage =
                 dataTableResult.reason instanceof Error
@@ -582,6 +657,13 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
           syncSession(null);
           resetSelectionDetails();
         }
+        debugDataRef.current = {
+          sampleItem: null,
+          sampleLocalId: null,
+          selectedItem: null,
+          selectedLocalId: null,
+        };
+        emitDebugDataChange(debugDataRef.current);
         emitDataTableChange({
           phase: "idle",
           message: "Load a model to review element data in a table.",
@@ -603,6 +685,13 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
 
       resetSelectionDetails();
       syncSession(null);
+      debugDataRef.current = {
+        sampleItem: null,
+        sampleLocalId: null,
+        selectedItem: null,
+        selectedLocalId: null,
+      };
+      emitDebugDataChange(debugDataRef.current);
       emitDataTableChange({
         phase: "idle",
         message: "Load a model to review element data in a table.",
