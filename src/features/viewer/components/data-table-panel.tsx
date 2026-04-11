@@ -10,6 +10,7 @@ import {
 } from "@/features/viewer/lib/ifc-data";
 import type {
   ModelMetadata,
+  ViewerValidationClauseTableView,
   ViewerDataTableColumn,
   ViewerDataTableSort,
   ViewerDataTableState,
@@ -20,6 +21,7 @@ type DataTablePanelProps = {
   embedded?: boolean;
   metadata: ModelMetadata | null;
   tableState: ViewerDataTableState;
+  validationClauseViews: ViewerValidationClauseTableView[];
   activeSelection: ViewerSelection | null;
   visibleRowKeysInView: Set<string> | null;
   importRevision?: number;
@@ -33,6 +35,7 @@ type DataTableUiState = {
   dataSignature: string;
   query: string;
   ifcTypeFilter: string;
+  validationClauseId: string;
   showEditedOnly: boolean;
   sort: ViewerDataTableSort | null;
   visibleColumnKeys: string[];
@@ -50,6 +53,12 @@ function statusTone(phase: ViewerDataTableState["phase"]) {
     default:
       return "border-[color:var(--viewer-border)] bg-white/60 text-[color:var(--muted-ink)]";
   }
+}
+
+function validationClauseTone(result: ViewerValidationClauseTableView["result"]) {
+  return result === "error"
+    ? "border-[#d3a08e] bg-[#fff0ea] text-[#8a3e1f]"
+    : "border-[#d8af80] bg-[#fff7ed] text-[#915217]";
 }
 
 function cellTone(column: ViewerDataTableColumn, state: "present" | "missing" | "empty" | "null" | "undefined") {
@@ -101,6 +110,7 @@ function buildDefaultUiState(dataSignature: string, state: ViewerDataTableState[
     dataSignature,
     query: "",
     ifcTypeFilter: "",
+    validationClauseId: "",
     showEditedOnly: false,
     sort: null,
     visibleColumnKeys: state ? getDefaultViewerDataTableColumnKeys(state.columns) : [],
@@ -116,6 +126,7 @@ const DataTablePanelComponent = function DataTablePanel({
   embedded = false,
   metadata,
   tableState,
+  validationClauseViews,
   activeSelection,
   visibleRowKeysInView,
   importRevision = 0,
@@ -145,6 +156,16 @@ const DataTablePanelComponent = function DataTablePanel({
       return updater(base);
     });
   }, [data, dataSignature]);
+  const activeClauseView = useMemo(
+    () =>
+      validationClauseViews.find((clause) => clause.clauseId === activeUiState.validationClauseId) ??
+      null,
+    [activeUiState.validationClauseId, validationClauseViews],
+  );
+  const activeClauseRowKeySet = useMemo(
+    () => (activeClauseView ? new Set(activeClauseView.rowKeys) : null),
+    [activeClauseView],
+  );
 
   const visibleColumns = useMemo(() => {
     if (!data) {
@@ -166,6 +187,9 @@ const DataTablePanelComponent = function DataTablePanel({
       query: deferredQuery,
       ifcType: deferredIfcTypeFilter,
     });
+    if (activeClauseRowKeySet) {
+      nextRows = nextRows.filter((row) => activeClauseRowKeySet.has(row.key));
+    }
     if (activeUiState.showEditedOnly) {
       nextRows = nextRows.filter(rowHasImportedEdits);
     }
@@ -173,7 +197,14 @@ const DataTablePanelComponent = function DataTablePanel({
       nextRows = nextRows.filter((row) => visibleRowKeysInView.has(row.key));
     }
     return nextRows;
-  }, [activeUiState.showEditedOnly, data, deferredIfcTypeFilter, deferredQuery, visibleRowKeysInView]);
+  }, [
+    activeClauseRowKeySet,
+    activeUiState.showEditedOnly,
+    data,
+    deferredIfcTypeFilter,
+    deferredQuery,
+    visibleRowKeysInView,
+  ]);
 
   const editedRowCount = useMemo(
     () => (data ? data.rows.filter(rowHasImportedEdits).length : 0),
@@ -213,12 +244,28 @@ const DataTablePanelComponent = function DataTablePanel({
         ...current,
         query: "",
         ifcTypeFilter: "",
+        validationClauseId: "",
         showEditedOnly: true,
         visibleColumnKeys: [...nextVisibleColumnKeys],
         selectedRowKeys: new Set<string>(),
       };
     });
   }, [importRevision, importedColumnKeys, updateUiState]);
+
+  useEffect(() => {
+    if (!activeUiState.validationClauseId) {
+      return;
+    }
+
+    if (validationClauseViews.some((clause) => clause.clauseId === activeUiState.validationClauseId)) {
+      return;
+    }
+
+    updateUiState((current) => ({
+      ...current,
+      validationClauseId: "",
+    }));
+  }, [activeUiState.validationClauseId, updateUiState, validationClauseViews]);
 
   const toggleSort = (columnKey: string) => {
     updateUiState((current) => {
@@ -321,6 +368,7 @@ const DataTablePanelComponent = function DataTablePanel({
           <span>{data?.columns.length ?? 0} columns discovered</span>
           <span>{visibleRows.length} visible rows</span>
           <span>{editedRowCount} edited rows</span>
+          {activeClauseView ? <span>Clause view: {activeClauseView.clauseTitle}</span> : null}
           <span>{activeUiState.selectedRowKeys.size} checked rows</span>
           <span>{tableState.message}</span>
         </div>
@@ -368,6 +416,84 @@ const DataTablePanelComponent = function DataTablePanel({
               ))}
             </select>
           </label>
+
+          <details className="relative">
+            <summary
+              className={`list-none rounded-2xl border px-4 py-3 text-sm font-medium transition ${
+                activeClauseView
+                  ? validationClauseTone(activeClauseView.result)
+                  : "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
+              }`}
+            >
+              {activeClauseView
+                ? `View by validation clause: ${activeClauseView.clauseTitle}`
+                : "View by validation clause"}
+            </summary>
+            <div className="absolute left-0 top-[calc(100%+0.5rem)] z-20 w-[min(28rem,85vw)] rounded-[1.25rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] p-4 shadow-[var(--viewer-shadow)]">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+                Validation Clauses
+              </div>
+              <div className="mt-3 space-y-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateUiState((current) => ({
+                      ...current,
+                      validationClauseId: "",
+                      selectedRowKeys: new Set<string>(),
+                    }))
+                  }
+                  className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm transition ${
+                    activeClauseView
+                      ? "border-[color:var(--viewer-border)] bg-white/60 text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
+                      : "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
+                  }`}
+                >
+                  <span className="font-medium">Show all rows</span>
+                  <span className="text-[11px] uppercase tracking-[0.16em]">
+                    {data?.rows.length ?? 0} elements
+                  </span>
+                </button>
+
+                {validationClauseViews.length > 0 ? (
+                  <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                    {validationClauseViews.map((clause) => (
+                      <button
+                        key={clause.clauseId}
+                        type="button"
+                        onClick={() =>
+                          updateUiState((current) => ({
+                            ...current,
+                            validationClauseId: clause.clauseId,
+                            selectedRowKeys: new Set<string>(),
+                          }))
+                        }
+                        className={`flex w-full items-start justify-between gap-3 rounded-2xl border px-3 py-3 text-left text-sm transition ${
+                          activeClauseView?.clauseId === clause.clauseId
+                            ? validationClauseTone(clause.result)
+                            : "border-[color:var(--viewer-border)] bg-white/60 text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
+                        }`}
+                      >
+                        <span className="min-w-0">
+                          <span className="block break-words font-medium">{clause.clauseTitle}</span>
+                          <span className="mt-1 block text-[11px] uppercase tracking-[0.16em]">
+                            {clause.result}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-[11px] uppercase tracking-[0.16em]">
+                          {clause.elementCount} elements
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-[color:var(--viewer-border)] px-4 py-4 text-sm text-[color:var(--muted-ink)]">
+                    Run validation to filter the table by clause.
+                  </div>
+                )}
+              </div>
+            </div>
+          </details>
 
           <button
             type="button"
@@ -536,8 +662,8 @@ const DataTablePanelComponent = function DataTablePanel({
                 The current filters hide every element
               </div>
               <p className="mt-2 text-sm leading-6 text-[color:var(--muted-ink)]">
-                Adjust the text filter, IFC type filter, edited-only toggle, or visible columns to
-                bring matching rows back into view.
+                Adjust the text filter, IFC type filter, validation clause view, edited-only
+                toggle, or visible columns to bring matching rows back into view.
               </p>
             </div>
           </div>

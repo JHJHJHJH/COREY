@@ -41,14 +41,36 @@ export interface ViewerValidationRule {
   failSeverity: ViewerValidationFailureSeverity;
 }
 
-export interface ViewerValidationConfig {
-  version: 1;
+export interface ViewerValidationClause {
+  id: string;
+  title: string;
   rules: ViewerValidationRule[];
+}
+
+export interface ViewerValidationConfig {
+  version: 2;
+  clauses: ViewerValidationClause[];
+}
+
+export interface ViewerValidationRuleFailure {
+  clauseId: string;
+  clauseTitle: string;
+  ruleId: string;
+  result: ViewerValidationFailureSeverity;
+  description: string;
+}
+
+export interface ViewerValidationClauseFailure {
+  clauseId: string;
+  clauseTitle: string;
+  result: ViewerValidationFailureSeverity;
+  rules: ViewerValidationRuleFailure[];
 }
 
 export interface ViewerValidationMatch {
   result: ViewerValidationResult;
-  ruleId: string;
+  failedRuleCount: number;
+  clauseFailures: ViewerValidationClauseFailure[];
 }
 
 export interface ViewerValidationSummary {
@@ -57,6 +79,8 @@ export interface ViewerValidationSummary {
   okCount: number;
   warnCount: number;
   errorCount: number;
+  failedClauseCount: number;
+  failedClauses: ViewerValidationClauseFailure[];
 }
 
 export interface ViewerValidationValue {
@@ -75,19 +99,29 @@ export interface ViewerValidationElementResult {
   modelId: string;
   localId: number;
   result: ViewerValidationFailureSeverity;
-  matchedRuleIds: string[];
+  failedClauses: ViewerValidationClauseFailure[];
 }
 
 export interface ViewerValidationRunPayload {
   version: number;
   sourceId: string;
-  rules: ViewerValidationRule[];
+  clauses: ViewerValidationClause[];
   rows: ViewerValidationRow[];
 }
 
 export interface ViewerValidationRunResult {
   sourceId: string;
   results: ViewerValidationElementResult[];
+  failedClauseCount: number;
+  failedClauses: ViewerValidationClauseFailure[];
+}
+
+export interface ViewerValidationClauseTableView {
+  clauseId: string;
+  clauseTitle: string;
+  result: ViewerValidationFailureSeverity;
+  elementCount: number;
+  rowKeys: string[];
 }
 
 export type ViewerValidationElementMap = Record<string, number[]>;

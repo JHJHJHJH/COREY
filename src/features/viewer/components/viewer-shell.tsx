@@ -69,6 +69,7 @@ import type {
   ViewerSessionState,
   ViewerStatus,
   ViewerValidationHighlights,
+  ViewerValidationClauseTableView,
   ViewerValidationRunPayload,
   ViewerValidationRunResult,
   ViewerTreeNode,
@@ -138,6 +139,7 @@ type ViewerValidationState = {
   mode: "worker" | "api" | null;
   progress: number;
   issueCount: number;
+  failedClauseCount: number;
   message: string;
 };
 
@@ -146,6 +148,7 @@ const initialValidationState: ViewerValidationState = {
   mode: null,
   progress: 0,
   issueCount: 0,
+  failedClauseCount: 0,
   message: "No validation rules configured.",
 };
 
@@ -233,6 +236,18 @@ function summarizeIfcTypes(ifcTypes: string[], max = 6) {
   const visible = ifcTypes.slice(0, max);
   const suffix = ifcTypes.length > max ? ` (+${ifcTypes.length - max} more)` : "";
   return `${visible.join(", ")}${suffix}`;
+}
+
+function compareValidationSeverity(
+  left: "warn" | "error",
+  right: "warn" | "error",
+) {
+  const rank = {
+    warn: 1,
+    error: 2,
+  } as const;
+
+  return rank[right] - rank[left];
 }
 
 function StatusDot({ phase }: { phase: ViewerStatus["phase"] }) {
@@ -633,6 +648,7 @@ export function ViewerShell() {
   const [validationHighlights, setValidationHighlights] = useState<ViewerValidationHighlights>(
     emptyValidationHighlights,
   );
+  const [validationResult, setValidationResult] = useState<ViewerValidationRunResult | null>(null);
   const [showTree, setShowTree] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
   const [showDataTable, setShowDataTable] = useState(false);
@@ -657,15 +673,16 @@ export function ViewerShell() {
   const hasModel = Boolean(metadata && status.phase === "loaded");
   const isDataTableDetached = showDataTable && showDataTableInWindow;
   const activeDrawerResizeSide = drawerDragState?.side ?? null;
-  const deferredRules = useDeferredValue(config.rules);
+  const deferredClauses = useDeferredValue(config.clauses);
   const compiledValidationRules = useMemo(
-    () => compileViewerValidationRules(deferredRules),
-    [deferredRules],
+    () => compileViewerValidationRules(deferredClauses),
+    [deferredClauses],
   );
   const runnableRuleCount = useMemo(
     () =>
       [...compiledValidationRules.values()].reduce(
-        (count, rulesForType) => count + rulesForType.size,
+        (count, rulesForType) =>
+          count + [...rulesForType.values()].reduce((ruleCount, rulesForTarget) => ruleCount + rulesForTarget.length, 0),
         0,
       ),
     [compiledValidationRules],
@@ -698,10 +715,80 @@ export function ViewerShell() {
   const validatedSelectionDetails = useMemo<ViewerSelectionDetails>(
     () => ({
       ...selectionDetails,
-      inspection: applyViewerValidationToInspection(selectionDetails.inspection, deferredRules),
+      inspection: applyViewerValidationToInspection(selectionDetails.inspection, deferredClauses),
     }),
-    [deferredRules, selectionDetails],
+    [deferredClauses, selectionDetails],
   );
+  const validationClauseTableViews = useMemo<ViewerValidationClauseTableView[]>(() => {
+    if (!validationResult || !effectiveDataTableData) {
+      return [];
+    }
+
+    const rowKeyByElementId = new Map<string, string>();
+    for (const row of effectiveDataTableData.rows) {
+      rowKeyByElementId.set(`${row.modelId}:${row.localId}`, row.key);
+    }
+
+    const clauseMap = new Map<
+      string,
+      {
+        clauseId: string;
+        clauseTitle: string;
+        result: "warn" | "error";
+        rowKeys: Set<string>;
+      }
+    >();
+
+    for (const result of validationResult.results) {
+      const rowKey = rowKeyByElementId.get(`${result.modelId}:${result.localId}`);
+      if (!rowKey) {
+        continue;
+      }
+
+      for (const clauseFailure of result.failedClauses) {
+        const existing = clauseMap.get(clauseFailure.clauseId);
+        if (!existing) {
+          clauseMap.set(clauseFailure.clauseId, {
+            clauseId: clauseFailure.clauseId,
+            clauseTitle: clauseFailure.clauseTitle,
+            result: clauseFailure.result,
+            rowKeys: new Set([rowKey]),
+          });
+          continue;
+        }
+
+        existing.result =
+          compareValidationSeverity(clauseFailure.result, existing.result) < 0
+            ? clauseFailure.result
+            : existing.result;
+        existing.rowKeys.add(rowKey);
+      }
+    }
+
+    return [...clauseMap.values()]
+      .map((clause) => ({
+        clauseId: clause.clauseId,
+        clauseTitle: clause.clauseTitle,
+        result: clause.result,
+        elementCount: clause.rowKeys.size,
+        rowKeys: [...clause.rowKeys],
+      }))
+      .sort((left, right) => {
+        const severityComparison = compareValidationSeverity(left.result, right.result);
+        if (severityComparison !== 0) {
+          return severityComparison;
+        }
+
+        if (left.elementCount !== right.elementCount) {
+          return right.elementCount - left.elementCount;
+        }
+
+        return left.clauseTitle.localeCompare(right.clauseTitle, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
+      });
+  }, [effectiveDataTableData, validationResult]);
   const debugTreeSample = useMemo(
     () => (tree.length > 0 ? buildViewerTreeDebugSample(tree) : null),
     [tree],
@@ -746,7 +833,7 @@ export function ViewerShell() {
       !metadata ||
       status.phase !== "loaded" ||
       !effectiveDataTableData ||
-      deferredRules.length === 0 ||
+      deferredClauses.length === 0 ||
       runnableRuleCount === 0
     ) {
       return null;
@@ -755,10 +842,10 @@ export function ViewerShell() {
     return {
       version: VIEWER_VALIDATION_CONFIG_VERSION,
       sourceId: metadata.sourceId ?? metadata.name,
-      rules: deferredRules,
-      rows: buildViewerValidationRows(effectiveDataTableData, deferredRules),
+      clauses: deferredClauses,
+      rows: buildViewerValidationRows(effectiveDataTableData, deferredClauses),
     };
-  }, [deferredRules, effectiveDataTableData, metadata, runnableRuleCount, status.phase]);
+  }, [deferredClauses, effectiveDataTableData, metadata, runnableRuleCount, status.phase]);
 
   useEffect(() => {
     const sourceId = metadata?.sourceId;
@@ -1265,13 +1352,15 @@ export function ViewerShell() {
     if (!metadata || status.phase !== "loaded" || !effectiveDataTableData) {
       startTransition(() => {
         setValidationHighlights(emptyValidationHighlights);
+        setValidationResult(null);
         setValidationState({
           phase: "idle",
           mode: null,
           progress: 0,
           issueCount: 0,
+          failedClauseCount: 0,
           message:
-            deferredRules.length === 0
+            deferredClauses.length === 0
               ? "No validation rules configured."
               : runnableRuleCount === 0
                 ? "Complete at least one rule to start validation."
@@ -1284,13 +1373,15 @@ export function ViewerShell() {
     if (!validationPayload) {
       startTransition(() => {
         setValidationHighlights(emptyValidationHighlights);
+        setValidationResult(null);
         setValidationState({
           phase: "idle",
           mode: null,
           progress: 0,
           issueCount: 0,
+          failedClauseCount: 0,
           message:
-            deferredRules.length === 0
+            deferredClauses.length === 0
               ? "No validation rules configured."
               : "Complete at least one rule to start validation.",
         });
@@ -1301,11 +1392,13 @@ export function ViewerShell() {
     if (validationPayload.rows.length === 0) {
       startTransition(() => {
         setValidationHighlights(emptyValidationHighlights);
+        setValidationResult(null);
         setValidationState({
           phase: "ready",
           mode: null,
           progress: 100,
           issueCount: 0,
+          failedClauseCount: 0,
           message: `No indexed elements match the current rule IFC types. Rules: ${summarizeIfcTypes(
             runnableRuleIfcTypes,
           )}. Indexed: ${summarizeIfcTypes(indexedIfcTypes)}.`,
@@ -1325,15 +1418,17 @@ export function ViewerShell() {
 
       startTransition(() => {
         setValidationHighlights(groupViewerValidationResultsBySeverity(result.results));
+        setValidationResult(result);
         setValidationState({
           phase: "ready",
           mode,
           progress: 100,
           issueCount: result.results.length,
+          failedClauseCount: result.failedClauseCount,
           message:
             result.results.length === 0
               ? `Validated ${validationPayload.rows.length} elements with no issues.`
-              : `Validated ${validationPayload.rows.length} elements. ${result.results.length} flagged.`,
+              : `Validated ${validationPayload.rows.length} elements. ${result.results.length} flagged across ${result.failedClauseCount} clauses.`,
         });
       });
     };
@@ -1344,11 +1439,13 @@ export function ViewerShell() {
       }
 
       startTransition(() => {
+        setValidationResult(null);
         setValidationState((current) => ({
           phase: "error",
           mode,
           progress: current.progress,
           issueCount: current.issueCount,
+          failedClauseCount: current.failedClauseCount,
           message,
         }));
       });
@@ -1366,11 +1463,13 @@ export function ViewerShell() {
       validationAbortControllerRef.current = controller;
 
       startTransition(() => {
+        setValidationResult(null);
         setValidationState({
           phase: "running",
           mode: "api",
           progress: 0,
           issueCount: 0,
+          failedClauseCount: 0,
           message: `Validating ${validationPayload.rows.length} elements via API fallback...`,
         });
       });
@@ -1408,13 +1507,15 @@ export function ViewerShell() {
     };
 
     startTransition(() => {
-      setValidationState({
-        phase: "running",
-        mode: "worker",
-        progress: 0,
-        issueCount: 0,
-        message: `Validating ${validationPayload.rows.length} elements in a worker...`,
-      });
+        setValidationResult(null);
+        setValidationState({
+          phase: "running",
+          mode: "worker",
+          progress: 0,
+          issueCount: 0,
+          failedClauseCount: 0,
+          message: `Validating ${validationPayload.rows.length} elements in a worker...`,
+        });
     });
 
     try {
@@ -1440,6 +1541,7 @@ export function ViewerShell() {
               mode: "worker",
               progress,
               issueCount: 0,
+              failedClauseCount: 0,
               message: `Validating ${message.totalRowCount} elements in a worker... ${progress}%`,
             });
           });
@@ -1475,7 +1577,7 @@ export function ViewerShell() {
     };
   }, [
     effectiveDataTableData,
-    deferredRules.length,
+    deferredClauses.length,
     metadata,
     runnableRuleCount,
     runnableRuleIfcTypes,
@@ -1922,6 +2024,7 @@ export function ViewerShell() {
         embedded
         metadata={metadata}
         tableState={effectiveDataTableState}
+        validationClauseViews={validationClauseTableViews}
         activeSelection={session.selected}
         visibleRowKeysInView={dataTableVisibleRowKeysInView}
         importRevision={dataTableImportFocus.revision}
@@ -2007,8 +2110,8 @@ export function ViewerShell() {
               status
             </div>
             <div className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/72 px-3 py-1.5 text-[color:var(--muted-ink)]">
-              <span className="font-semibold text-[color:var(--foreground)]">Rules:</span>{" "}
-              {config.rules.length}
+              <span className="font-semibold text-[color:var(--foreground)]">Clauses:</span>{" "}
+              {config.clauses.length}
             </div>
             <div
               className={`rounded-full border px-3 py-1.5 ${validationPhaseTone(validationState.phase)}`}
@@ -2019,7 +2122,7 @@ export function ViewerShell() {
                   : validationState.phase === "ready"
                     ? validationState.issueCount === 0
                       ? "Validation clear"
-                      : `Validation ${validationState.issueCount} flagged`
+                      : `Validation ${validationState.issueCount} flagged · ${validationState.failedClauseCount} clauses`
                     : validationState.phase === "error"
                       ? "Validation error"
                       : "Validation idle"}

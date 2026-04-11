@@ -1,5 +1,7 @@
 "use client";
 
+import { CircleAlert, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type {
   ViewerElementInspection,
   ViewerInspectionGroup,
@@ -7,9 +9,19 @@ import type {
   ViewerInspectionValue,
   ViewerSelection,
   ViewerSelectionDetails,
+  ViewerValidationClauseFailure,
   ViewerValidationMatch,
   ViewerValidationSummary,
 } from "@/features/viewer/types";
+
+type ValidationPopupPayload = {
+  id: string;
+  selectionKey: string;
+  title: string;
+  subtitle: string | null;
+  clauseFailures: ViewerValidationClauseFailure[];
+  result: ViewerValidationMatch["result"] | ViewerValidationSummary["result"];
+};
 
 function validationLabel(validation: ViewerValidationMatch | null) {
   if (!validation) {
@@ -74,14 +86,111 @@ function badgeClass(value: ViewerInspectionValue) {
   return "border-[color:var(--viewer-border)] bg-white/70 text-[color:var(--muted-ink)]";
 }
 
+function popupTone(result: ValidationPopupPayload["result"]) {
+  if (result === "error") {
+    return "border-[#d3a08e] bg-[#fff0ea] text-[#8a3e1f]";
+  }
+
+  if (result === "warn") {
+    return "border-[#d8af80] bg-[#fff7ed] text-[#915217]";
+  }
+
+  return "border-[color:var(--viewer-border)] bg-white text-[color:var(--foreground)]";
+}
+
+function ValidationDetailsButton({
+  title,
+  onClick,
+}: {
+  title: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[color:var(--viewer-border)] bg-white/75 text-[color:var(--muted-ink)] transition hover:bg-white hover:text-[color:var(--foreground)]"
+      aria-label={title}
+      title={title}
+    >
+      <CircleAlert className="h-3.5 w-3.5" />
+    </button>
+  );
+}
+
+function ClauseFailureList({
+  clauseFailures,
+}: {
+  clauseFailures: ViewerValidationClauseFailure[];
+}) {
+  if (clauseFailures.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-2 space-y-1 text-[11px] leading-5 text-[color:var(--muted-ink)]">
+      {clauseFailures.map((clauseFailure) => (
+        <div
+          key={clauseFailure.clauseId}
+          className="rounded-lg border border-[color:var(--viewer-border)] bg-white/65 px-2 py-1.5"
+        >
+          <div className="font-semibold text-[color:var(--foreground)]">{clauseFailure.clauseTitle}</div>
+          <div>{clauseFailure.rules.map((rule) => rule.description).join(" · ")}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ValidationDetailsPopup({
+  payload,
+  onClose,
+}: {
+  payload: ValidationPopupPayload;
+  onClose: () => void;
+}) {
+  return (
+    <section
+      className={`absolute inset-x-3 top-16 z-20 max-h-[min(32rem,calc(100%-5rem))] overflow-hidden rounded-2xl border shadow-[0_22px_50px_rgba(15,23,42,0.22)] ${popupTone(payload.result)}`}
+    >
+      <div className="flex items-start justify-between gap-3 border-b border-black/10 px-3 py-3">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold uppercase tracking-[0.18em]">Validation Details</div>
+          <div className="mt-1 text-sm font-semibold">{payload.title}</div>
+          {payload.subtitle ? <div className="mt-1 text-xs opacity-80">{payload.subtitle}</div> : null}
+        </div>
+
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-xl border border-black/10 bg-white/65 transition hover:bg-white"
+            aria-label="Close validation details"
+            title="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="max-h-[24rem] overflow-y-auto px-3 py-3">
+        <ClauseFailureList clauseFailures={payload.clauseFailures} />
+      </div>
+    </section>
+  );
+}
+
 function InspectionValueRow({
   label,
   value,
+  onOpenDetails,
 }: {
   label: string;
   value: ViewerInspectionValue;
+  onOpenDetails: (payload: Omit<ValidationPopupPayload, "selectionKey">) => void;
 }) {
   const badge = validationLabel(value.validation);
+  const failedClauseCount = value.validation?.clauseFailures.length ?? 0;
 
   return (
     <div
@@ -103,16 +212,42 @@ function InspectionValueRow({
             {badge}
           </span>
         ) : null}
+        {failedClauseCount > 0 && value.validation ? (
+          <ValidationDetailsButton
+            title={failedClauseCount === 1 ? "View 1 failed clause" : `View ${failedClauseCount} failed clauses`}
+            onClick={() =>
+              onOpenDetails({
+                id: `row:${label}`,
+                title: label,
+                subtitle: value.text,
+                clauseFailures: value.validation.clauseFailures,
+                result: value.validation.result,
+              })
+            }
+          />
+        ) : null}
       </div>
     </div>
   );
 }
 
-function InspectionRowView({ row }: { row: ViewerInspectionRow }) {
-  return <InspectionValueRow label={row.label} value={row.value} />;
+function InspectionRowView({
+  row,
+  onOpenDetails,
+}: {
+  row: ViewerInspectionRow;
+  onOpenDetails: (payload: Omit<ValidationPopupPayload, "selectionKey">) => void;
+}) {
+  return <InspectionValueRow label={row.label} value={row.value} onOpenDetails={onOpenDetails} />;
 }
 
-function PropertySetGroup({ group }: { group: ViewerInspectionGroup }) {
+function PropertySetGroup({
+  group,
+  onOpenDetails,
+}: {
+  group: ViewerInspectionGroup;
+  onOpenDetails: (payload: Omit<ValidationPopupPayload, "selectionKey">) => void;
+}) {
   return (
     <section className="overflow-hidden rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)]">
       <div className="border-b border-[color:var(--viewer-border)] px-2.5 py-2">
@@ -129,7 +264,7 @@ function PropertySetGroup({ group }: { group: ViewerInspectionGroup }) {
       {group.rows.length > 0 ? (
         <div className="divide-y divide-[color:var(--viewer-border)]">
           {group.rows.map((row) => (
-            <InspectionRowView key={row.key} row={row} />
+            <InspectionRowView key={row.key} row={row} onOpenDetails={onOpenDetails} />
           ))}
         </div>
       ) : (
@@ -184,7 +319,13 @@ function UnavailableState({ selection }: { selection: ViewerSelection }) {
   );
 }
 
-function ValidationSummaryBanner({ summary }: { summary: ViewerValidationSummary | null }) {
+function ValidationSummaryBanner({
+  summary,
+  onOpenDetails,
+}: {
+  summary: ViewerValidationSummary | null;
+  onOpenDetails: (payload: Omit<ValidationPopupPayload, "selectionKey">) => void;
+}) {
   if (!summary) {
     return null;
   }
@@ -198,7 +339,7 @@ function ValidationSummaryBanner({ summary }: { summary: ViewerValidationSummary
 
   return (
     <section className={`rounded-xl border px-3 py-3 ${tone}`}>
-      <div className="text-xs font-semibold uppercase tracking-[0.18em]">Rule Summary</div>
+      <div className="text-xs font-semibold uppercase tracking-[0.18em]">Validation Summary</div>
       <div className="mt-2 text-sm">
         {summary.errorCount > 0 ? `${summary.errorCount} error` : "0 error"}
         {" · "}
@@ -206,11 +347,41 @@ function ValidationSummaryBanner({ summary }: { summary: ViewerValidationSummary
         {" · "}
         {summary.okCount > 0 ? `${summary.okCount} ok` : "0 ok"}
       </div>
+      {summary.failedClauseCount > 0 ? (
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <div className="text-sm">Failed clauses: {summary.failedClauseCount}</div>
+          <ValidationDetailsButton
+            title={
+              summary.failedClauseCount === 1
+                ? "View 1 failed clause"
+                : `View ${summary.failedClauseCount} failed clauses`
+            }
+            onClick={() =>
+              onOpenDetails({
+                id: "summary",
+                title: "Selected element issues",
+                subtitle:
+                  summary.failedClauseCount === 1
+                    ? "1 failed clause"
+                    : `${summary.failedClauseCount} failed clauses`,
+                clauseFailures: summary.failedClauses,
+                result: summary.result,
+              })
+            }
+          />
+        </div>
+      ) : null}
     </section>
   );
 }
 
-function InspectionContent({ inspection }: { inspection: ViewerElementInspection }) {
+function InspectionContent({
+  inspection,
+  onOpenDetails,
+}: {
+  inspection: ViewerElementInspection;
+  onOpenDetails: (payload: Omit<ValidationPopupPayload, "selectionKey">) => void;
+}) {
   return (
     <div className="space-y-4">
       <section className="space-y-2">
@@ -223,12 +394,12 @@ function InspectionContent({ inspection }: { inspection: ViewerElementInspection
           </div>
         </div>
 
-        <ValidationSummaryBanner summary={inspection.validationSummary} />
+        <ValidationSummaryBanner summary={inspection.validationSummary} onOpenDetails={onOpenDetails} />
 
         <div className="overflow-hidden rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)]">
           <div className="divide-y divide-[color:var(--viewer-border)]">
             {inspection.summaryRows.map((row) => (
-              <InspectionRowView key={row.key} row={row} />
+              <InspectionRowView key={row.key} row={row} onOpenDetails={onOpenDetails} />
             ))}
           </div>
         </div>
@@ -242,7 +413,7 @@ function InspectionContent({ inspection }: { inspection: ViewerElementInspection
         {inspection.propertySets.length > 0 ? (
           <div className="space-y-2">
             {inspection.propertySets.map((group) => (
-              <PropertySetGroup key={group.key} group={group} />
+              <PropertySetGroup key={group.key} group={group} onOpenDetails={onOpenDetails} />
             ))}
           </div>
         ) : (
@@ -261,14 +432,63 @@ type PropertiesPanelProps = {
 };
 
 export function PropertiesPanel({ embedded = false, details }: PropertiesPanelProps) {
+  const selectionKey = details.selection
+    ? `${details.selection.modelId}:${details.selection.localId}`
+    : "none";
+  const [popupPayload, setPopupPayload] = useState<ValidationPopupPayload | null>(null);
+  const popupRef = useRef<HTMLDivElement | null>(null);
+  const activePopup = popupPayload?.selectionKey === selectionKey ? popupPayload : null;
+
+  useEffect(() => {
+    if (!activePopup) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!popupRef.current?.contains(event.target as Node)) {
+        setPopupPayload(null);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setPopupPayload(null);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [activePopup]);
+
+  const openValidationPopup = (payload: Omit<ValidationPopupPayload, "selectionKey">) => {
+    setPopupPayload({
+      ...payload,
+      selectionKey,
+    });
+  };
+
   return (
     <aside
       className={`flex h-full min-h-0 flex-col overflow-hidden ${
         embedded
-          ? "bg-[color:var(--panel-bg)]/92"
-          : "rounded-[1.75rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] shadow-[var(--viewer-shadow)]"
+          ? "relative bg-[color:var(--panel-bg)]/92"
+          : "relative rounded-[1.75rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] shadow-[var(--viewer-shadow)]"
       }`}
     >
+      {activePopup ? (
+        <div ref={popupRef}>
+          <ValidationDetailsPopup
+            payload={activePopup}
+            onClose={() => setPopupPayload(null)}
+          />
+        </div>
+      ) : null}
+
       <div
         className={`border-b border-[color:var(--viewer-border)] px-3 py-3 ${
           embedded ? "pl-12" : ""
@@ -283,7 +503,7 @@ export function PropertiesPanel({ embedded = false, details }: PropertiesPanelPr
         ) : details.loading && !details.inspection ? (
           <LoadingState selection={details.selection} />
         ) : details.inspection ? (
-          <InspectionContent inspection={details.inspection} />
+          <InspectionContent inspection={details.inspection} onOpenDetails={openValidationPopup} />
         ) : (
           <UnavailableState selection={details.selection} />
         )}

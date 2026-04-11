@@ -9,18 +9,26 @@ import {
 } from "react";
 import {
   VIEWER_VALIDATION_STORAGE_KEY,
-  createEmptyViewerValidationConfig,
+  createViewerValidationClause,
   createViewerValidationRule,
-  parseViewerValidationConfigText,
+  createEmptyViewerValidationConfig,
+  parseStoredViewerValidationConfigText,
   sanitizeViewerValidationConfig,
 } from "@/features/rules/lib/validation";
-import type { ViewerValidationConfig, ViewerValidationRule } from "@/features/viewer/types";
+import type {
+  ViewerValidationClause,
+  ViewerValidationConfig,
+  ViewerValidationRule,
+} from "@/features/viewer/types";
 
 type ViewerRulesContextValue = {
   config: ViewerValidationConfig;
-  addRule: () => void;
-  updateRule: (ruleId: string, nextRule: ViewerValidationRule) => void;
-  removeRule: (ruleId: string) => void;
+  addClause: () => void;
+  updateClause: (clauseId: string, nextClause: ViewerValidationClause) => void;
+  removeClause: (clauseId: string) => void;
+  addRule: (clauseId: string) => void;
+  updateRule: (clauseId: string, ruleId: string, nextRule: ViewerValidationRule) => void;
+  removeRule: (clauseId: string, ruleId: string) => void;
   replaceConfig: (config: ViewerValidationConfig) => void;
 };
 
@@ -48,7 +56,7 @@ function readStoredConfig() {
 
   try {
     cachedConfigText = text;
-    cachedConfigSnapshot = parseViewerValidationConfigText(text);
+    cachedConfigSnapshot = parseStoredViewerValidationConfigText(text);
     return cachedConfigSnapshot;
   } catch {
     window.localStorage.removeItem(VIEWER_VALIDATION_STORAGE_KEY);
@@ -108,22 +116,61 @@ export function ViewerRulesProvider({ children }: PropsWithChildren) {
   const value = useMemo<ViewerRulesContextValue>(
     () => ({
       config,
-      addRule() {
+      addClause() {
         writeStoredConfig({
           ...config,
-          rules: [...config.rules, createViewerValidationRule()],
+          clauses: [...config.clauses, createViewerValidationClause()],
         });
       },
-      updateRule(ruleId, nextRule) {
+      updateClause(clauseId, nextClause) {
         writeStoredConfig({
           ...config,
-          rules: config.rules.map((rule) => (rule.id === ruleId ? nextRule : rule)),
+          clauses: config.clauses.map((clause) => (clause.id === clauseId ? nextClause : clause)),
         });
       },
-      removeRule(ruleId) {
+      removeClause(clauseId) {
         writeStoredConfig({
           ...config,
-          rules: config.rules.filter((rule) => rule.id !== ruleId),
+          clauses: config.clauses.filter((clause) => clause.id !== clauseId),
+        });
+      },
+      addRule(clauseId) {
+        writeStoredConfig({
+          ...config,
+          clauses: config.clauses.map((clause) =>
+            clause.id === clauseId
+              ? {
+                  ...clause,
+                  rules: [...clause.rules, createViewerValidationRule()],
+                }
+              : clause,
+          ),
+        });
+      },
+      updateRule(clauseId, ruleId, nextRule) {
+        writeStoredConfig({
+          ...config,
+          clauses: config.clauses.map((clause) =>
+            clause.id === clauseId
+              ? {
+                  ...clause,
+                  rules: clause.rules.map((rule) => (rule.id === ruleId ? nextRule : rule)),
+                }
+              : clause,
+          ),
+        });
+      },
+      removeRule(clauseId, ruleId) {
+        writeStoredConfig({
+          ...config,
+          clauses: config.clauses.map((clause) =>
+            clause.id === clauseId
+              ? {
+                  ...clause,
+                  rules: clause.rules.filter((rule) => rule.id !== ruleId),
+                }
+              : clause,
+          ),
         });
       },
       replaceConfig(nextConfig) {

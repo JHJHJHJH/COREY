@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Trash2, X } from "lucide-react";
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useViewerRules } from "@/features/rules/rules-provider";
 import {
   createEmptyViewerValidationConfig,
@@ -11,6 +11,7 @@ import {
 } from "@/features/rules/lib/validation";
 import type {
   ViewerValidationCheck,
+  ViewerValidationClause,
   ViewerValidationRule,
 } from "@/features/viewer/types";
 
@@ -23,14 +24,14 @@ const STARTER_TEMPLATES = [
   {
     id: "testmodel-simple",
     name: "Testmodel Simple",
-    description: "2 slab checks for GlobalId and SGPset_Slab > ReferTo2DDetail to force demo highlights.",
+    description: "2 slab checks grouped into one clause to force demo highlights.",
     href: "/resources/testmodel-rules-simple.json",
     ruleCount: 2,
   },
   {
     id: "testmodel-comprehensive",
     name: "Testmodel Comprehensive",
-    description: "67 mixed-severity rules for IfcSlab, IfcColumn, and IfcBeam with broad expected highlights.",
+    description: "67 grouped rules for IfcSlab, IfcColumn, and IfcBeam with broad expected highlights.",
     href: "/resources/testmodel-rules-comprehensive.json",
     ruleCount: 67,
   },
@@ -344,11 +345,110 @@ function RuleRow({
   );
 }
 
+function ClauseCard({
+  clause,
+  onChange,
+  onRemove,
+  onAddRule,
+  onUpdateRule,
+  onRemoveRule,
+}: {
+  clause: ViewerValidationClause;
+  onChange: (clause: ViewerValidationClause) => void;
+  onRemove: () => void;
+  onAddRule: () => void;
+  onUpdateRule: (ruleId: string, nextRule: ViewerValidationRule) => void;
+  onRemoveRule: (ruleId: string) => void;
+}) {
+  return (
+    <section className="overflow-hidden rounded-[1.5rem] border border-[color:var(--viewer-border)] bg-white/55 shadow-[0_12px_30px_rgba(10,48,128,0.08)]">
+      <div className="border-b border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/70 px-4 py-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+              Clause
+            </div>
+            <div className="mt-2 max-w-xl">
+              <input
+                value={clause.title}
+                onChange={(event) => onChange({ ...clause, title: event.target.value })}
+                className={inputClassName()}
+                placeholder="Clause title"
+                aria-label="Clause title"
+              />
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted-ink)]">
+              <span className="rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-3 py-1.5">
+                {clause.rules.length} rules
+              </span>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <button type="button" onClick={onAddRule} className={compactButtonClassName()}>
+              Add rule
+            </button>
+            <button
+              type="button"
+              onClick={onRemove}
+              className="inline-flex h-8 items-center justify-center rounded-xl border border-[#d9a89d] bg-[#fff0ea] px-2.5 text-xs font-medium text-[#b5432f] transition hover:bg-[#ffe5dc] hover:text-[#962f1f]"
+            >
+              Remove clause
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {clause.rules.length === 0 ? (
+        <div className="px-4 py-6 text-sm text-[color:var(--muted-ink)]">
+          This clause has no rules yet.
+        </div>
+      ) : (
+        <div className="overflow-auto">
+          <table className="min-w-full border-separate border-spacing-0 text-left">
+            <thead className="sticky top-0 z-10 bg-[color:var(--panel-bg)]">
+              <tr>
+                <th className={headerCellClassName("min-w-[12rem]")}>IFC Type</th>
+                <th className={headerCellClassName("min-w-[9rem]")}>Severity</th>
+                <th className={headerCellClassName("min-w-[10rem]")}>Target Kind</th>
+                <th className={headerCellClassName("min-w-[12rem]")}>Attribute Name</th>
+                <th className={headerCellClassName("min-w-[13rem]")}>Property Set</th>
+                <th className={headerCellClassName("min-w-[12rem]")}>Property Label</th>
+                <th className={headerCellClassName("min-w-[11rem]")}>Check Kind</th>
+                <th className={headerCellClassName("min-w-[16rem]")}>Allowed Values</th>
+                <th className={headerCellClassName("min-w-[8rem]")}>Min</th>
+                <th className={headerCellClassName("min-w-[8rem]")}>Max</th>
+                <th className={headerCellClassName("min-w-[7rem]")}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {clause.rules.map((rule) => (
+                <RuleRow
+                  key={rule.id}
+                  rule={rule}
+                  onChange={(nextRule) => onUpdateRule(rule.id, nextRule)}
+                  onRemove={() => onRemoveRule(rule.id)}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function RulesScreen({ mode, onClose }: RulesScreenProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { config, addRule, removeRule, replaceConfig, updateRule } = useViewerRules();
+  const { config, addClause, updateClause, removeClause, addRule, updateRule, removeRule, replaceConfig } =
+    useViewerRules();
   const [importError, setImportError] = useState<string | null>(null);
   const [loadingTemplateId, setLoadingTemplateId] = useState<string | null>(null);
+
+  const totalRuleCount = useMemo(
+    () => config.clauses.reduce((count, clause) => count + clause.rules.length, 0),
+    [config.clauses],
+  );
 
   const handleExport = () => {
     const blob = new Blob([serializeViewerValidationConfig(config)], {
@@ -357,7 +457,7 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
     const href = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = href;
-    anchor.download = "corey-rules.json";
+    anchor.download = "corey-clauses.json";
     anchor.click();
     URL.revokeObjectURL(href);
   };
@@ -418,10 +518,11 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
                   COREY Rules
                 </div>
                 <h1 className="mt-1 text-xl font-semibold tracking-tight text-[color:var(--foreground)]">
-                  Validation rules workspace
+                  Validation clauses workspace
                 </h1>
                 <p className="mt-1.5 max-w-2xl text-sm leading-5 text-[color:var(--muted-ink)]">
-                  Configure entity checks for required values, enums, and numeric ranges.
+                  Group validation rules into clauses so failed elements can report which clause and
+                  which checks they broke.
                 </p>
               </div>
 
@@ -436,7 +537,10 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
 
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted-ink)]">
               <span className="rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-3 py-1.5">
-                {config.rules.length} rules
+                {config.clauses.length} clauses
+              </span>
+              <span className="rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-3 py-1.5">
+                {totalRuleCount} rules
               </span>
               <span className="rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-3 py-1.5">
                 Auto-saved locally
@@ -482,6 +586,9 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
                           {template.name}
                         </h2>
                         <p className="mt-0.5 text-[11px] leading-4 text-[color:var(--muted-ink)]">
+                          {template.description}
+                        </p>
+                        <p className="mt-1 text-[11px] leading-4 text-[color:var(--muted-ink)]">
                           {template.ruleCount} rules
                         </p>
                       </div>
@@ -516,8 +623,8 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
             onChange={handleImport}
             className="hidden"
           />
-          <button type="button" onClick={addRule} className={secondaryButtonClassName()}>
-            Add rule
+          <button type="button" onClick={addClause} className={secondaryButtonClassName()}>
+            Add clause
           </button>
           <button
             type="button"
@@ -546,47 +653,31 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-        {config.rules.length === 0 ? (
+        {config.clauses.length === 0 ? (
           <div className="rounded-[1.5rem] border border-dashed border-[color:var(--viewer-border)] bg-white/45 px-6 py-8 text-center">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-              No Rules Yet
+              No Clauses Yet
             </div>
             <div className="mt-3 text-lg font-semibold text-[color:var(--foreground)]">
-              Add your first IFC validation rule
+              Add your first validation clause
             </div>
             <p className="mt-2 text-sm leading-6 text-[color:var(--muted-ink)]">
-              Rules are global to this browser profile and can be exported as JSON for reuse.
+              Clauses are global to this browser profile and export as version 2 clause-based JSON.
             </p>
           </div>
         ) : (
-          <div className="overflow-auto rounded-[1.5rem] border border-[color:var(--viewer-border)] bg-white/50 shadow-[0_12px_30px_rgba(10,48,128,0.08)]">
-            <table className="min-w-full border-separate border-spacing-0 text-left">
-              <thead className="sticky top-0 z-10 bg-[color:var(--panel-bg)]">
-                <tr>
-                  <th className={headerCellClassName("min-w-[12rem]")}>IFC Type</th>
-                  <th className={headerCellClassName("min-w-[9rem]")}>Severity</th>
-                  <th className={headerCellClassName("min-w-[10rem]")}>Target Kind</th>
-                  <th className={headerCellClassName("min-w-[12rem]")}>Attribute Name</th>
-                  <th className={headerCellClassName("min-w-[13rem]")}>Property Set</th>
-                  <th className={headerCellClassName("min-w-[12rem]")}>Property Label</th>
-                  <th className={headerCellClassName("min-w-[11rem]")}>Check Kind</th>
-                  <th className={headerCellClassName("min-w-[16rem]")}>Allowed Values</th>
-                  <th className={headerCellClassName("min-w-[8rem]")}>Min</th>
-                  <th className={headerCellClassName("min-w-[8rem]")}>Max</th>
-                  <th className={headerCellClassName("min-w-[7rem]")}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {config.rules.map((rule) => (
-                  <RuleRow
-                    key={rule.id}
-                    rule={rule}
-                    onChange={(nextRule) => updateRule(rule.id, nextRule)}
-                    onRemove={() => removeRule(rule.id)}
-                  />
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-4">
+            {config.clauses.map((clause) => (
+              <ClauseCard
+                key={clause.id}
+                clause={clause}
+                onChange={(nextClause) => updateClause(clause.id, nextClause)}
+                onRemove={() => removeClause(clause.id)}
+                onAddRule={() => addRule(clause.id)}
+                onUpdateRule={(ruleId, nextRule) => updateRule(clause.id, ruleId, nextRule)}
+                onRemoveRule={(ruleId) => removeRule(clause.id, ruleId)}
+              />
+            ))}
           </div>
         )}
       </div>

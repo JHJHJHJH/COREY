@@ -6,6 +6,8 @@ import type {
   ViewerInspectionValue,
   ViewerInspectionValueState,
   ViewerValidationCheck,
+  ViewerValidationClause,
+  ViewerValidationClauseFailure,
   ViewerValidationConfig,
   ViewerValidationElementMap,
   ViewerValidationElementResult,
@@ -15,6 +17,7 @@ import type {
   ViewerValidationResult,
   ViewerValidationRow,
   ViewerValidationRule,
+  ViewerValidationRuleFailure,
   ViewerValidationRunPayload,
   ViewerValidationRunResult,
   ViewerValidationSummary,
@@ -22,11 +25,14 @@ import type {
   ViewerValidationValue,
 } from "@/features/viewer/types";
 
-export const VIEWER_VALIDATION_CONFIG_VERSION = 1 as const;
+export const VIEWER_VALIDATION_CONFIG_VERSION = 2 as const;
+
+const LEGACY_VIEWER_VALIDATION_CONFIG_VERSION = 1 as const;
 
 export const VIEWER_VALIDATION_STORAGE_KEY = "bca-ifc.validation-rules.v1";
 
 const DEFAULT_VALIDATION_CHUNK_SIZE = 250;
+const LEGACY_MIGRATION_CLAUSE_TITLE = "Migrated clause";
 
 const EMPTY_VALUE_STATES: ReadonlySet<ViewerInspectionValueState> = new Set([
   "missing",
@@ -49,8 +55,28 @@ const VALID_INSPECTION_STATES: ReadonlySet<ViewerInspectionValueState> = new Set
   "undefined",
 ]);
 
+type CompiledViewerValidationRule = {
+  clauseId: string;
+  clauseTitle: string;
+  description: string;
+  rule: ViewerValidationRule;
+};
+
+type CompiledViewerValidationRuleMap = Map<string, Map<string, CompiledViewerValidationRule[]>>;
+
+function createValidationId(prefix: "rule" | "clause") {
+  return (
+    globalThis.crypto?.randomUUID?.() ??
+    `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  );
+}
+
 function createRuleId() {
-  return globalThis.crypto?.randomUUID?.() ?? `rule-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return createValidationId("rule");
+}
+
+function createClauseId() {
+  return createValidationId("clause");
 }
 
 function normalizeToken(value: string) {
@@ -231,6 +257,21 @@ function sanitizeRule(rule: unknown): ViewerValidationRule {
   };
 }
 
+function sanitizeClause(clause: unknown): ViewerValidationClause {
+  if (!isRecord(clause)) {
+    throw new Error("Each clause entry must be an object.");
+  }
+
+  const title = normalizeStoredText(String(clause.title ?? "")) || "Untitled clause";
+  const rules = Array.isArray(clause.rules) ? clause.rules : [];
+
+  return {
+    id: typeof clause.id === "string" && clause.id.trim().length > 0 ? clause.id : createClauseId(),
+    title,
+    rules: rules.map((rule) => sanitizeRule(rule)),
+  };
+}
+
 function isRunnableRule(rule: ViewerValidationRule) {
   if (!normalizeStoredText(rule.ifcType)) {
     return false;
@@ -255,10 +296,20 @@ function isRunnableRule(rule: ViewerValidationRule) {
   return true;
 }
 
-function findRuleForTarget(
+function normalizeValidationAttributeName(value: string) {
+  const normalized = normalizeToken(value);
+
+  if (normalized === "_guid" || normalized === "guid" || normalized === "globalid") {
+    return "globalid";
+  }
+
+  return normalized;
+}
+
+function findRulesForTarget(
   ifcType: string | null,
   target: ViewerValidationTarget | null,
-  compiledRules: Map<string, Map<string, ViewerValidationRule>>,
+  compiledRules: CompiledViewerValidationRuleMap,
 ) {
   if (!ifcType || !target) {
     return null;
@@ -320,6 +371,49 @@ function toValidationValue(
   };
 }
 
+function ruleTargetLabel(target: ViewerValidationTarget) {
+  if (target.kind === "attribute") {
+    return target.name;
+  }
+
+  return `${target.group} > ${target.label}`;
+}
+
+function uniqueRuleFailures(ruleFailures: ViewerValidationRuleFailure[]) {
+  const unique = new Map<string, ViewerValidationRuleFailure>();
+
+  for (const failure of ruleFailures) {
+    unique.set(`${failure.clauseId}::${failure.ruleId}`, failure);
+  }
+
+  return [...unique.values()];
+}
+
+function aggregateClauseFailures(ruleFailures: ViewerValidationRuleFailure[]) {
+  const grouped = new Map<string, ViewerValidationClauseFailure>();
+
+  for (const failure of uniqueRuleFailures(ruleFailures)) {
+    const existing = grouped.get(failure.clauseId);
+    if (!existing) {
+      grouped.set(failure.clauseId, {
+        clauseId: failure.clauseId,
+        clauseTitle: failure.clauseTitle,
+        result: failure.result,
+        rules: [failure],
+      });
+      continue;
+    }
+
+    existing.result =
+      VALIDATION_RESULT_PRIORITY[failure.result] > VALIDATION_RESULT_PRIORITY[existing.result]
+        ? failure.result
+        : existing.result;
+    existing.rules.push(failure);
+  }
+
+  return [...grouped.values()];
+}
+
 function summarizeValidation(matches: ViewerValidationMatch[]): ViewerValidationSummary | null {
   if (matches.length === 0) {
     return null;
@@ -329,6 +423,7 @@ function summarizeValidation(matches: ViewerValidationMatch[]): ViewerValidation
   let okCount = 0;
   let warnCount = 0;
   let errorCount = 0;
+  const failedRuleMatches: ViewerValidationRuleFailure[] = [];
 
   for (const match of matches) {
     result =
@@ -341,7 +436,13 @@ function summarizeValidation(matches: ViewerValidationMatch[]): ViewerValidation
     } else {
       errorCount += 1;
     }
+
+    for (const clauseFailure of match.clauseFailures) {
+      failedRuleMatches.push(...clauseFailure.rules);
+    }
   }
+
+  const failedClauses = aggregateClauseFailures(failedRuleMatches);
 
   return {
     result,
@@ -349,28 +450,59 @@ function summarizeValidation(matches: ViewerValidationMatch[]): ViewerValidation
     okCount,
     warnCount,
     errorCount,
+    failedClauseCount: failedClauses.length,
+    failedClauses,
+  };
+}
+
+function toRuleFailure(
+  compiledRule: CompiledViewerValidationRule,
+  result: ViewerValidationFailureSeverity,
+): ViewerValidationRuleFailure {
+  return {
+    clauseId: compiledRule.clauseId,
+    clauseTitle: compiledRule.clauseTitle,
+    ruleId: compiledRule.rule.id,
+    result,
+    description: compiledRule.description,
   };
 }
 
 function applyValidationToInspectionRows(
   rows: ViewerInspectionRow[],
-  compiledRules: Map<string, Map<string, ViewerValidationRule>>,
+  compiledRules: CompiledViewerValidationRuleMap,
   ifcType: string | null,
   matches: ViewerValidationMatch[],
 ) {
   return rows.map((row) => {
-    const rule = findRuleForTarget(ifcType, row.target, compiledRules);
-    if (!rule) {
+    const rules = findRulesForTarget(ifcType, row.target, compiledRules);
+    if (!rules || rules.length === 0) {
       return {
         ...row,
         value: cloneValidationValue(row.value, null),
       };
     }
 
-    const result = evaluateRuleAgainstValue(toValidationValue(row.value), rule);
+    const failedRuleMatches: ViewerValidationRuleFailure[] = [];
+    let result: ViewerValidationResult = "ok";
+
+    for (const compiledRule of rules) {
+      const evaluation = evaluateRuleAgainstValue(toValidationValue(row.value), compiledRule.rule);
+      if (evaluation === "ok") {
+        continue;
+      }
+
+      failedRuleMatches.push(toRuleFailure(compiledRule, evaluation));
+      result =
+        VALIDATION_RESULT_PRIORITY[evaluation] > VALIDATION_RESULT_PRIORITY[result]
+          ? evaluation
+          : result;
+    }
+
     const match = {
       result,
-      ruleId: rule.id,
+      failedRuleCount: failedRuleMatches.length,
+      clauseFailures: aggregateClauseFailures(failedRuleMatches),
     } satisfies ViewerValidationMatch;
 
     matches.push(match);
@@ -435,10 +567,29 @@ function buildCompactRowValue(
   };
 }
 
+function migrateLegacyViewerValidationConfig(input: unknown): ViewerValidationConfig | null {
+  if (!isRecord(input) || input.version !== LEGACY_VIEWER_VALIDATION_CONFIG_VERSION) {
+    return null;
+  }
+
+  const rules = Array.isArray(input.rules) ? input.rules : [];
+
+  return {
+    version: VIEWER_VALIDATION_CONFIG_VERSION,
+    clauses: [
+      {
+        id: createClauseId(),
+        title: LEGACY_MIGRATION_CLAUSE_TITLE,
+        rules: rules.map((rule) => sanitizeRule(rule)),
+      },
+    ],
+  };
+}
+
 export function createEmptyViewerValidationConfig(): ViewerValidationConfig {
   return {
     version: VIEWER_VALIDATION_CONFIG_VERSION,
-    rules: [],
+    clauses: [],
   };
 }
 
@@ -457,13 +608,21 @@ export function createViewerValidationRule(): ViewerValidationRule {
   };
 }
 
+export function createViewerValidationClause(): ViewerValidationClause {
+  return {
+    id: createClauseId(),
+    title: "New clause",
+    rules: [createViewerValidationRule()],
+  };
+}
+
 export function normalizeIfcType(value: string) {
   return normalizeToken(value);
 }
 
 export function buildViewerValidationTargetId(target: ViewerValidationTarget) {
   if (target.kind === "attribute") {
-    return `attribute:${normalizeToken(target.name)}`;
+    return `attribute:${normalizeValidationAttributeName(target.name)}`;
   }
 
   return `property:${normalizeToken(target.group)}::${normalizeToken(target.label)}`;
@@ -473,10 +632,36 @@ export function buildViewerValidationRuleKey(rule: Pick<ViewerValidationRule, "i
   return `${normalizeIfcType(rule.ifcType)}::${buildViewerValidationTargetId(rule.target)}`;
 }
 
+export function describeViewerValidationRule(rule: ViewerValidationRule) {
+  const targetLabel = ruleTargetLabel(rule.target);
+
+  if (rule.check.kind === "empty") {
+    return `${targetLabel} is required`;
+  }
+
+  if (rule.check.kind === "enum") {
+    return `${targetLabel} must be one of ${rule.check.allowedValues.join(", ")}`;
+  }
+
+  if (rule.check.min !== null && rule.check.max !== null) {
+    return `${targetLabel} must be between ${rule.check.min} and ${rule.check.max}`;
+  }
+
+  if (rule.check.min !== null) {
+    return `${targetLabel} must be at least ${rule.check.min}`;
+  }
+
+  return `${targetLabel} must be at most ${rule.check.max}`;
+}
+
+export function flattenViewerValidationClauses(clauses: ViewerValidationClause[]) {
+  return clauses.flatMap((clause) => clause.rules);
+}
+
 export function sanitizeViewerValidationConfig(config: ViewerValidationConfig): ViewerValidationConfig {
   return {
     version: VIEWER_VALIDATION_CONFIG_VERSION,
-    rules: config.rules.map((rule) => sanitizeRule(rule)),
+    clauses: config.clauses.map((clause) => sanitizeClause(clause)),
   };
 }
 
@@ -485,18 +670,33 @@ export function parseViewerValidationConfig(input: unknown): ViewerValidationCon
     throw new Error("Rules JSON must be an object.");
   }
 
+  if (input.version === LEGACY_VIEWER_VALIDATION_CONFIG_VERSION) {
+    throw new Error(
+      `Rules JSON version ${LEGACY_VIEWER_VALIDATION_CONFIG_VERSION} is no longer supported. Import a version ${VIEWER_VALIDATION_CONFIG_VERSION} clause-based config.`,
+    );
+  }
+
   if (input.version !== VIEWER_VALIDATION_CONFIG_VERSION) {
     throw new Error(`Rules JSON version must be ${VIEWER_VALIDATION_CONFIG_VERSION}.`);
   }
 
-  if (!Array.isArray(input.rules)) {
-    throw new Error("Rules JSON must contain a rules array.");
+  if (!Array.isArray(input.clauses)) {
+    throw new Error("Rules JSON must contain a clauses array.");
   }
 
   return sanitizeViewerValidationConfig({
     version: VIEWER_VALIDATION_CONFIG_VERSION,
-    rules: input.rules.map((rule) => sanitizeRule(rule)),
+    clauses: input.clauses.map((clause) => sanitizeClause(clause)),
   });
+}
+
+export function parseStoredViewerValidationConfig(input: unknown): ViewerValidationConfig {
+  const migrated = migrateLegacyViewerValidationConfig(input);
+  if (migrated) {
+    return sanitizeViewerValidationConfig(migrated);
+  }
+
+  return parseViewerValidationConfig(input);
 }
 
 export function parseViewerValidationRunPayload(input: unknown): ViewerValidationRunPayload {
@@ -506,7 +706,7 @@ export function parseViewerValidationRunPayload(input: unknown): ViewerValidatio
 
   const config = parseViewerValidationConfig({
     version: input.version,
-    rules: input.rules,
+    clauses: input.clauses,
   });
 
   if (typeof input.sourceId !== "string" || input.sourceId.trim().length === 0) {
@@ -520,7 +720,7 @@ export function parseViewerValidationRunPayload(input: unknown): ViewerValidatio
   return {
     version: config.version,
     sourceId: input.sourceId,
-    rules: config.rules,
+    clauses: config.clauses,
     rows: input.rows.map((row) => sanitizeValidationRow(row)),
   };
 }
@@ -537,18 +737,42 @@ export function parseViewerValidationConfigText(text: string) {
   return parseViewerValidationConfig(parsed);
 }
 
+export function parseStoredViewerValidationConfigText(text: string) {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error("Rules JSON could not be parsed.");
+  }
+
+  return parseStoredViewerValidationConfig(parsed);
+}
+
 export function serializeViewerValidationConfig(config: ViewerValidationConfig) {
   return JSON.stringify(sanitizeViewerValidationConfig(config), null, 2);
 }
 
-export function compileViewerValidationRules(rules: ViewerValidationRule[]) {
-  const compiled = new Map<string, Map<string, ViewerValidationRule>>();
+export function compileViewerValidationRules(clauses: ViewerValidationClause[]) {
+  const compiled: CompiledViewerValidationRuleMap = new Map();
 
-  for (const rule of rules.map((entry) => sanitizeRule(entry)).filter(isRunnableRule)) {
-    const normalizedIfcType = normalizeIfcType(rule.ifcType);
-    const rulesForType = compiled.get(normalizedIfcType) ?? new Map<string, ViewerValidationRule>();
-    rulesForType.set(buildViewerValidationTargetId(rule.target), rule);
-    compiled.set(normalizedIfcType, rulesForType);
+  for (const clause of clauses.map((entry) => sanitizeClause(entry))) {
+    for (const rule of clause.rules.filter(isRunnableRule)) {
+      const normalizedIfcType = normalizeIfcType(rule.ifcType);
+      const targetId = buildViewerValidationTargetId(rule.target);
+      const rulesForType = compiled.get(normalizedIfcType) ?? new Map<string, CompiledViewerValidationRule[]>();
+      const compiledRulesForTarget = rulesForType.get(targetId) ?? [];
+
+      compiledRulesForTarget.push({
+        clauseId: clause.id,
+        clauseTitle: clause.title,
+        description: describeViewerValidationRule(rule),
+        rule,
+      });
+
+      rulesForType.set(targetId, compiledRulesForTarget);
+      compiled.set(normalizedIfcType, rulesForType);
+    }
   }
 
   return compiled;
@@ -556,9 +780,9 @@ export function compileViewerValidationRules(rules: ViewerValidationRule[]) {
 
 export function buildViewerValidationRows(
   data: ViewerDataTableData,
-  rules: ViewerValidationRule[],
+  clauses: ViewerValidationClause[],
 ) {
-  const compiledRules = compileViewerValidationRules(rules);
+  const compiledRules = compileViewerValidationRules(clauses);
   const targetKeyToColumnKey = buildRowTargetKeyToColumnKey(data);
   const rows: ViewerValidationRow[] = [];
 
@@ -596,8 +820,9 @@ export async function evaluateViewerValidationPayload(
     signal?: AbortSignal;
   },
 ): Promise<ViewerValidationRunResult> {
-  const compiledRules = compileViewerValidationRules(payload.rules);
+  const compiledRules = compileViewerValidationRules(payload.clauses);
   const results: ViewerValidationElementResult[] = [];
+  const allRuleFailures: ViewerValidationRuleFailure[] = [];
   const totalRowCount = payload.rows.length;
   const chunkSize = Math.max(1, options?.chunkSize ?? DEFAULT_VALIDATION_CHUNK_SIZE);
 
@@ -619,31 +844,34 @@ export async function evaluateViewerValidationPayload(
       }
 
       let result: ViewerValidationFailureSeverity | null = null;
-      const matchedRuleIds: string[] = [];
+      const failedRuleMatches: ViewerValidationRuleFailure[] = [];
 
-      for (const [targetId, rule] of rulesForType.entries()) {
-        const evaluation = evaluateRuleAgainstValue(
-          row.values[targetId] ?? missingValidationValue(),
-          rule,
-        );
+      for (const [targetId, rulesForTarget] of rulesForType.entries()) {
+        const value = row.values[targetId] ?? missingValidationValue();
 
-        if (evaluation === "ok") {
-          continue;
+        for (const compiledRule of rulesForTarget) {
+          const evaluation = evaluateRuleAgainstValue(value, compiledRule.rule);
+
+          if (evaluation === "ok") {
+            continue;
+          }
+
+          failedRuleMatches.push(toRuleFailure(compiledRule, evaluation));
+          result =
+            result === null || VALIDATION_RESULT_PRIORITY[evaluation] > VALIDATION_RESULT_PRIORITY[result]
+              ? evaluation
+              : result;
         }
-
-        matchedRuleIds.push(rule.id);
-        result =
-          result === null || VALIDATION_RESULT_PRIORITY[evaluation] > VALIDATION_RESULT_PRIORITY[result]
-            ? evaluation
-            : result;
       }
 
       if (result) {
+        const failedClauses = aggregateClauseFailures(failedRuleMatches);
+        allRuleFailures.push(...failedRuleMatches);
         results.push({
           modelId: row.modelId,
           localId: row.localId,
           result,
-          matchedRuleIds,
+          failedClauses,
         });
       }
     }
@@ -654,9 +882,13 @@ export async function evaluateViewerValidationPayload(
     });
   }
 
+  const failedClauses = aggregateClauseFailures(allRuleFailures);
+
   return {
     sourceId: payload.sourceId,
     results,
+    failedClauseCount: failedClauses.length,
+    failedClauses,
   };
 }
 
@@ -678,13 +910,13 @@ export function groupViewerValidationResultsBySeverity(
 
 export function applyViewerValidationToInspection(
   inspection: ViewerElementInspection | null,
-  rules: ViewerValidationRule[],
+  clauses: ViewerValidationClause[],
 ) {
   if (!inspection) {
     return null;
   }
 
-  const compiledRules = compileViewerValidationRules(rules);
+  const compiledRules = compileViewerValidationRules(clauses);
   const inspectionIfcType = getInspectionIfcType(inspection);
   const matches: ViewerValidationMatch[] = [];
   const summaryRows = applyValidationToInspectionRows(
