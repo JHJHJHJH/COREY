@@ -11,7 +11,7 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import {
   filterViewerDataTableRows,
   formatBytes,
@@ -139,6 +139,225 @@ function buildDefaultUiState(dataSignature: string, state: ViewerDataTableState[
 function rowHasImportedEdits(row: NonNullable<ViewerDataTableState["data"]>["rows"][number]) {
   return Object.values(row.cells).some((cell) => cell.source === "draft");
 }
+
+type DataTableContentProps = {
+  data: ViewerDataTableState["data"];
+  tablePhase: ViewerDataTableState["phase"];
+  tableMessage: string;
+  visibleRows: NonNullable<ViewerDataTableState["data"]>["rows"];
+  visibleColumns: ViewerDataTableColumn[];
+  activeSelection: ViewerSelection | null;
+  selectedRowKeys: Set<string>;
+  sort: ViewerDataTableSort | null;
+  allVisibleSelected: boolean;
+  selectAllRef: RefObject<HTMLInputElement | null>;
+  onToggleAllVisibleRows: () => void;
+  onToggleSort: (columnKey: string) => void;
+  onToggleRow: (rowKey: string) => void;
+  onSelectRow: (localId: number) => void;
+};
+
+const DataTableContent = memo(function DataTableContent({
+  data,
+  tablePhase,
+  tableMessage,
+  visibleRows,
+  visibleColumns,
+  activeSelection,
+  selectedRowKeys,
+  sort,
+  allVisibleSelected,
+  selectAllRef,
+  onToggleAllVisibleRows,
+  onToggleSort,
+  onToggleRow,
+  onSelectRow,
+}: DataTableContentProps) {
+  return (
+    <div className="min-h-0 flex-1 overflow-hidden">
+      {!data && tablePhase === "loading" ? (
+        <div className="flex h-full items-center justify-center px-5 py-6">
+          <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[#d8af80] bg-[#fff7ed] px-6 py-6 text-center">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#915217]">
+              Loading Table
+            </div>
+            <div className="mt-3 text-lg font-semibold text-[color:var(--foreground)]">
+              Building the IFC data table
+            </div>
+            <p className="mt-2 text-sm leading-6 text-[#915217]">{tableMessage}</p>
+          </div>
+        </div>
+      ) : !data && tablePhase === "error" ? (
+        <div className="flex h-full items-center justify-center px-5 py-6">
+          <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[#c78972] bg-[#fff0ea] px-6 py-6 text-center">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a3e1f]">
+              Table Unavailable
+            </div>
+            <div className="mt-3 text-lg font-semibold text-[color:var(--foreground)]">
+              The data table could not be indexed
+            </div>
+            <p className="mt-2 text-sm leading-6 text-[#8a3e1f]">{tableMessage}</p>
+          </div>
+        </div>
+      ) : !data ? (
+        <div className="flex h-full items-center justify-center px-5 py-6">
+          <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[color:var(--viewer-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.54),rgba(245,239,230,0.76))] px-6 py-6 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+              No Table Data
+            </div>
+            <div className="mt-3 text-lg font-semibold text-[color:var(--foreground)]">
+              Load an IFC model to populate the review grid
+            </div>
+            <p className="mt-2 text-sm leading-6 text-[color:var(--muted-ink)]">
+              The table view will flatten IFC attributes and property sets into reusable review
+              columns once a model is indexed.
+            </p>
+          </div>
+        </div>
+      ) : data.rows.length === 0 ? (
+        <div className="flex h-full items-center justify-center px-5 py-6">
+          <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[color:var(--viewer-border)] bg-white/60 px-6 py-6 text-center">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+              Empty Model Table
+            </div>
+            <div className="mt-3 text-lg font-semibold text-[color:var(--foreground)]">
+              No geometry-backed IFC elements were found
+            </div>
+            <p className="mt-2 text-sm leading-6 text-[color:var(--muted-ink)]">
+              The model loaded, but the viewer did not find elements with geometry to index into
+              the review grid.
+            </p>
+          </div>
+        </div>
+      ) : visibleRows.length === 0 ? (
+        <div className="flex h-full items-center justify-center px-5 py-6">
+          <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[color:var(--viewer-border)] bg-white/60 px-6 py-6 text-center">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+              No Matching Rows
+            </div>
+            <div className="mt-3 text-lg font-semibold text-[color:var(--foreground)]">
+              The current filters hide every element
+            </div>
+            <p className="mt-2 text-sm leading-6 text-[color:var(--muted-ink)]">
+              Adjust the text filter, IFC type filter, validation clause view, edited-only
+              toggle, or visible columns to bring matching rows back into view.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="h-full overflow-auto">
+          <table className="min-w-full border-separate border-spacing-0 text-left">
+            <thead className="sticky top-0 z-10 bg-[color:var(--panel-bg)]">
+              <tr>
+                <th className="w-12 border-b border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-3">
+                  <input
+                    ref={selectAllRef}
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={onToggleAllVisibleRows}
+                    className="h-4 w-4 rounded border-[color:var(--viewer-border)] text-[color:var(--accent)]"
+                    aria-label="Select all visible rows"
+                  />
+                </th>
+                {visibleColumns.map((column) => (
+                  <th
+                    key={column.key}
+                    aria-sort={
+                      sort?.columnKey === column.key
+                        ? sort.direction === "asc"
+                          ? "ascending"
+                          : "descending"
+                        : "none"
+                    }
+                    className="min-w-[12rem] border-b border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-3 align-bottom"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onToggleSort(column.key)}
+                      className="flex w-full items-end justify-between gap-3 text-left"
+                      aria-label={`${sortLabel(sort, column.key)} by ${column.label}`}
+                    >
+                      <span className="min-w-0">
+                        {column.group ? (
+                          <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+                            {column.group}
+                          </span>
+                        ) : null}
+                        <span className="mt-1 block break-words text-sm font-semibold text-[color:var(--foreground)]">
+                          {column.label}
+                        </span>
+                      </span>
+                      <SortIndicator sort={sort} columnKey={column.key} />
+                    </button>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+
+            <tbody>
+              {visibleRows.map((row) => {
+                const checked = selectedRowKeys.has(row.key);
+                const selected = activeSelection?.localId === row.localId;
+
+                return (
+                  <tr
+                    key={row.key}
+                    onClick={() => onSelectRow(row.localId)}
+                    className={`cursor-pointer transition hover:bg-white/45 ${
+                      selected
+                        ? "bg-[#e7f3ee]"
+                        : checked
+                          ? "bg-[#f6efe3]"
+                          : "bg-transparent"
+                    }`}
+                  >
+                    <td className="border-b border-[color:var(--viewer-border)] px-3 py-3 align-top">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => onToggleRow(row.key)}
+                        onClick={(event) => event.stopPropagation()}
+                        className="h-4 w-4 rounded border-[color:var(--viewer-border)] text-[color:var(--accent)]"
+                        aria-label={`Select row ${row.localId}`}
+                      />
+                    </td>
+                    {visibleColumns.map((column) => {
+                      const cell = row.cells[column.key];
+                      const draftCell = cell?.source === "draft";
+
+                      return (
+                        <td
+                          key={column.key}
+                          className={`border-b border-[color:var(--viewer-border)] px-3 py-3 align-top text-sm ${
+                            draftCell
+                              ? "bg-[#edf7f1] text-[#1e6b45]"
+                              : cell
+                                ? cellTone(column, cell.state)
+                                : "text-[color:var(--muted-ink)]"
+                          }`}
+                        >
+                          <div className="min-w-0 break-words font-mono text-[12px] leading-5">
+                            {cell?.text ?? "MISSING"}
+                          </div>
+                          {draftCell ? (
+                            <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1e6b45]">
+                              Imported
+                            </div>
+                          ) : null}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+});
+DataTableContent.displayName = "DataTableContent";
 
 const DataTablePanelComponent = function DataTablePanel({
   embedded = false,
@@ -383,7 +602,7 @@ const DataTablePanelComponent = function DataTablePanel({
     onValidationClauseChange?.("");
   }, [activeUiState.validationClauseId, onValidationClauseChange, updateUiState, validationClauseViews]);
 
-  const toggleSort = (columnKey: string) => {
+  const toggleSort = useCallback((columnKey: string) => {
     updateUiState((current) => {
       if (!current.sort || current.sort.columnKey !== columnKey) {
         return { ...current, sort: { columnKey, direction: "asc" } };
@@ -395,9 +614,9 @@ const DataTablePanelComponent = function DataTablePanel({
 
       return { ...current, sort: null };
     });
-  };
+  }, [updateUiState]);
 
-  const toggleRow = (rowKey: string) => {
+  const toggleRow = useCallback((rowKey: string) => {
     updateUiState((current) => {
       const next = new Set(current.selectedRowKeys);
       if (next.has(rowKey)) {
@@ -407,9 +626,9 @@ const DataTablePanelComponent = function DataTablePanel({
       }
       return { ...current, selectedRowKeys: next };
     });
-  };
+  }, [updateUiState]);
 
-  const toggleAllVisibleRows = () => {
+  const toggleAllVisibleRows = useCallback(() => {
     updateUiState((current) => {
       const next = new Set(current.selectedRowKeys);
       if (allVisibleSelected) {
@@ -423,7 +642,7 @@ const DataTablePanelComponent = function DataTablePanel({
       }
       return { ...current, selectedRowKeys: next };
     });
-  };
+  }, [allVisibleSelected, updateUiState, visibleRows]);
 
   const toggleColumn = (columnKey: string) => {
     updateUiState((current) => {
@@ -586,9 +805,20 @@ const DataTablePanelComponent = function DataTablePanel({
               </button>
             </div>
 
-            {showFilters ? (
-              <div id="table-filters-content" className="flex flex-col gap-3">
-                <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
+            <div
+              id="table-filters-content"
+              aria-hidden={!showFilters}
+              className={`grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out ${
+                showFilters ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+              }`}
+            >
+              <div className="min-h-0 overflow-hidden">
+                <div
+                  className={`flex flex-col gap-3 transition-[opacity,transform] duration-200 ease-out ${
+                    showFilters ? "translate-y-0 opacity-100" : "-translate-y-1 opacity-0"
+                  }`}
+                >
+                  <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
                   <label className="min-w-0 flex-1">
                     <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
                       Text Filter
@@ -650,440 +880,276 @@ const DataTablePanelComponent = function DataTablePanel({
                   </label>
                 </div>
 
-                {hasActiveFilters ? (
-                  <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[color:var(--viewer-border)] bg-white/65 px-3 py-2 text-[11px] text-[color:var(--muted-ink)]">
-                    <span className="font-semibold uppercase tracking-[0.16em] text-[color:var(--foreground)]">
-                      Active Filters
-                    </span>
-                    {activeFilterLabels.map((label) => (
-                      <span
-                        key={label}
-                        className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1"
-                      >
-                        {label}
+                  {hasActiveFilters ? (
+                    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[color:var(--viewer-border)] bg-white/65 px-3 py-2 text-[11px] text-[color:var(--muted-ink)]">
+                      <span className="font-semibold uppercase tracking-[0.16em] text-[color:var(--foreground)]">
+                        Active Filters
                       </span>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void resetFilters();
-                      }}
-                      disabled={!data || isSyncingToView}
-                      className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-[color:var(--viewer-border)] bg-white px-3 py-1 font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <FilterX className="h-3.5 w-3.5" />
-                      Reset filters
-                    </button>
-                  </div>
-                ) : null}
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="relative" ref={clauseMenuRef}>
-                    <button
-                      type="button"
-                      aria-expanded={showClauseMenu}
-                      onClick={() => {
-                        setShowClauseMenu((current) => !current);
-                        setShowColumnMenu(false);
-                      }}
-                      disabled={!data}
-                      className={`inline-flex max-w-full items-center gap-2 rounded-2xl border px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${activeClauseView ? validationClauseTone(activeClauseView.result) : compactButtonTone(showClauseMenu)}`}
-                    >
-                      <ClipboardCheck className="h-4 w-4 shrink-0" />
-                      <span className="min-w-0 truncate">
-                        {activeClauseView ? activeClauseView.clauseTitle : "Clauses"}
-                      </span>
-                      <ChevronDown
-                        className={`h-4 w-4 shrink-0 transition ${showClauseMenu ? "rotate-180" : ""}`}
-                      />
-                    </button>
-
-                    {showClauseMenu ? (
-                      <div className="absolute left-0 top-[calc(100%+0.5rem)] z-20 w-[min(28rem,85vw)] rounded-[1.25rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] p-3 shadow-[var(--viewer-shadow)]">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-                              Validation Clauses
-                            </div>
-                            <div className="mt-1 text-[11px] text-[color:var(--muted-ink)]">
-                              {clauseSummary}
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setShowClauseMenu(false)}
-                            className="flex h-8 w-8 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-white/75 text-[color:var(--muted-ink)] transition hover:bg-white hover:text-[color:var(--foreground)]"
-                            aria-label="Close validation clause filter"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-
-                        <div className="mt-3 space-y-2">
-                          <button
-                            type="button"
-                            onClick={() => setValidationClauseFilter("")}
-                            className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm transition ${
-                              activeClauseView
-                                ? "border-[color:var(--viewer-border)] bg-white/60 text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
-                                : "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
-                            }`}
-                          >
-                            <span className="font-medium">Show all rows</span>
-                            <span className="text-[11px] uppercase tracking-[0.16em]">
-                              {data?.rows.length ?? 0} elements
-                            </span>
-                          </button>
-
-                          {validationClauseViews.length > 0 ? (
-                            <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
-                              {validationClauseViews.map((clause) => (
-                                <button
-                                  key={clause.clauseId}
-                                  type="button"
-                                  onClick={() => setValidationClauseFilter(clause.clauseId)}
-                                  className={`flex w-full items-start justify-between gap-3 rounded-2xl border px-3 py-3 text-left text-sm transition ${
-                                    activeClauseView?.clauseId === clause.clauseId
-                                      ? validationClauseTone(clause.result)
-                                      : "border-[color:var(--viewer-border)] bg-white/60 text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
-                                  }`}
-                                >
-                                  <span className="min-w-0">
-                                    <span className="block break-words font-medium">{clause.clauseTitle}</span>
-                                    <span className="mt-1 block text-[11px] uppercase tracking-[0.16em]">
-                                      {clause.result}
-                                    </span>
-                                  </span>
-                                  <span className="shrink-0 text-[11px] uppercase tracking-[0.16em]">
-                                    {clause.elementCount} elements
-                                  </span>
-                                </button>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="rounded-2xl border border-dashed border-[color:var(--viewer-border)] px-4 py-4 text-sm text-[color:var(--muted-ink)]">
-                              Run validation to filter the table by clause.
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={!data || editedRowCount === 0}
-                    onClick={() =>
-                      updateUiState((current) => ({
-                        ...current,
-                        showEditedOnly: !current.showEditedOnly,
-                      }))
-                    }
-                    className={`rounded-2xl border px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${compactButtonTone(activeUiState.showEditedOnly)}`}
-                  >
-                    Show edited only
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={!data || isSyncingToView}
-                    onClick={() => {
-                      void handleSyncToView();
-                    }}
-                    className={`inline-flex items-center gap-2 rounded-2xl border px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${compactButtonTone(Boolean(visibleRowKeysInView))}`}
-                  >
-                    <RefreshCw className={`h-4 w-4 ${isSyncingToView ? "animate-spin" : ""}`} />
-                    {isSyncingToView ? "Syncing view..." : "Sync to view"}
-                  </button>
-
-                  <div className="relative" ref={columnMenuRef}>
-                    <button
-                      type="button"
-                      aria-expanded={showColumnMenu}
-                      onClick={() => {
-                        setShowColumnMenu((current) => !current);
-                        setShowClauseMenu(false);
-                      }}
-                      disabled={!data}
-                      className={`inline-flex items-center gap-2 rounded-2xl border px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${compactButtonTone(showColumnMenu || hasCustomVisibleColumns)}`}
-                    >
-                      <Columns3 className="h-4 w-4 shrink-0" />
-                      <span>Columns</span>
-                      {dynamicColumns.length > 0 ? (
-                        <span className="rounded-full bg-black/8 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em]">
-                          {visibleDynamicColumnCount}
+                      {activeFilterLabels.map((label) => (
+                        <span
+                          key={label}
+                          className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1"
+                        >
+                          {label}
                         </span>
-                      ) : null}
-                      <ChevronDown
-                        className={`h-4 w-4 shrink-0 transition ${showColumnMenu ? "rotate-180" : ""}`}
-                      />
-                    </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void resetFilters();
+                        }}
+                        disabled={!data || isSyncingToView}
+                        className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-[color:var(--viewer-border)] bg-white px-3 py-1 font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <FilterX className="h-3.5 w-3.5" />
+                        Reset filters
+                      </button>
+                    </div>
+                  ) : null}
 
-                    {showColumnMenu ? (
-                      <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-[min(30rem,85vw)] rounded-[1.25rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] p-3 shadow-[var(--viewer-shadow)]">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-                              Visible Columns
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative" ref={clauseMenuRef}>
+                      <button
+                        type="button"
+                        aria-expanded={showClauseMenu}
+                        onClick={() => {
+                          setShowClauseMenu((current) => !current);
+                          setShowColumnMenu(false);
+                        }}
+                        disabled={!data}
+                        className={`inline-flex max-w-full items-center gap-2 rounded-2xl border px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${activeClauseView ? validationClauseTone(activeClauseView.result) : compactButtonTone(showClauseMenu)}`}
+                      >
+                        <ClipboardCheck className="h-4 w-4 shrink-0" />
+                        <span className="min-w-0 truncate">
+                          {activeClauseView ? activeClauseView.clauseTitle : "Clauses"}
+                        </span>
+                        <ChevronDown
+                          className={`h-4 w-4 shrink-0 transition ${showClauseMenu ? "rotate-180" : ""}`}
+                        />
+                      </button>
+
+                      {showClauseMenu ? (
+                        <div className="absolute left-0 top-[calc(100%+0.5rem)] z-20 w-[min(28rem,85vw)] rounded-[1.25rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] p-3 shadow-[var(--viewer-shadow)]">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+                                Validation Clauses
+                              </div>
+                              <div className="mt-1 text-[11px] text-[color:var(--muted-ink)]">
+                                {clauseSummary}
+                              </div>
                             </div>
-                            <div className="mt-1 text-[11px] text-[color:var(--muted-ink)]">
-                              {columnSummary}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              disabled={!data}
-                              onClick={() => {
-                                updateUiState((current) => ({
-                                  ...current,
-                                  visibleColumnKeys: defaultVisibleColumnKeys,
-                                }));
-                              }}
-                              className="rounded-full border border-[color:var(--viewer-border)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              Reset
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setShowColumnMenu(false)}
+                              onClick={() => setShowClauseMenu(false)}
                               className="flex h-8 w-8 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-white/75 text-[color:var(--muted-ink)] transition hover:bg-white hover:text-[color:var(--foreground)]"
-                              aria-label="Close columns menu"
+                              aria-label="Close validation clause filter"
                             >
                               <X className="h-4 w-4" />
                             </button>
                           </div>
-                        </div>
 
-                        <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
-                          {dynamicColumns.map((column) => (
-                            <label
-                              key={column.key}
-                              className="flex items-start gap-3 rounded-2xl border border-[color:var(--viewer-border)] bg-white/55 px-3 py-3 text-sm text-[color:var(--foreground)]"
+                          <div className="mt-3 space-y-2">
+                            <button
+                              type="button"
+                              onClick={() => setValidationClauseFilter("")}
+                              className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm transition ${
+                                activeClauseView
+                                  ? "border-[color:var(--viewer-border)] bg-white/60 text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
+                                  : "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
+                              }`}
                             >
-                              <input
-                                type="checkbox"
-                                checked={activeUiState.visibleColumnKeys.includes(column.key)}
-                                onChange={() => toggleColumn(column.key)}
-                                className="mt-0.5 h-4 w-4 rounded border-[color:var(--viewer-border)] text-[color:var(--accent)]"
-                              />
-                              <span className="min-w-0">
-                                <span className="block break-words font-medium">{column.label}</span>
-                                <span className="mt-1 block text-[11px] uppercase tracking-[0.16em] text-[color:var(--muted-ink)]">
-                                  {column.group ?? column.kind}
-                                </span>
+                              <span className="font-medium">Show all rows</span>
+                              <span className="text-[11px] uppercase tracking-[0.16em]">
+                                {data?.rows.length ?? 0} elements
                               </span>
-                            </label>
-                          ))}
-                          {dynamicColumns.length === 0 ? (
-                            <div className="rounded-2xl border border-dashed border-[color:var(--viewer-border)] px-4 py-4 text-sm text-[color:var(--muted-ink)]">
-                              Load a model to discover dynamic columns.
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
+                            </button>
 
-                  {showClearChecked ? (
+                            {validationClauseViews.length > 0 ? (
+                              <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                                {validationClauseViews.map((clause) => (
+                                  <button
+                                    key={clause.clauseId}
+                                    type="button"
+                                    onClick={() => setValidationClauseFilter(clause.clauseId)}
+                                    className={`flex w-full items-start justify-between gap-3 rounded-2xl border px-3 py-3 text-left text-sm transition ${
+                                      activeClauseView?.clauseId === clause.clauseId
+                                        ? validationClauseTone(clause.result)
+                                        : "border-[color:var(--viewer-border)] bg-white/60 text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
+                                    }`}
+                                  >
+                                    <span className="min-w-0">
+                                      <span className="block break-words font-medium">{clause.clauseTitle}</span>
+                                      <span className="mt-1 block text-[11px] uppercase tracking-[0.16em]">
+                                        {clause.result}
+                                      </span>
+                                    </span>
+                                    <span className="shrink-0 text-[11px] uppercase tracking-[0.16em]">
+                                      {clause.elementCount} elements
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="rounded-2xl border border-dashed border-[color:var(--viewer-border)] px-4 py-4 text-sm text-[color:var(--muted-ink)]">
+                                Run validation to filter the table by clause.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+
                     <button
                       type="button"
+                      disabled={!data || editedRowCount === 0}
                       onClick={() =>
-                        updateUiState((current) => ({ ...current, selectedRowKeys: new Set() }))
+                        updateUiState((current) => ({
+                          ...current,
+                          showEditedOnly: !current.showEditedOnly,
+                        }))
                       }
-                      className="rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3.5 py-2.5 text-sm font-medium text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]"
+                      className={`rounded-2xl border px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${compactButtonTone(activeUiState.showEditedOnly)}`}
                     >
-                      Clear checked
+                      Show edited only
                     </button>
-                  ) : null}
+
+                    <button
+                      type="button"
+                      disabled={!data || isSyncingToView}
+                      onClick={() => {
+                        void handleSyncToView();
+                      }}
+                      className={`inline-flex items-center gap-2 rounded-2xl border px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${compactButtonTone(Boolean(visibleRowKeysInView))}`}
+                    >
+                      <RefreshCw className={`h-4 w-4 ${isSyncingToView ? "animate-spin" : ""}`} />
+                      {isSyncingToView ? "Syncing view..." : "Sync to view"}
+                    </button>
+
+                    <div className="relative" ref={columnMenuRef}>
+                      <button
+                        type="button"
+                        aria-expanded={showColumnMenu}
+                        onClick={() => {
+                          setShowColumnMenu((current) => !current);
+                          setShowClauseMenu(false);
+                        }}
+                        disabled={!data}
+                        className={`inline-flex items-center gap-2 rounded-2xl border px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${compactButtonTone(showColumnMenu || hasCustomVisibleColumns)}`}
+                      >
+                        <Columns3 className="h-4 w-4 shrink-0" />
+                        <span>Columns</span>
+                        {dynamicColumns.length > 0 ? (
+                          <span className="rounded-full bg-black/8 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em]">
+                            {visibleDynamicColumnCount}
+                          </span>
+                        ) : null}
+                        <ChevronDown
+                          className={`h-4 w-4 shrink-0 transition ${showColumnMenu ? "rotate-180" : ""}`}
+                        />
+                      </button>
+
+                      {showColumnMenu ? (
+                        <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-[min(30rem,85vw)] rounded-[1.25rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] p-3 shadow-[var(--viewer-shadow)]">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+                                Visible Columns
+                              </div>
+                              <div className="mt-1 text-[11px] text-[color:var(--muted-ink)]">
+                                {columnSummary}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                disabled={!data}
+                                onClick={() => {
+                                  updateUiState((current) => ({
+                                    ...current,
+                                    visibleColumnKeys: defaultVisibleColumnKeys,
+                                  }));
+                                }}
+                                className="rounded-full border border-[color:var(--viewer-border)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                Reset
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setShowColumnMenu(false)}
+                                className="flex h-8 w-8 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-white/75 text-[color:var(--muted-ink)] transition hover:bg-white hover:text-[color:var(--foreground)]"
+                                aria-label="Close columns menu"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
+                            {dynamicColumns.map((column) => (
+                              <label
+                                key={column.key}
+                                className="flex items-start gap-3 rounded-2xl border border-[color:var(--viewer-border)] bg-white/55 px-3 py-3 text-sm text-[color:var(--foreground)]"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={activeUiState.visibleColumnKeys.includes(column.key)}
+                                  onChange={() => toggleColumn(column.key)}
+                                  className="mt-0.5 h-4 w-4 rounded border-[color:var(--viewer-border)] text-[color:var(--accent)]"
+                                />
+                                <span className="min-w-0">
+                                  <span className="block break-words font-medium">{column.label}</span>
+                                  <span className="mt-1 block text-[11px] uppercase tracking-[0.16em] text-[color:var(--muted-ink)]">
+                                    {column.group ?? column.kind}
+                                  </span>
+                                </span>
+                              </label>
+                            ))}
+                            {dynamicColumns.length === 0 ? (
+                              <div className="rounded-2xl border border-dashed border-[color:var(--viewer-border)] px-4 py-4 text-sm text-[color:var(--muted-ink)]">
+                                Load a model to discover dynamic columns.
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {showClearChecked ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateUiState((current) => ({ ...current, selectedRowKeys: new Set() }))
+                        }
+                        className="rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3.5 py-2.5 text-sm font-medium text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]"
+                      >
+                        Clear checked
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
-            ) : null}
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-hidden">
-        {!data && tableState.phase === "loading" ? (
-          <div className="flex h-full items-center justify-center px-5 py-6">
-            <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[#d8af80] bg-[#fff7ed] px-6 py-6 text-center">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#915217]">
-                Loading Table
-              </div>
-              <div className="mt-3 text-lg font-semibold text-[color:var(--foreground)]">
-                Building the IFC data table
-              </div>
-              <p className="mt-2 text-sm leading-6 text-[#915217]">{tableState.message}</p>
-            </div>
-          </div>
-        ) : !data && tableState.phase === "error" ? (
-          <div className="flex h-full items-center justify-center px-5 py-6">
-            <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[#c78972] bg-[#fff0ea] px-6 py-6 text-center">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a3e1f]">
-                Table Unavailable
-              </div>
-              <div className="mt-3 text-lg font-semibold text-[color:var(--foreground)]">
-                The data table could not be indexed
-              </div>
-              <p className="mt-2 text-sm leading-6 text-[#8a3e1f]">{tableState.message}</p>
-            </div>
-          </div>
-        ) : !data ? (
-          <div className="flex h-full items-center justify-center px-5 py-6">
-            <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[color:var(--viewer-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.54),rgba(245,239,230,0.76))] px-6 py-6 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-                No Table Data
-              </div>
-              <div className="mt-3 text-lg font-semibold text-[color:var(--foreground)]">
-                Load an IFC model to populate the review grid
-              </div>
-              <p className="mt-2 text-sm leading-6 text-[color:var(--muted-ink)]">
-                The table view will flatten IFC attributes and property sets into reusable review
-                columns once a model is indexed.
-              </p>
-            </div>
-          </div>
-        ) : data.rows.length === 0 ? (
-          <div className="flex h-full items-center justify-center px-5 py-6">
-            <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[color:var(--viewer-border)] bg-white/60 px-6 py-6 text-center">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-                Empty Model Table
-              </div>
-              <div className="mt-3 text-lg font-semibold text-[color:var(--foreground)]">
-                No geometry-backed IFC elements were found
-              </div>
-              <p className="mt-2 text-sm leading-6 text-[color:var(--muted-ink)]">
-                The model loaded, but the viewer did not find elements with geometry to index into
-                the review grid.
-              </p>
-            </div>
-          </div>
-        ) : visibleRows.length === 0 ? (
-          <div className="flex h-full items-center justify-center px-5 py-6">
-            <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[color:var(--viewer-border)] bg-white/60 px-6 py-6 text-center">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-                No Matching Rows
-              </div>
-              <div className="mt-3 text-lg font-semibold text-[color:var(--foreground)]">
-                The current filters hide every element
-              </div>
-              <p className="mt-2 text-sm leading-6 text-[color:var(--muted-ink)]">
-                Adjust the text filter, IFC type filter, validation clause view, edited-only
-                toggle, or visible columns to bring matching rows back into view.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="h-full overflow-auto">
-            <table className="min-w-full border-separate border-spacing-0 text-left">
-              <thead className="sticky top-0 z-10 bg-[color:var(--panel-bg)]">
-                <tr>
-                  <th className="w-12 border-b border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-3">
-                    <input
-                      ref={selectAllRef}
-                      type="checkbox"
-                      checked={allVisibleSelected}
-                      onChange={toggleAllVisibleRows}
-                      className="h-4 w-4 rounded border-[color:var(--viewer-border)] text-[color:var(--accent)]"
-                      aria-label="Select all visible rows"
-                    />
-                  </th>
-                  {visibleColumns.map((column) => (
-                    <th
-                      key={column.key}
-                      aria-sort={
-                        activeUiState.sort?.columnKey === column.key
-                          ? activeUiState.sort.direction === "asc"
-                            ? "ascending"
-                            : "descending"
-                          : "none"
-                      }
-                      className="min-w-[12rem] border-b border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-3 align-bottom"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => toggleSort(column.key)}
-                        className="flex w-full items-end justify-between gap-3 text-left"
-                        aria-label={`${sortLabel(activeUiState.sort, column.key)} by ${column.label}`}
-                      >
-                        <span className="min-w-0">
-                          {column.group ? (
-                            <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-                              {column.group}
-                            </span>
-                          ) : null}
-                          <span className="mt-1 block break-words text-sm font-semibold text-[color:var(--foreground)]">
-                            {column.label}
-                          </span>
-                        </span>
-                        <SortIndicator sort={activeUiState.sort} columnKey={column.key} />
-                      </button>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-
-              <tbody>
-                {visibleRows.map((row) => {
-                  const checked = activeUiState.selectedRowKeys.has(row.key);
-                  const selected = activeSelection?.localId === row.localId;
-
-                  return (
-                    <tr
-                      key={row.key}
-                      onClick={() => onSelectRow(row.localId)}
-                      className={`cursor-pointer transition hover:bg-white/45 ${
-                        selected
-                          ? "bg-[#e7f3ee]"
-                          : checked
-                            ? "bg-[#f6efe3]"
-                            : "bg-transparent"
-                      }`}
-                    >
-                      <td className="border-b border-[color:var(--viewer-border)] px-3 py-3 align-top">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleRow(row.key)}
-                          onClick={(event) => event.stopPropagation()}
-                          className="h-4 w-4 rounded border-[color:var(--viewer-border)] text-[color:var(--accent)]"
-                          aria-label={`Select row ${row.localId}`}
-                        />
-                      </td>
-                      {visibleColumns.map((column) => {
-                        const cell = row.cells[column.key];
-                        const draftCell = cell?.source === "draft";
-
-                        return (
-                          <td
-                            key={column.key}
-                            className={`border-b border-[color:var(--viewer-border)] px-3 py-3 align-top text-sm ${
-                              draftCell
-                                ? "bg-[#edf7f1] text-[#1e6b45]"
-                                : cell
-                                  ? cellTone(column, cell.state)
-                                  : "text-[color:var(--muted-ink)]"
-                            }`}
-                          >
-                            <div className="min-w-0 break-words font-mono text-[12px] leading-5">
-                              {cell?.text ?? "MISSING"}
-                            </div>
-                            {draftCell ? (
-                              <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1e6b45]">
-                                Imported
-                              </div>
-                            ) : null}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      <DataTableContent
+        data={data}
+        tablePhase={tableState.phase}
+        tableMessage={tableState.message}
+        visibleRows={visibleRows}
+        visibleColumns={visibleColumns}
+        activeSelection={activeSelection}
+        selectedRowKeys={activeUiState.selectedRowKeys}
+        sort={activeUiState.sort}
+        allVisibleSelected={allVisibleSelected}
+        selectAllRef={selectAllRef}
+        onToggleAllVisibleRows={toggleAllVisibleRows}
+        onToggleSort={toggleSort}
+        onToggleRow={toggleRow}
+        onSelectRow={onSelectRow}
+      />
     </aside>
   );
 };
