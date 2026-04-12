@@ -191,6 +191,7 @@ function InspectionValueRow({
 }) {
   const badge = validationLabel(value.validation);
   const failedClauseCount = value.validation?.clauseFailures.length ?? 0;
+  const validation = value.validation;
 
   return (
     <div
@@ -212,7 +213,7 @@ function InspectionValueRow({
             {badge}
           </span>
         ) : null}
-        {failedClauseCount > 0 && value.validation ? (
+        {failedClauseCount > 0 && validation ? (
           <ValidationDetailsButton
             title={failedClauseCount === 1 ? "View 1 failed clause" : `View ${failedClauseCount} failed clauses`}
             onClick={() =>
@@ -220,8 +221,8 @@ function InspectionValueRow({
                 id: `row:${label}`,
                 title: label,
                 subtitle: value.text,
-                clauseFailures: value.validation.clauseFailures,
-                result: value.validation.result,
+                clauseFailures: validation.clauseFailures,
+                result: validation.result,
               })
             }
           />

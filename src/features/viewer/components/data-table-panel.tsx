@@ -1,6 +1,16 @@
 "use client";
 
-import { RefreshCw } from "lucide-react";
+import {
+  ChevronDown,
+  ClipboardCheck,
+  Columns3,
+  FilterX,
+  PanelTopClose,
+  PanelTopOpen,
+  RefreshCw,
+  Search,
+  X,
+} from "lucide-react";
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   filterViewerDataTableRows,
@@ -22,11 +32,13 @@ type DataTablePanelProps = {
   metadata: ModelMetadata | null;
   tableState: ViewerDataTableState;
   validationClauseViews: ViewerValidationClauseTableView[];
+  selectedValidationClauseId?: string;
   activeSelection: ViewerSelection | null;
   visibleRowKeysInView: Set<string> | null;
   importRevision?: number;
   importedColumnKeys?: string[];
   onSyncToView: () => Promise<void>;
+  onValidationClauseChange?: (clauseId: string) => void;
   onSelectRow: (localId: number) => void;
   showMetaHeader?: boolean;
 };
@@ -59,6 +71,12 @@ function validationClauseTone(result: ViewerValidationClauseTableView["result"])
   return result === "error"
     ? "border-[#d3a08e] bg-[#fff0ea] text-[#8a3e1f]"
     : "border-[#d8af80] bg-[#fff7ed] text-[#915217]";
+}
+
+function compactButtonTone(active: boolean) {
+  return active
+    ? "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
+    : "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]";
 }
 
 function cellTone(column: ViewerDataTableColumn, state: "present" | "missing" | "empty" | "null" | "undefined") {
@@ -127,15 +145,19 @@ const DataTablePanelComponent = function DataTablePanel({
   metadata,
   tableState,
   validationClauseViews,
+  selectedValidationClauseId = "",
   activeSelection,
   visibleRowKeysInView,
   importRevision = 0,
   importedColumnKeys = [],
   onSyncToView,
+  onValidationClauseChange,
   onSelectRow,
   showMetaHeader = true,
 }: DataTablePanelProps) {
   const selectAllRef = useRef<HTMLInputElement | null>(null);
+  const clauseMenuRef = useRef<HTMLDivElement | null>(null);
+  const columnMenuRef = useRef<HTMLDivElement | null>(null);
   const data = tableState.data;
   const dataSignature = useMemo(() => buildDataSignature(data), [data]);
   const [uiState, setUiState] = useState<DataTableUiState>(() =>
@@ -146,6 +168,9 @@ const DataTablePanelComponent = function DataTablePanel({
   const deferredQuery = useDeferredValue(activeUiState.query);
   const deferredIfcTypeFilter = useDeferredValue(activeUiState.ifcTypeFilter);
   const [isSyncingToView, setIsSyncingToView] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
+  const [showClauseMenu, setShowClauseMenu] = useState(false);
+  const [showColumnMenu, setShowColumnMenu] = useState(false);
 
   const updateUiState = useCallback((updater: (current: DataTableUiState) => DataTableUiState) => {
     setUiState((current) => {
@@ -210,6 +235,38 @@ const DataTablePanelComponent = function DataTablePanel({
     () => (data ? data.rows.filter(rowHasImportedEdits).length : 0),
     [data],
   );
+  const dynamicColumns = useMemo(
+    () => data?.columns.filter((column) => column.kind !== "base") ?? [],
+    [data],
+  );
+  const visibleDynamicColumnCount = useMemo(
+    () =>
+      dynamicColumns.filter((column) => activeUiState.visibleColumnKeys.includes(column.key)).length,
+    [activeUiState.visibleColumnKeys, dynamicColumns],
+  );
+  const defaultVisibleColumnKeys = useMemo(
+    () => (data ? getDefaultViewerDataTableColumnKeys(data.columns) : []),
+    [data],
+  );
+  const hasCustomVisibleColumns = useMemo(() => {
+    if (!data) {
+      return false;
+    }
+
+    const current = new Set(activeUiState.visibleColumnKeys);
+    const defaults = new Set(defaultVisibleColumnKeys);
+    if (current.size !== defaults.size) {
+      return true;
+    }
+
+    for (const key of defaults) {
+      if (!current.has(key)) {
+        return true;
+      }
+    }
+
+    return false;
+  }, [activeUiState.visibleColumnKeys, data, defaultVisibleColumnKeys]);
 
   const visibleRows = useMemo(
     () => sortViewerDataTableRows(filteredRows, activeUiState.sort),
@@ -228,6 +285,63 @@ const DataTablePanelComponent = function DataTablePanel({
       selectAllRef.current.indeterminate = !allVisibleSelected && someVisibleSelected;
     }
   }, [allVisibleSelected, someVisibleSelected]);
+
+  useEffect(() => {
+    if (!showClauseMenu && !showColumnMenu) {
+      return undefined;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+
+      if (showClauseMenu && clauseMenuRef.current?.contains(target)) {
+        return;
+      }
+
+      if (showColumnMenu && columnMenuRef.current?.contains(target)) {
+        return;
+      }
+
+      setShowClauseMenu(false);
+      setShowColumnMenu(false);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowClauseMenu(false);
+        setShowColumnMenu(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showClauseMenu, showColumnMenu]);
+
+  useEffect(() => {
+    if (showFilters) {
+      return;
+    }
+
+    setShowClauseMenu(false);
+    setShowColumnMenu(false);
+  }, [showFilters]);
+
+  useEffect(() => {
+    if (selectedValidationClauseId === activeUiState.validationClauseId) {
+      return;
+    }
+
+    updateUiState((current) => ({
+      ...current,
+      validationClauseId: selectedValidationClauseId,
+      selectedRowKeys: new Set<string>(),
+    }));
+  }, [activeUiState.validationClauseId, selectedValidationClauseId, updateUiState]);
 
   useEffect(() => {
     if (importRevision === 0 || importedColumnKeys.length === 0) {
@@ -250,7 +364,8 @@ const DataTablePanelComponent = function DataTablePanel({
         selectedRowKeys: new Set<string>(),
       };
     });
-  }, [importRevision, importedColumnKeys, updateUiState]);
+    onValidationClauseChange?.("");
+  }, [importRevision, importedColumnKeys, onValidationClauseChange, updateUiState]);
 
   useEffect(() => {
     if (!activeUiState.validationClauseId) {
@@ -265,7 +380,8 @@ const DataTablePanelComponent = function DataTablePanel({
       ...current,
       validationClauseId: "",
     }));
-  }, [activeUiState.validationClauseId, updateUiState, validationClauseViews]);
+    onValidationClauseChange?.("");
+  }, [activeUiState.validationClauseId, onValidationClauseChange, updateUiState, validationClauseViews]);
 
   const toggleSort = (columnKey: string) => {
     updateUiState((current) => {
@@ -330,6 +446,59 @@ const DataTablePanelComponent = function DataTablePanel({
     }
   };
 
+  const setValidationClauseFilter = (clauseId: string) => {
+    updateUiState((current) => ({
+      ...current,
+      validationClauseId: clauseId,
+      selectedRowKeys: new Set<string>(),
+    }));
+    onValidationClauseChange?.(clauseId);
+    setShowClauseMenu(false);
+  };
+
+  const resetFilters = async () => {
+    updateUiState((current) => ({
+      ...current,
+      query: "",
+      ifcTypeFilter: "",
+      validationClauseId: "",
+      showEditedOnly: false,
+    }));
+    onValidationClauseChange?.("");
+    setShowClauseMenu(false);
+    setShowColumnMenu(false);
+
+    if (visibleRowKeysInView) {
+      setIsSyncingToView(true);
+      try {
+        await onSyncToView();
+      } finally {
+        setIsSyncingToView(false);
+      }
+    }
+  };
+
+  const hasActiveFilters =
+    Boolean(activeUiState.query.trim()) ||
+    Boolean(activeUiState.ifcTypeFilter) ||
+    Boolean(activeUiState.validationClauseId) ||
+    activeUiState.showEditedOnly ||
+    Boolean(visibleRowKeysInView);
+  const clauseSummary = activeClauseView ? activeClauseView.clauseTitle : "All rows";
+  const columnSummary =
+    dynamicColumns.length === 0
+      ? "No dynamic columns"
+      : `${visibleDynamicColumnCount} of ${dynamicColumns.length} visible`;
+  const showClearChecked = activeUiState.selectedRowKeys.size > 0;
+  const activeFilterLabels = [
+    activeUiState.query.trim() ? "Search" : null,
+    activeUiState.ifcTypeFilter || null,
+    activeClauseView ? "Clause" : null,
+    activeUiState.showEditedOnly ? "Edited only" : null,
+    visibleRowKeysInView ? "View synced" : null,
+  ].filter((value): value is string => Boolean(value));
+  const FiltersToggleIcon = showFilters ? PanelTopClose : PanelTopOpen;
+
   return (
     <aside
       className={`flex h-full min-h-0 flex-col overflow-hidden ${
@@ -376,224 +545,361 @@ const DataTablePanelComponent = function DataTablePanel({
         
       </div>
 
-      <div className="border-b border-[color:var(--viewer-border)] px-4 py-3">
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="min-w-[16rem] flex-1">
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-              Text Filter
-            </span>
-            <input
-              value={activeUiState.query}
-              onChange={(event) =>
-                updateUiState((current) => ({ ...current, query: event.target.value }))
-              }
-              placeholder="Filter by element values, attributes, or property set values"
-              disabled={!data}
-              className="w-full rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-4 py-3 text-sm text-[color:var(--foreground)] outline-none transition placeholder:text-[color:var(--muted-ink)] focus:border-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
-            />
-          </label>
-
-          <label className="w-full min-w-[14rem] sm:w-auto">
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-              IFC Type
-            </span>
-            <select
-              value={activeUiState.ifcTypeFilter}
-              onChange={(event) =>
-                updateUiState((current) => ({
-                  ...current,
-                  ifcTypeFilter: event.target.value,
-                }))
-              }
-              disabled={!data}
-              className="w-full rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-4 py-3 text-sm text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50 sm:min-w-[14rem]"
-            >
-              <option value="">All IFC types</option>
-              {data?.ifcTypes.map((ifcType) => (
-                <option key={ifcType} value={ifcType}>
-                  {ifcType}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <details className="relative">
-            <summary
-              className={`list-none rounded-2xl border px-4 py-3 text-sm font-medium transition ${
-                activeClauseView
-                  ? validationClauseTone(activeClauseView.result)
-                  : "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
-              }`}
-            >
-              {activeClauseView
-                ? `View by validation clause: ${activeClauseView.clauseTitle}`
-                : "View by validation clause"}
-            </summary>
-            <div className="absolute left-0 top-[calc(100%+0.5rem)] z-20 w-[min(28rem,85vw)] rounded-[1.25rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] p-4 shadow-[var(--viewer-shadow)]">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-                Validation Clauses
-              </div>
-              <div className="mt-3 space-y-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    updateUiState((current) => ({
-                      ...current,
-                      validationClauseId: "",
-                      selectedRowKeys: new Set<string>(),
-                    }))
-                  }
-                  className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm transition ${
-                    activeClauseView
-                      ? "border-[color:var(--viewer-border)] bg-white/60 text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
-                      : "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
-                  }`}
-                >
-                  <span className="font-medium">Show all rows</span>
-                  <span className="text-[11px] uppercase tracking-[0.16em]">
-                    {data?.rows.length ?? 0} elements
-                  </span>
-                </button>
-
-                {validationClauseViews.length > 0 ? (
-                  <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
-                    {validationClauseViews.map((clause) => (
-                      <button
-                        key={clause.clauseId}
-                        type="button"
-                        onClick={() =>
-                          updateUiState((current) => ({
-                            ...current,
-                            validationClauseId: clause.clauseId,
-                            selectedRowKeys: new Set<string>(),
-                          }))
-                        }
-                        className={`flex w-full items-start justify-between gap-3 rounded-2xl border px-3 py-3 text-left text-sm transition ${
-                          activeClauseView?.clauseId === clause.clauseId
-                            ? validationClauseTone(clause.result)
-                            : "border-[color:var(--viewer-border)] bg-white/60 text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
-                        }`}
-                      >
-                        <span className="min-w-0">
-                          <span className="block break-words font-medium">{clause.clauseTitle}</span>
-                          <span className="mt-1 block text-[11px] uppercase tracking-[0.16em]">
-                            {clause.result}
-                          </span>
-                        </span>
-                        <span className="shrink-0 text-[11px] uppercase tracking-[0.16em]">
-                          {clause.elementCount} elements
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-[color:var(--viewer-border)] px-4 py-4 text-sm text-[color:var(--muted-ink)]">
-                    Run validation to filter the table by clause.
-                  </div>
-                )}
-              </div>
-            </div>
-          </details>
-
-          <button
-            type="button"
-            disabled={!data || editedRowCount === 0}
-            onClick={() =>
-              updateUiState((current) => ({
-                ...current,
-                showEditedOnly: !current.showEditedOnly,
-              }))
-            }
-            className={`rounded-2xl border px-4 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
-              activeUiState.showEditedOnly
-                ? "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
-                : "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
-            }`}
-          >
-            Show edited only
-          </button>
-
-          <button
-            type="button"
-            disabled={!data || isSyncingToView}
-            onClick={() => {
-              void handleSyncToView();
-            }}
-            className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
-              visibleRowKeysInView
-                ? "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
-                : "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
-            }`}
-          >
-            <RefreshCw className={`h-4 w-4 ${isSyncingToView ? "animate-spin" : ""}`} />
-            {isSyncingToView ? "Syncing view..." : "Sync to view"}
-          </button>
-
-          <details className="relative">
-            <summary className="list-none rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-4 py-3 text-sm font-medium text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]">
-              Columns
-            </summary>
-            <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-[min(30rem,85vw)] rounded-[1.25rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] p-4 shadow-[var(--viewer-shadow)]">
-              <div className="flex items-center justify-between gap-3">
+      <div id="table-filters" className="border-b border-[color:var(--viewer-border)] px-4 py-3">
+        <div className="rounded-[1.4rem] border border-[color:var(--viewer-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.82),rgba(245,249,255,0.92))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-                  Visible Columns
+                  Table Filters
                 </div>
-                <button
-                  type="button"
-                  disabled={!data}
-                  onClick={() => {
-                    updateUiState((current) => ({
-                      ...current,
-                      visibleColumnKeys: data
-                        ? getDefaultViewerDataTableColumnKeys(data.columns)
-                        : [],
-                    }));
-                  }}
-                  className="rounded-full border border-[color:var(--viewer-border)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Reset
-                </button>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[color:var(--muted-ink)]">
+                  <span>{showFilters ? "Expanded" : "Collapsed"}</span>
+                  {activeFilterLabels.length > 0 ? (
+                    <span>{activeFilterLabels.length} active</span>
+                  ) : (
+                    <span>No active filters</span>
+                  )}
+                  {!showFilters
+                    ? activeFilterLabels.slice(0, 3).map((label) => (
+                        <span
+                          key={label}
+                          className="rounded-full border border-[color:var(--viewer-border)] bg-white/75 px-2.5 py-1"
+                        >
+                          {label}
+                        </span>
+                      ))
+                    : null}
+                </div>
               </div>
 
-              <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
-                {data?.columns.filter((column) => column.kind !== "base").map((column) => (
-                  <label
-                    key={column.key}
-                    className="flex items-start gap-3 rounded-2xl border border-[color:var(--viewer-border)] bg-white/55 px-3 py-3 text-sm text-[color:var(--foreground)]"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={activeUiState.visibleColumnKeys.includes(column.key)}
-                      onChange={() => toggleColumn(column.key)}
-                      className="mt-0.5 h-4 w-4 rounded border-[color:var(--viewer-border)] text-[color:var(--accent)]"
-                    />
-                    <span className="min-w-0">
-                      <span className="block break-words font-medium">{column.label}</span>
-                      <span className="mt-1 block text-[11px] uppercase tracking-[0.16em] text-[color:var(--muted-ink)]">
-                        {column.group ?? column.kind}
-                      </span>
+              <button
+                type="button"
+                aria-controls="table-filters-content"
+                aria-expanded={showFilters}
+                onClick={() => setShowFilters((current) => !current)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[color:var(--viewer-border)] bg-white/75 text-[color:var(--foreground)] transition hover:bg-white"
+                aria-label={showFilters ? "Collapse filters drawer" : "Expand filters drawer"}
+                title={showFilters ? "Collapse filters" : "Expand filters"}
+              >
+                <FiltersToggleIcon className="h-4 w-4" />
+              </button>
+            </div>
+
+            {showFilters ? (
+              <div id="table-filters-content" className="flex flex-col gap-3">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
+                  <label className="min-w-0 flex-1">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+                      Text Filter
                     </span>
+                    <div className="relative">
+                      <Search
+                        className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--muted-ink)]"
+                        aria-hidden="true"
+                      />
+                      <input
+                        value={activeUiState.query}
+                        onChange={(event) =>
+                          updateUiState((current) => ({ ...current, query: event.target.value }))
+                        }
+                        placeholder="Filter by element values, attributes, or property set values"
+                        disabled={!data}
+                        className="w-full rounded-2xl border border-[color:var(--viewer-border)] bg-white/80 py-3 pl-11 pr-10 text-sm text-[color:var(--foreground)] outline-none transition placeholder:text-[color:var(--muted-ink)] focus:border-[color:var(--accent)] focus:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                      />
+                      {activeUiState.query ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateUiState((current) => ({
+                              ...current,
+                              query: "",
+                            }))
+                          }
+                          className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-[color:var(--viewer-border)] bg-white/90 text-[color:var(--muted-ink)] transition hover:bg-white hover:text-[color:var(--foreground)]"
+                          aria-label="Clear text filter"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      ) : null}
+                    </div>
                   </label>
-                ))}
-                {!data?.columns.some((column) => column.kind !== "base") ? (
-                  <div className="rounded-2xl border border-dashed border-[color:var(--viewer-border)] px-4 py-4 text-sm text-[color:var(--muted-ink)]">
-                    Load a model to discover dynamic columns.
+
+                  <label className="w-full min-w-[14rem] xl:w-[16rem]">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+                      IFC Type
+                    </span>
+                    <select
+                      value={activeUiState.ifcTypeFilter}
+                      onChange={(event) =>
+                        updateUiState((current) => ({
+                          ...current,
+                          ifcTypeFilter: event.target.value,
+                        }))
+                      }
+                      disabled={!data}
+                      className="w-full rounded-2xl border border-[color:var(--viewer-border)] bg-white/80 px-4 py-3 text-sm text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent)] focus:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="">All IFC types</option>
+                      {data?.ifcTypes.map((ifcType) => (
+                        <option key={ifcType} value={ifcType}>
+                          {ifcType}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                {hasActiveFilters ? (
+                  <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[color:var(--viewer-border)] bg-white/65 px-3 py-2 text-[11px] text-[color:var(--muted-ink)]">
+                    <span className="font-semibold uppercase tracking-[0.16em] text-[color:var(--foreground)]">
+                      Active Filters
+                    </span>
+                    {activeFilterLabels.map((label) => (
+                      <span
+                        key={label}
+                        className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1"
+                      >
+                        {label}
+                      </span>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void resetFilters();
+                      }}
+                      disabled={!data || isSyncingToView}
+                      className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-[color:var(--viewer-border)] bg-white px-3 py-1 font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <FilterX className="h-3.5 w-3.5" />
+                      Reset filters
+                    </button>
                   </div>
                 ) : null}
-              </div>
-            </div>
-          </details>
 
-          <button
-            type="button"
-            disabled={activeUiState.selectedRowKeys.size === 0}
-            onClick={() =>
-              updateUiState((current) => ({ ...current, selectedRowKeys: new Set() }))
-            }
-            className="rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-4 py-3 text-sm font-medium text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Clear checked
-          </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative" ref={clauseMenuRef}>
+                    <button
+                      type="button"
+                      aria-expanded={showClauseMenu}
+                      onClick={() => {
+                        setShowClauseMenu((current) => !current);
+                        setShowColumnMenu(false);
+                      }}
+                      disabled={!data}
+                      className={`inline-flex max-w-full items-center gap-2 rounded-2xl border px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${activeClauseView ? validationClauseTone(activeClauseView.result) : compactButtonTone(showClauseMenu)}`}
+                    >
+                      <ClipboardCheck className="h-4 w-4 shrink-0" />
+                      <span className="min-w-0 truncate">
+                        {activeClauseView ? activeClauseView.clauseTitle : "Clauses"}
+                      </span>
+                      <ChevronDown
+                        className={`h-4 w-4 shrink-0 transition ${showClauseMenu ? "rotate-180" : ""}`}
+                      />
+                    </button>
+
+                    {showClauseMenu ? (
+                      <div className="absolute left-0 top-[calc(100%+0.5rem)] z-20 w-[min(28rem,85vw)] rounded-[1.25rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] p-3 shadow-[var(--viewer-shadow)]">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+                              Validation Clauses
+                            </div>
+                            <div className="mt-1 text-[11px] text-[color:var(--muted-ink)]">
+                              {clauseSummary}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setShowClauseMenu(false)}
+                            className="flex h-8 w-8 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-white/75 text-[color:var(--muted-ink)] transition hover:bg-white hover:text-[color:var(--foreground)]"
+                            aria-label="Close validation clause filter"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                        <div className="mt-3 space-y-2">
+                          <button
+                            type="button"
+                            onClick={() => setValidationClauseFilter("")}
+                            className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm transition ${
+                              activeClauseView
+                                ? "border-[color:var(--viewer-border)] bg-white/60 text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
+                                : "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
+                            }`}
+                          >
+                            <span className="font-medium">Show all rows</span>
+                            <span className="text-[11px] uppercase tracking-[0.16em]">
+                              {data?.rows.length ?? 0} elements
+                            </span>
+                          </button>
+
+                          {validationClauseViews.length > 0 ? (
+                            <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                              {validationClauseViews.map((clause) => (
+                                <button
+                                  key={clause.clauseId}
+                                  type="button"
+                                  onClick={() => setValidationClauseFilter(clause.clauseId)}
+                                  className={`flex w-full items-start justify-between gap-3 rounded-2xl border px-3 py-3 text-left text-sm transition ${
+                                    activeClauseView?.clauseId === clause.clauseId
+                                      ? validationClauseTone(clause.result)
+                                      : "border-[color:var(--viewer-border)] bg-white/60 text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
+                                  }`}
+                                >
+                                  <span className="min-w-0">
+                                    <span className="block break-words font-medium">{clause.clauseTitle}</span>
+                                    <span className="mt-1 block text-[11px] uppercase tracking-[0.16em]">
+                                      {clause.result}
+                                    </span>
+                                  </span>
+                                  <span className="shrink-0 text-[11px] uppercase tracking-[0.16em]">
+                                    {clause.elementCount} elements
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="rounded-2xl border border-dashed border-[color:var(--viewer-border)] px-4 py-4 text-sm text-[color:var(--muted-ink)]">
+                              Run validation to filter the table by clause.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={!data || editedRowCount === 0}
+                    onClick={() =>
+                      updateUiState((current) => ({
+                        ...current,
+                        showEditedOnly: !current.showEditedOnly,
+                      }))
+                    }
+                    className={`rounded-2xl border px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${compactButtonTone(activeUiState.showEditedOnly)}`}
+                  >
+                    Show edited only
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={!data || isSyncingToView}
+                    onClick={() => {
+                      void handleSyncToView();
+                    }}
+                    className={`inline-flex items-center gap-2 rounded-2xl border px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${compactButtonTone(Boolean(visibleRowKeysInView))}`}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isSyncingToView ? "animate-spin" : ""}`} />
+                    {isSyncingToView ? "Syncing view..." : "Sync to view"}
+                  </button>
+
+                  <div className="relative" ref={columnMenuRef}>
+                    <button
+                      type="button"
+                      aria-expanded={showColumnMenu}
+                      onClick={() => {
+                        setShowColumnMenu((current) => !current);
+                        setShowClauseMenu(false);
+                      }}
+                      disabled={!data}
+                      className={`inline-flex items-center gap-2 rounded-2xl border px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${compactButtonTone(showColumnMenu || hasCustomVisibleColumns)}`}
+                    >
+                      <Columns3 className="h-4 w-4 shrink-0" />
+                      <span>Columns</span>
+                      {dynamicColumns.length > 0 ? (
+                        <span className="rounded-full bg-black/8 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em]">
+                          {visibleDynamicColumnCount}
+                        </span>
+                      ) : null}
+                      <ChevronDown
+                        className={`h-4 w-4 shrink-0 transition ${showColumnMenu ? "rotate-180" : ""}`}
+                      />
+                    </button>
+
+                    {showColumnMenu ? (
+                      <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-[min(30rem,85vw)] rounded-[1.25rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] p-3 shadow-[var(--viewer-shadow)]">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+                              Visible Columns
+                            </div>
+                            <div className="mt-1 text-[11px] text-[color:var(--muted-ink)]">
+                              {columnSummary}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              disabled={!data}
+                              onClick={() => {
+                                updateUiState((current) => ({
+                                  ...current,
+                                  visibleColumnKeys: defaultVisibleColumnKeys,
+                                }));
+                              }}
+                              className="rounded-full border border-[color:var(--viewer-border)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Reset
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowColumnMenu(false)}
+                              className="flex h-8 w-8 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-white/75 text-[color:var(--muted-ink)] transition hover:bg-white hover:text-[color:var(--foreground)]"
+                              aria-label="Close columns menu"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
+                          {dynamicColumns.map((column) => (
+                            <label
+                              key={column.key}
+                              className="flex items-start gap-3 rounded-2xl border border-[color:var(--viewer-border)] bg-white/55 px-3 py-3 text-sm text-[color:var(--foreground)]"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={activeUiState.visibleColumnKeys.includes(column.key)}
+                                onChange={() => toggleColumn(column.key)}
+                                className="mt-0.5 h-4 w-4 rounded border-[color:var(--viewer-border)] text-[color:var(--accent)]"
+                              />
+                              <span className="min-w-0">
+                                <span className="block break-words font-medium">{column.label}</span>
+                                <span className="mt-1 block text-[11px] uppercase tracking-[0.16em] text-[color:var(--muted-ink)]">
+                                  {column.group ?? column.kind}
+                                </span>
+                              </span>
+                            </label>
+                          ))}
+                          {dynamicColumns.length === 0 ? (
+                            <div className="rounded-2xl border border-dashed border-[color:var(--viewer-border)] px-4 py-4 text-sm text-[color:var(--muted-ink)]">
+                              Load a model to discover dynamic columns.
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {showClearChecked ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateUiState((current) => ({ ...current, selectedRowKeys: new Set() }))
+                      }
+                      className="rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3.5 py-2.5 text-sm font-medium text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]"
+                    >
+                      Clear checked
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 

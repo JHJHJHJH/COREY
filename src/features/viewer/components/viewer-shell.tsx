@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  ClipboardCheck,
+  CircleAlert,
   Download,
   FileOutput,
   FileSpreadsheet,
@@ -36,6 +38,7 @@ import { DetachedWindow } from "@/features/viewer/components/detached-window";
 import { ModelTreePanel } from "@/features/viewer/components/model-tree-panel";
 import { IfcViewport } from "@/features/viewer/components/ifc-viewport";
 import { PropertiesPanel } from "@/features/viewer/components/properties-panel";
+import { ValidationDiagnosisReport } from "@/features/viewer/components/validation-diagnosis-report";
 import { ViewerToolbar } from "@/features/viewer/components/viewer-toolbar";
 import {
   applyViewerDataTableDraft,
@@ -46,7 +49,9 @@ import {
 import {
   buildViewerDataTableExcelFileName,
   buildViewerDataTableIfcFileName,
+  buildViewerValidationDiagnosisExcelFileName,
   exportViewerDataTableToExcel,
+  exportViewerValidationDiagnosisToExcel,
   importViewerDataTableFromExcel,
 } from "@/features/viewer/lib/data-table-excel";
 import {
@@ -55,12 +60,15 @@ import {
   sanitizeViewerDebugValue,
 } from "@/features/viewer/lib/ifc-data";
 import { LocalFileModelSource } from "@/features/viewer/lib/model-source";
+import { buildViewerValidationDiagnosisReport } from "@/features/viewer/lib/validation-report";
 import { exportEditedIfc } from "@/features/viewer/lib/ifc-writeback";
 import type {
   ModelMetadata,
   ModelSourceResult,
   ViewerCategorySummary,
   ViewerDebugData,
+  ViewerValidationDiagnosisElement,
+  ViewerValidationDiagnosisReport,
   ViewerDataTableDraft,
   ViewerDataTableExportStatus,
   ViewerDataTableImportReport,
@@ -123,6 +131,16 @@ const initialDataTableActionStatus: ViewerDataTableExportStatus = {
   phase: "idle",
   message: "",
   issues: [],
+};
+
+type ValidationReportStatus = {
+  phase: "idle" | "running" | "success" | "error";
+  message: string;
+};
+
+const initialValidationReportStatus: ValidationReportStatus = {
+  phase: "idle" as const,
+  message: "",
 };
 
 const initialDebugData: ViewerDebugData = {
@@ -236,18 +254,6 @@ function summarizeIfcTypes(ifcTypes: string[], max = 6) {
   const visible = ifcTypes.slice(0, max);
   const suffix = ifcTypes.length > max ? ` (+${ifcTypes.length - max} more)` : "";
   return `${visible.join(", ")}${suffix}`;
-}
-
-function compareValidationSeverity(
-  left: "warn" | "error",
-  right: "warn" | "error",
-) {
-  const rank = {
-    warn: 1,
-    error: 2,
-  } as const;
-
-  return rank[right] - rank[left];
 }
 
 function StatusDot({ phase }: { phase: ViewerStatus["phase"] }) {
@@ -649,10 +655,13 @@ export function ViewerShell() {
     emptyValidationHighlights,
   );
   const [validationResult, setValidationResult] = useState<ViewerValidationRunResult | null>(null);
+  const [validationReportStatus, setValidationReportStatus] = useState(initialValidationReportStatus);
+  const [selectedValidationClauseId, setSelectedValidationClauseId] = useState("");
   const [showTree, setShowTree] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
   const [showDataTable, setShowDataTable] = useState(false);
   const [showDataTableInWindow, setShowDataTableInWindow] = useState(false);
+  const [showValidationReport, setShowValidationReport] = useState(false);
   const [treeDrawerWidth, setTreeDrawerWidth] = useState(DEFAULT_TREE_DRAWER_WIDTH);
   const [propertiesDrawerWidth, setPropertiesDrawerWidth] = useState(
     DEFAULT_PROPERTIES_DRAWER_WIDTH,
@@ -719,76 +728,26 @@ export function ViewerShell() {
     }),
     [deferredClauses, selectionDetails],
   );
-  const validationClauseTableViews = useMemo<ViewerValidationClauseTableView[]>(() => {
-    if (!validationResult || !effectiveDataTableData) {
-      return [];
-    }
-
-    const rowKeyByElementId = new Map<string, string>();
-    for (const row of effectiveDataTableData.rows) {
-      rowKeyByElementId.set(`${row.modelId}:${row.localId}`, row.key);
-    }
-
-    const clauseMap = new Map<
-      string,
-      {
-        clauseId: string;
-        clauseTitle: string;
-        result: "warn" | "error";
-        rowKeys: Set<string>;
-      }
-    >();
-
-    for (const result of validationResult.results) {
-      const rowKey = rowKeyByElementId.get(`${result.modelId}:${result.localId}`);
-      if (!rowKey) {
-        continue;
-      }
-
-      for (const clauseFailure of result.failedClauses) {
-        const existing = clauseMap.get(clauseFailure.clauseId);
-        if (!existing) {
-          clauseMap.set(clauseFailure.clauseId, {
-            clauseId: clauseFailure.clauseId,
-            clauseTitle: clauseFailure.clauseTitle,
-            result: clauseFailure.result,
-            rowKeys: new Set([rowKey]),
-          });
-          continue;
-        }
-
-        existing.result =
-          compareValidationSeverity(clauseFailure.result, existing.result) < 0
-            ? clauseFailure.result
-            : existing.result;
-        existing.rowKeys.add(rowKey);
-      }
-    }
-
-    return [...clauseMap.values()]
-      .map((clause) => ({
+  const validationDiagnosisReport = useMemo<ViewerValidationDiagnosisReport | null>(
+    () =>
+      buildViewerValidationDiagnosisReport({
+        metadata,
+        data: effectiveDataTableData,
+        result: validationResult,
+      }),
+    [effectiveDataTableData, metadata, validationResult],
+  );
+  const validationClauseTableViews = useMemo<ViewerValidationClauseTableView[]>(
+    () =>
+      validationDiagnosisReport?.clauses.map((clause) => ({
         clauseId: clause.clauseId,
         clauseTitle: clause.clauseTitle,
         result: clause.result,
-        elementCount: clause.rowKeys.size,
-        rowKeys: [...clause.rowKeys],
-      }))
-      .sort((left, right) => {
-        const severityComparison = compareValidationSeverity(left.result, right.result);
-        if (severityComparison !== 0) {
-          return severityComparison;
-        }
-
-        if (left.elementCount !== right.elementCount) {
-          return right.elementCount - left.elementCount;
-        }
-
-        return left.clauseTitle.localeCompare(right.clauseTitle, undefined, {
-          numeric: true,
-          sensitivity: "base",
-        });
-      });
-  }, [effectiveDataTableData, validationResult]);
+        elementCount: clause.elementCount,
+        rowKeys: clause.elements.map((element) => element.rowKey),
+      })) ?? [],
+    [validationDiagnosisReport],
+  );
   const debugTreeSample = useMemo(
     () => (tree.length > 0 ? buildViewerTreeDebugSample(tree) : null),
     [tree],
@@ -1807,41 +1766,56 @@ export function ViewerShell() {
     setDrawerDragState(nextDragState);
   };
 
-  const startDataTableDialogMove = (event: React.PointerEvent<HTMLElement>) => {
-    event.preventDefault();
-    setDataTableDialogResizeState(null);
-    setDataTableDialogMoveState({
-      startX: event.clientX,
-      startY: event.clientY,
-      startLayout: dataTableDialogLayout,
-    });
-  };
-
-  const startDataTableDialogResize = (event: React.PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setDataTableDialogMoveState(null);
-    setDataTableDialogResizeState({
-      startX: event.clientX,
-      startY: event.clientY,
-      startLayout: dataTableDialogLayout,
-    });
-  };
-
-  const resetDataTableDialogLayout = () => {
-    const workspace = workspaceRef.current;
-    if (!workspace) {
-      return;
-    }
-
-    setDataTableDialogLayout(
-      buildDefaultDataTableDialogLayout(workspace.clientWidth, workspace.clientHeight),
-    );
-  };
-
   const handleDataTableRowSelect = useCallback((localId: number) => {
     void viewportRef.current?.selectNode(localId);
   }, []);
+
+  const handleValidationDiagnosisElementSelect = useCallback(
+    async (element: ViewerValidationDiagnosisElement) => {
+      setShowProperties(true);
+      await viewportRef.current?.selectNode(element.localId);
+      await viewportRef.current?.focusSelection();
+    },
+    [],
+  );
+
+  const handleShowClauseInDataTable = useCallback((clauseId: string) => {
+    setSelectedValidationClauseId(clauseId);
+    setShowDataTable(true);
+    setShowDataTableInWindow(true);
+  }, []);
+
+  const handleExportValidationDiagnosis = useCallback(async () => {
+    if (!metadata || !validationDiagnosisReport) {
+      setValidationReportStatus({
+        phase: "error",
+        message: "Load a validated model before exporting a diagnosis report.",
+      });
+      return;
+    }
+
+    setValidationReportStatus({
+      phase: "running",
+      message: "Preparing clause diagnosis Excel export...",
+    });
+
+    try {
+      const result = await exportViewerValidationDiagnosisToExcel({
+        report: validationDiagnosisReport,
+        fileName: buildViewerValidationDiagnosisExcelFileName(metadata.name),
+      });
+
+      setValidationReportStatus({
+        phase: "success",
+        message: `Exported diagnosis report to ${result.fileName}.`,
+      });
+    } catch (error) {
+      setValidationReportStatus({
+        phase: "error",
+        message: error instanceof Error ? error.message : "Diagnosis Excel export failed.",
+      });
+    }
+  }, [metadata, validationDiagnosisReport]);
 
   const syncDataTableToView = useCallback(() => {
     if (!effectiveDataTableData) {
@@ -1899,6 +1873,33 @@ export function ViewerShell() {
   useEffect(() => {
     setDataTableVisibleRowKeysInView(null);
   }, [metadata?.sourceId]);
+
+  useEffect(() => {
+    setValidationReportStatus(initialValidationReportStatus);
+    setSelectedValidationClauseId("");
+  }, [metadata?.sourceId]);
+
+  useEffect(() => {
+    if (validationState.phase === "running" || validationResult === null) {
+      setValidationReportStatus(initialValidationReportStatus);
+    }
+  }, [validationResult, validationState.phase]);
+
+  useEffect(() => {
+    if (!validationDiagnosisReport) {
+      setSelectedValidationClauseId("");
+      return;
+    }
+
+    if (
+      !selectedValidationClauseId ||
+      validationDiagnosisReport.clauses.some((clause) => clause.clauseId === selectedValidationClauseId)
+    ) {
+      return;
+    }
+
+    setSelectedValidationClauseId("");
+  }, [selectedValidationClauseId, validationDiagnosisReport]);
 
   useEffect(() => {
     if (!isDataTableSyncedToView) {
@@ -1991,7 +1992,7 @@ export function ViewerShell() {
           <FileOutput className="h-4 w-4" />
         </HeaderActionButton>
         <HeaderActionButton
-          label={isDataTableDetached ? "Dock" : "Pop out"}
+          label={isDataTableDetached ? "Show inline" : "Open window"}
           onClick={isDataTableDetached ? showDataTableDialog : showDataTableWindow}
         >
           {isDataTableDetached ? (
@@ -2000,14 +2001,6 @@ export function ViewerShell() {
             <SquareArrowOutUpRight className="h-4 w-4" />
           )}
         </HeaderActionButton>
-        {!isDataTableDetached ? (
-          <HeaderActionButton
-            label="Reset layout"
-            onClick={resetDataTableDialogLayout}
-          >
-            <RotateCcw className="h-4 w-4" />
-          </HeaderActionButton>
-        ) : null}
         <HeaderActionButton
           label="Close"
           onClick={hideDataTable}
@@ -2025,11 +2018,13 @@ export function ViewerShell() {
         metadata={metadata}
         tableState={effectiveDataTableState}
         validationClauseViews={validationClauseTableViews}
+        selectedValidationClauseId={selectedValidationClauseId}
         activeSelection={session.selected}
         visibleRowKeysInView={dataTableVisibleRowKeysInView}
         importRevision={dataTableImportFocus.revision}
         importedColumnKeys={dataTableImportFocus.columnKeys}
         onSyncToView={handleSyncDataTableToView}
+        onValidationClauseChange={setSelectedValidationClauseId}
         onSelectRow={handleDataTableRowSelect}
         showMetaHeader={false}
       />
@@ -2076,10 +2071,19 @@ export function ViewerShell() {
               </button>
               <Link
                 href="/rules"
+                className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-4 text-sm text-[color:var(--foreground)] no-underline transition hover:bg-[color:var(--surface-strong)]"
+              >
+                <ClipboardCheck className="h-4 w-4 shrink-0" />
+                <span>Clauses</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => setShowValidationReport(true)}
                 className="inline-flex h-10 items-center gap-2 rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-4 text-sm font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]"
               >
-                <span>Rules</span>
-              </Link>
+                <CircleAlert className="h-4 w-4" />
+                <span>Report</span>
+              </button>
             </div>
           </div>
 
@@ -2305,41 +2309,10 @@ export function ViewerShell() {
               }}
             />
 
-            {showDataTable && !isDataTableDetached && dataTableDialogLayout.initialized ? (
-              <div className="pointer-events-none absolute inset-0 z-50">
-                <div
-                  ref={dataTableDialogRef}
-                  className="pointer-events-auto absolute flex min-h-0 flex-col overflow-hidden rounded-[1.5rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/96 shadow-[var(--viewer-shadow)] backdrop-blur"
-                  style={{
-                    left: `${dataTableDialogLayout.x}px`,
-                    top: `${dataTableDialogLayout.y}px`,
-                    width: `${dataTableDialogLayout.width}px`,
-                    height: `${dataTableDialogLayout.height}px`,
-                    willChange:
-                      dataTableDialogMoveState || dataTableDialogResizeState
-                        ? "transform, width, height"
-                        : undefined,
-                  }}
-                >
-                  <div
-                    onPointerDown={startDataTableDialogMove}
-                    title="Drag to move data table window"
-                    className="cursor-move"
-                  >
-                    {dataTableHeader}
-                  </div>
-
-                  {dataTablePanelContent}
-
-                  <div
-                    aria-hidden="true"
-                    onPointerDown={startDataTableDialogResize}
-                    title="Drag to resize data table window"
-                    className="absolute bottom-2 right-2 z-10 h-5 w-5 cursor-se-resize touch-none rounded-md border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/92"
-                  >
-                    <span className="absolute bottom-1 right-1 h-2.5 w-0.5 rotate-45 rounded-full bg-[color:var(--muted-ink)]" />
-                    <span className="absolute bottom-1 right-2.5 h-1.5 w-0.5 rotate-45 rounded-full bg-[color:var(--muted-ink)]" />
-                  </div>
+            {showDataTable && !isDataTableDetached ? (
+              <div className="absolute inset-0 z-50 overflow-hidden border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] shadow-[var(--viewer-shadow)]">
+                <div className="flex h-full min-h-0 flex-col bg-[color:var(--panel-bg)] text-[color:var(--foreground)]">
+                  {dataTableSurface}
                 </div>
               </div>
             ) : null}
@@ -2347,14 +2320,44 @@ export function ViewerShell() {
               <DetachedWindow
                 title={`Data Table${metadata ? ` · ${metadata.name}` : ""}`}
                 name="corey-data-table"
-                width={Math.max(dataTableDialogLayout.width, DEFAULT_DATA_TABLE_DIALOG_WIDTH)}
-                height={Math.max(dataTableDialogLayout.height, DEFAULT_DATA_TABLE_DIALOG_HEIGHT)}
+                width={1}
+                height={1}
+                fullscreen
+                preferExtendedScreen
                 onClose={hideDataTable}
                 onOpenBlocked={showDataTableDialog}
               >
                 <div className="flex h-screen min-h-0 flex-col bg-[color:var(--panel-bg)] text-[color:var(--foreground)]">
                   {dataTableSurface}
                 </div>
+              </DetachedWindow>
+            ) : null}
+            {showValidationReport ? (
+              <DetachedWindow
+                title={`Clause Diagnosis Report${metadata ? ` · ${metadata.name}` : ""}`}
+                name="corey-validation-diagnosis"
+                width={1480}
+                height={920}
+                fullscreen
+                onClose={() => setShowValidationReport(false)}
+                onOpenBlocked={() => setShowValidationReport(false)}
+              >
+                <ValidationDiagnosisReport
+                  metadata={metadata}
+                  report={validationDiagnosisReport}
+                  validationPhase={validationState.phase}
+                  validationMessage={validationState.message}
+                  statusMessage={validationReportStatus.message}
+                  activeSelection={session.selected}
+                  onExport={() => {
+                    void handleExportValidationDiagnosis();
+                  }}
+                  onShowClauseInTable={handleShowClauseInDataTable}
+                  onSelectElement={(element) => {
+                    void handleValidationDiagnosisElementSelect(element);
+                  }}
+                  onClose={() => setShowValidationReport(false)}
+                />
               </DetachedWindow>
             ) : null}
           </div>

@@ -11,11 +11,14 @@ import type {
   ViewerDataTableEdit,
   ViewerDataTableImportReport,
   ViewerDataTableIssue,
+  ViewerValidationDiagnosisReport,
 } from "@/features/viewer/types";
 
 const VIEWER_DATA_TABLE_WORKBOOK_VERSION = 1;
 const DATA_SHEET_NAME = "Data Table";
 const META_SHEET_NAME = "_corey_meta";
+const DIAGNOSIS_CLAUSES_SHEET_NAME = "Clause Summary";
+const DIAGNOSIS_ELEMENTS_SHEET_NAME = "Element Failures";
 const TECHNICAL_COLUMNS = ["__rowKey", "__modelId", "__localId"] as const;
 
 type SheetJsModule = {
@@ -199,6 +202,35 @@ function normalizeDisplayValue(value: unknown) {
   return String(value);
 }
 
+function buildDiagnosisClauseRows(report: ViewerValidationDiagnosisReport) {
+  return [
+    ["Clause", "Severity", "FailingElements", "FailedChecks"],
+    ...report.clauses.map((clause) => [
+      clause.clauseTitle,
+      clause.result,
+      clause.elementCount,
+      clause.ruleDescriptions.join(" | "),
+    ]),
+  ];
+}
+
+function buildDiagnosisElementRows(report: ViewerValidationDiagnosisReport) {
+  return [
+    ["Clause", "Severity", "Element", "IFCType", "GlobalId", "LocalId", "FailedChecks"],
+    ...report.clauses.flatMap((clause) =>
+      clause.elements.map((element) => [
+        clause.clauseTitle,
+        element.result,
+        element.label,
+        element.ifcType ?? "",
+        element.globalId ?? "",
+        element.localId,
+        element.failedRuleDescriptions.join(" | "),
+      ]),
+    ),
+  ];
+}
+
 export async function exportViewerDataTableToExcel(input: {
   data: ViewerDataTableData;
   sourceId: string;
@@ -247,6 +279,52 @@ export async function exportViewerDataTableToExcel(input: {
   ) {
     throw new Error(
       `Exported workbook verification failed. Found sheets: ${verificationSheetNames || "none"}.`,
+    );
+  }
+
+  const fileName =
+    input.fileName.toLowerCase().endsWith(".xlsx") ? input.fileName : `${input.fileName}.xlsx`;
+
+  await saveArrayBuffer(
+    bytes,
+    fileName,
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+
+  return {
+    fileName,
+  };
+}
+
+export async function exportViewerValidationDiagnosisToExcel(input: {
+  report: ViewerValidationDiagnosisReport;
+  fileName: string;
+}) {
+  const XLSX = await loadSheetJs();
+  const workbook = XLSX.utils.book_new();
+  const clauseSheet = XLSX.utils.aoa_to_sheet(buildDiagnosisClauseRows(input.report));
+  const elementSheet = XLSX.utils.aoa_to_sheet(buildDiagnosisElementRows(input.report));
+
+  XLSX.utils.book_append_sheet(workbook, clauseSheet, DIAGNOSIS_CLAUSES_SHEET_NAME);
+  XLSX.utils.book_append_sheet(workbook, elementSheet, DIAGNOSIS_ELEMENTS_SHEET_NAME);
+
+  const bytes = XLSX.write(workbook, {
+    bookType: "xlsx",
+    type: "array",
+    compression: true,
+  });
+  const verificationWorkbook = XLSX.read(bytes, {
+    type: "array",
+    raw: true,
+  });
+
+  if (
+    !verificationWorkbook.Sheets[DIAGNOSIS_CLAUSES_SHEET_NAME] ||
+    !verificationWorkbook.Sheets[DIAGNOSIS_ELEMENTS_SHEET_NAME]
+  ) {
+    const verificationSheetNames = verificationWorkbook.SheetNames.join(", ");
+    throw new Error(
+      `Exported diagnosis workbook verification failed. Found sheets: ${verificationSheetNames || "none"}.`,
     );
   }
 
@@ -436,4 +514,16 @@ export function buildViewerDataTableIfcFileName(name: string) {
   return name.toLowerCase().endsWith(".ifc")
     ? `${name.slice(0, Math.max(0, name.length - 4))}.edited.ifc`
     : `${name}.edited.ifc`;
+}
+
+export function buildViewerValidationDiagnosisExcelFileName(name: string) {
+  const baseName = name.toLowerCase().endsWith(".ifc")
+    ? name.slice(0, Math.max(0, name.length - 4))
+    : name;
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}Z$/, "Z");
+
+  return `${baseName}.clause-diagnosis.${timestamp}.xlsx`;
 }

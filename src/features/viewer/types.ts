@@ -116,6 +116,39 @@ export interface ViewerValidationRunResult {
   failedClauses: ViewerValidationClauseFailure[];
 }
 
+export interface ViewerValidationDiagnosisElement {
+  rowKey: string;
+  modelId: string;
+  localId: number;
+  label: string;
+  category: string | null;
+  ifcType: string | null;
+  globalId: string | null;
+  name: string | null;
+  result: ViewerValidationFailureSeverity;
+  failedRuleCount: number;
+  failedRuleDescriptions: string[];
+}
+
+export interface ViewerValidationDiagnosisClause {
+  clauseId: string;
+  clauseTitle: string;
+  result: ViewerValidationFailureSeverity;
+  elementCount: number;
+  ruleDescriptions: string[];
+  elements: ViewerValidationDiagnosisElement[];
+}
+
+export interface ViewerValidationDiagnosisReport {
+  sourceId: string;
+  modelName: string | null;
+  flaggedElementCount: number;
+  warnElementCount: number;
+  errorElementCount: number;
+  failedClauseCount: number;
+  clauses: ViewerValidationDiagnosisClause[];
+}
+
 export interface ViewerValidationClauseTableView {
   clauseId: string;
   clauseTitle: string;

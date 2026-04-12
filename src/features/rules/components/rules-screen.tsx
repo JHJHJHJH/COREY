@@ -35,6 +35,14 @@ const STARTER_TEMPLATES = [
     href: "/resources/testmodel-rules-comprehensive.json",
     ruleCount: 67,
   },
+  {
+    id: "industry-mapping-bca-column-beam",
+    name: "BCA - Column + Beam",
+    description:
+      "55 generated checks grouped by Agency + Identified Component from the industry mapping CSV.",
+    href: "/resources/industry-mapping-bca-column-beam.json",
+    ruleCount: 55,
+  },
 ] as const;
 
 function inputClassName() {
@@ -510,7 +518,7 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
       }`}
     >
       <div className="border-b border-[color:var(--viewer-border)] bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(234,242,255,0.94))] px-5 py-3">
-        <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(36rem,42rem)] lg:items-start lg:gap-4">
+        <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(44rem,56rem)] lg:items-start lg:gap-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
@@ -571,7 +579,7 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
               ) : null}
             </div>
 
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {STARTER_TEMPLATES.map((template) => {
                 const isLoading = loadingTemplateId === template.id;
 

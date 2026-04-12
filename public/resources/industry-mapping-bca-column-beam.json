@@ -1,0 +1,732 @@
+{
+  "version": 2,
+  "clauses": [
+    {
+      "id": "bca-beam-requirements",
+      "title": "BCA - Beam",
+      "rules": [
+        {
+          "id": "bca-beam-sgpset-beam-beamspantype-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Beam",
+            "label": "BeamSpanType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beamreinforcement-bottomleft-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BeamReinforcement",
+            "label": "BottomLeft"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beamreinforcement-bottommiddle-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BeamReinforcement",
+            "label": "BottomMiddle"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beamreinforcement-bottomright-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BeamReinforcement",
+            "label": "BottomRight"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beam-constructionmethod-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Beam",
+            "label": "ConstructionMethod"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beamdimension-depth-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BeamDimension",
+            "label": "Depth"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-steelconnection-leftconnectiondetail-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SteelConnection",
+            "label": "LeftConnectionDetail"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-steelconnection-leftconnectiontype-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SteelConnection",
+            "label": "LeftConnectionType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beamdimension-mark-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BeamDimension",
+            "label": "Mark"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-material-materialgrade-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Material",
+            "label": "MaterialGrade"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beam-mechanicalconnectiontype-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Beam",
+            "label": "MechanicalConnectionType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beamdimension-membersection-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BeamDimension",
+            "label": "MemberSection"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beamreinforcement-prefabricatedreinforcementcage-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BeamReinforcement",
+            "label": "PrefabricatedReinforcementCage"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beam-referto2ddetail-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Beam",
+            "label": "ReferTo2DDetail"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beam-reinforcementsteelgrade-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Beam",
+            "label": "ReinforcementSteelGrade"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-steelconnection-rightconnectiondetail-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SteelConnection",
+            "label": "RightConnectionDetail"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-steelconnection-rightconnectiontype-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SteelConnection",
+            "label": "RightConnectionType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beam-sectionfabricationmethod-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Beam",
+            "label": "SectionFabricationMethod"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beamreinforcement-sidebar-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BeamReinforcement",
+            "label": "SideBar"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-steelconnection-spliceconnection-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SteelConnection",
+            "label": "SpliceConnection"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beamreinforcement-stirrupsleft-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BeamReinforcement",
+            "label": "StirrupsLeft"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beamreinforcement-stirrupsmiddle-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BeamReinforcement",
+            "label": "StirrupsMiddle"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beamreinforcement-stirrupsright-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BeamReinforcement",
+            "label": "StirrupsRight"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beamreinforcement-stirrupstypeleft-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BeamReinforcement",
+            "label": "StirrupsTypeLeft"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beamreinforcement-stirrupstypemiddle-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BeamReinforcement",
+            "label": "StirrupsTypeMiddle"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beamreinforcement-stirrupstyperight-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BeamReinforcement",
+            "label": "StirrupsTypeRight"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beamreinforcement-topleft-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BeamReinforcement",
+            "label": "TopLeft"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beamreinforcement-topmiddle-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BeamReinforcement",
+            "label": "TopMiddle"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beamreinforcement-topright-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BeamReinforcement",
+            "label": "TopRight"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-beam-sgpset-beamdimension-width-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BeamDimension",
+            "label": "Width"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "bca-column-requirements",
+      "title": "BCA - Column",
+      "rules": [
+        {
+          "id": "bca-column-sgpset-precastconcreteelementgeneral-arrangementtype-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_PrecastConcreteElementGeneral",
+            "label": "ArrangementType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-columndimension-breadth-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_ColumnDimension",
+            "label": "Breadth"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-steelconnection-connectiondetailsbottom-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SteelConnection",
+            "label": "ConnectionDetailsBottom"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-steelconnection-connectiondetailstop-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SteelConnection",
+            "label": "ConnectionDetailsTop"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-steelconnection-connectiontypebottom-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SteelConnection",
+            "label": "ConnectionTypeBottom"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-steelconnection-connectiontypetop-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SteelConnection",
+            "label": "ConnectionTypeTop"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-column-constructionmethod-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Column",
+            "label": "ConstructionMethod"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-columndimension-diameter-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_ColumnDimension",
+            "label": "Diameter"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-columndimension-endstorey-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_ColumnDimension",
+            "label": "EndStorey"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-columnreinforcement-mainrebar-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_ColumnReinforcement",
+            "label": "MainRebar"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-columndimension-mark-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_ColumnDimension",
+            "label": "Mark"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-material-materialgrade-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Material",
+            "label": "MaterialGrade"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-column-mechanicalconnectiontype-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Column",
+            "label": "MechanicalConnectionType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-columndimension-membersection-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_ColumnDimension",
+            "label": "MemberSection"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-columnreinforcement-prefabricatedreinforcementcage-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_ColumnReinforcement",
+            "label": "PrefabricatedReinforcementCage"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-column-referto2ddetail-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Column",
+            "label": "ReferTo2DDetail"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-column-reinforcementsteelgrade-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Column",
+            "label": "ReinforcementSteelGrade"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-column-sectionfabricationmethod-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Column",
+            "label": "SectionFabricationMethod"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-steelconnection-splicedetail-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SteelConnection",
+            "label": "SpliceDetail"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-columndimension-startingstorey-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_ColumnDimension",
+            "label": "StartingStorey"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-columnreinforcement-stirrups-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_ColumnReinforcement",
+            "label": "Stirrups"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-columnreinforcement-stirrupstype-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_ColumnReinforcement",
+            "label": "StirrupsType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-columndimension-width-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_ColumnDimension",
+            "label": "Width"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-columnstructuralload-workingload-da1-1-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_ColumnStructuralLoad",
+            "label": "WorkingLoad_DA1-1"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "bca-column-sgpset-columnstructuralload-workingload-da1-2-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_ColumnStructuralLoad",
+            "label": "WorkingLoad_DA1-2"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        }
+      ]
+    }
+  ]
+}
