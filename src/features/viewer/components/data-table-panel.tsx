@@ -764,11 +764,14 @@ const DataTablePanelComponent = function DataTablePanel({
         
       </div>
 
-      <div id="table-filters" className="border-b border-[color:var(--viewer-border)] px-4 py-3">
+      <div
+        id="table-filters"
+        className="relative z-20 border-b border-[color:var(--viewer-border)] px-4 py-3"
+      >
         <div className="rounded-[1.4rem] border border-[color:var(--viewer-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.82),rgba(245,249,255,0.92))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
           <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
+            <div className="flex items-center gap-3">
+              <div className="shrink-0">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
                   Table Filters
                 </div>
@@ -792,12 +795,75 @@ const DataTablePanelComponent = function DataTablePanel({
                 </div>
               </div>
 
+              <div className="min-w-[16rem] flex-1">
+                <div className="relative">
+                  <Search
+                    className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--muted-ink)]"
+                    aria-hidden="true"
+                  />
+                  <input
+                    value={activeUiState.query}
+                    onChange={(event) =>
+                      updateUiState((current) => ({ ...current, query: event.target.value }))
+                    }
+                    placeholder="Filter by element values, attributes, or property set values"
+                    aria-label="Filter table rows"
+                    disabled={!data}
+                    className="h-10 w-full rounded-2xl border border-[color:var(--viewer-border)] bg-white/80 py-2 pl-11 pr-10 text-sm text-[color:var(--foreground)] outline-none transition placeholder:text-[color:var(--muted-ink)] focus:border-[color:var(--accent)] focus:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                  {activeUiState.query ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateUiState((current) => ({
+                          ...current,
+                          query: "",
+                        }))
+                      }
+                      className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-[color:var(--viewer-border)] bg-white/90 text-[color:var(--muted-ink)] transition hover:bg-white hover:text-[color:var(--foreground)]"
+                      aria-label="Clear text filter"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+
+              {hasActiveFilters ? (
+                <div className="flex h-10 min-w-[18rem] max-w-[24rem] shrink-0 items-center gap-2 rounded-2xl border border-[color:var(--viewer-border)] bg-white/65 px-3 text-[11px] text-[color:var(--muted-ink)]">
+                  <span className="shrink-0 font-semibold uppercase tracking-[0.16em] text-[color:var(--foreground)]">
+                    Active Filters
+                  </span>
+                  <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+                    {activeFilterLabels.map((label) => (
+                      <span
+                        key={label}
+                        className="shrink-0 rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1"
+                      >
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void resetFilters();
+                    }}
+                    disabled={!data || isSyncingToView}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[color:var(--viewer-border)] bg-white px-3 py-1 font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <FilterX className="h-3.5 w-3.5" />
+                    Reset
+                  </button>
+                </div>
+              ) : null}
+
               <button
                 type="button"
                 aria-controls="table-filters-content"
                 aria-expanded={showFilters}
                 onClick={() => setShowFilters((current) => !current)}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[color:var(--viewer-border)] bg-white/75 text-[color:var(--foreground)] transition hover:bg-white"
+                className="ml-auto inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[color:var(--viewer-border)] bg-white/75 text-[color:var(--foreground)] transition hover:bg-white"
                 aria-label={showFilters ? "Collapse filters drawer" : "Expand filters drawer"}
                 title={showFilters ? "Collapse filters" : "Expand filters"}
               >
@@ -808,57 +874,17 @@ const DataTablePanelComponent = function DataTablePanel({
             <div
               id="table-filters-content"
               aria-hidden={!showFilters}
-              className={`grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out ${
-                showFilters ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+              className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+                showFilters ? "grid-rows-[1fr] overflow-visible" : "grid-rows-[0fr] overflow-hidden"
               }`}
             >
-              <div className="min-h-0 overflow-hidden">
+              <div className={`min-h-0 ${showFilters ? "overflow-visible" : "overflow-hidden"}`}>
                 <div
-                  className={`flex flex-col gap-3 transition-[opacity,transform] duration-200 ease-out ${
+                  className={`flex flex-nowrap items-end gap-3 transition-[opacity,transform] duration-200 ease-out ${
                     showFilters ? "translate-y-0 opacity-100" : "-translate-y-1 opacity-0"
                   }`}
                 >
-                  <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
-                  <label className="min-w-0 flex-1">
-                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-                      Text Filter
-                    </span>
-                    <div className="relative">
-                      <Search
-                        className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--muted-ink)]"
-                        aria-hidden="true"
-                      />
-                      <input
-                        value={activeUiState.query}
-                        onChange={(event) =>
-                          updateUiState((current) => ({ ...current, query: event.target.value }))
-                        }
-                        placeholder="Filter by element values, attributes, or property set values"
-                        disabled={!data}
-                        className="w-full rounded-2xl border border-[color:var(--viewer-border)] bg-white/80 py-3 pl-11 pr-10 text-sm text-[color:var(--foreground)] outline-none transition placeholder:text-[color:var(--muted-ink)] focus:border-[color:var(--accent)] focus:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-                      />
-                      {activeUiState.query ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateUiState((current) => ({
-                              ...current,
-                              query: "",
-                            }))
-                          }
-                          className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-[color:var(--viewer-border)] bg-white/90 text-[color:var(--muted-ink)] transition hover:bg-white hover:text-[color:var(--foreground)]"
-                          aria-label="Clear text filter"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      ) : null}
-                    </div>
-                  </label>
-
-                  <label className="w-full min-w-[14rem] xl:w-[16rem]">
-                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-                      IFC Type
-                    </span>
+                  <label className="w-[16rem] shrink-0">
                     <select
                       value={activeUiState.ifcTypeFilter}
                       onChange={(event) =>
@@ -878,36 +904,8 @@ const DataTablePanelComponent = function DataTablePanel({
                       ))}
                     </select>
                   </label>
-                </div>
 
-                  {hasActiveFilters ? (
-                    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[color:var(--viewer-border)] bg-white/65 px-3 py-2 text-[11px] text-[color:var(--muted-ink)]">
-                      <span className="font-semibold uppercase tracking-[0.16em] text-[color:var(--foreground)]">
-                        Active Filters
-                      </span>
-                      {activeFilterLabels.map((label) => (
-                        <span
-                          key={label}
-                          className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1"
-                        >
-                          {label}
-                        </span>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void resetFilters();
-                        }}
-                        disabled={!data || isSyncingToView}
-                        className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-[color:var(--viewer-border)] bg-white px-3 py-1 font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <FilterX className="h-3.5 w-3.5" />
-                        Reset filters
-                      </button>
-                    </div>
-                  ) : null}
-
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-2">
                     <div className="relative" ref={clauseMenuRef}>
                       <button
                         type="button"
@@ -929,7 +927,7 @@ const DataTablePanelComponent = function DataTablePanel({
                       </button>
 
                       {showClauseMenu ? (
-                        <div className="absolute left-0 top-[calc(100%+0.5rem)] z-20 w-[min(28rem,85vw)] rounded-[1.25rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] p-3 shadow-[var(--viewer-shadow)]">
+                        <div className="absolute left-0 top-[calc(100%+0.5rem)] z-40 w-[min(28rem,85vw)] rounded-[1.25rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] p-3 shadow-[var(--viewer-shadow)]">
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
@@ -1050,7 +1048,7 @@ const DataTablePanelComponent = function DataTablePanel({
                       </button>
 
                       {showColumnMenu ? (
-                        <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-[min(30rem,85vw)] rounded-[1.25rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] p-3 shadow-[var(--viewer-shadow)]">
+                        <div className="absolute right-0 top-[calc(100%+0.5rem)] z-40 w-[min(30rem,85vw)] rounded-[1.25rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] p-3 shadow-[var(--viewer-shadow)]">
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">

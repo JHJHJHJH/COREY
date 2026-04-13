@@ -12,17 +12,25 @@ import type {
   ViewerInspectionValueState,
 } from "@/features/viewer/types";
 
-const VIEWER_DATA_TABLE_DRAFT_VERSION = 1;
-const VIEWER_DATA_TABLE_DRAFT_STORAGE_PREFIX = "corey:data-table-draft:v1:";
+const VIEWER_DATA_TABLE_DRAFT_VERSION = 2;
+const VIEWER_DATA_TABLE_DRAFT_STORAGE_PREFIX = "corey:data-table-draft:";
+const LEGACY_VIEWER_DATA_TABLE_DRAFT_STORAGE_PREFIX = "corey:data-table-draft:v1:";
 
 type PersistedViewerDataTableDraft =
-  | ViewerDataTableDraft
   | {
       version: 1;
       sourceId: string;
       updatedAt: string;
       edits: Array<[rowKey: string, columnKey: string, raw: unknown, valueKind: ViewerDataTableEditableValueKind | null]>;
-    };
+    }
+  | {
+      version: 2;
+      sourceId: string;
+      updatedAt: string;
+      importedColumns?: ViewerDataTableColumn[];
+      edits: Array<[rowKey: string, columnKey: string, raw: unknown, valueKind: ViewerDataTableEditableValueKind | null]>;
+    }
+  | ViewerDataTableDraft;
 
 function isCompactPersistedEdit(
   entry: ViewerDataTableEdit | [string, string, unknown, ViewerDataTableEditableValueKind | null],
@@ -143,6 +151,47 @@ function toSearchText(columns: ViewerDataTableColumn[], cells: Record<string, Vi
   return parts.join(" ");
 }
 
+function normalizeImportedColumn(column: ViewerDataTableColumn): ViewerDataTableColumn {
+  return {
+    key: String(column.key ?? ""),
+    label: String(column.label ?? ""),
+    kind: column.kind,
+    group: column.group ? String(column.group) : null,
+    populatedRowCount:
+      typeof column.populatedRowCount === "number" && Number.isFinite(column.populatedRowCount)
+        ? column.populatedRowCount
+        : 0,
+    editable: Boolean(column.editable),
+    editableReason: column.editableReason ? String(column.editableReason) : null,
+    binding: column.binding ?? null,
+    valueKind: column.valueKind ?? null,
+    origin: column.origin === "import" ? "import" : "ifc",
+    importHeader: column.importHeader ? String(column.importHeader) : null,
+  };
+}
+
+function mergeViewerDataTableColumns(
+  baseColumns: ViewerDataTableColumn[],
+  importedColumns: ViewerDataTableColumn[],
+) {
+  if (importedColumns.length === 0) {
+    return baseColumns;
+  }
+
+  const existingKeys = new Set(baseColumns.map((column) => column.key));
+  const nextColumns = [...baseColumns];
+  for (const importedColumn of importedColumns) {
+    if (existingKeys.has(importedColumn.key)) {
+      continue;
+    }
+
+    nextColumns.push(importedColumn);
+    existingKeys.add(importedColumn.key);
+  }
+
+  return nextColumns;
+}
+
 export function buildViewerDataTableDraftValue(
   raw: unknown,
   valueKind: ViewerDataTableEditableValueKind | null,
@@ -243,11 +292,13 @@ export function coerceViewerDataTableInputValue(
 export function createViewerDataTableDraft(
   sourceId: string,
   edits: ViewerDataTableEdit[],
+  importedColumns: ViewerDataTableColumn[] = [],
 ): ViewerDataTableDraft {
   return {
     version: VIEWER_DATA_TABLE_DRAFT_VERSION,
     sourceId,
     updatedAt: new Date().toISOString(),
+    importedColumns,
     edits,
   };
 }
@@ -256,9 +307,15 @@ export function applyViewerDataTableDraft(
   data: ViewerDataTableData,
   draft: ViewerDataTableDraft | null,
 ) {
-  if (!draft || draft.edits.length === 0) {
+  if (!draft || (draft.edits.length === 0 && draft.importedColumns.length === 0)) {
     return data;
   }
+
+  const columns = mergeViewerDataTableColumns(
+    data.columns,
+    draft.importedColumns.map(normalizeImportedColumn),
+  );
+  const columnMap = new Map(columns.map((column) => [column.key, column]));
 
   const rowEditMap = new Map<string, Map<string, ViewerDataTableEdit>>();
   for (const edit of draft.edits) {
@@ -276,7 +333,7 @@ export function applyViewerDataTableDraft(
     let changed = false;
     const cells = { ...row.cells };
     for (const [columnKey, edit] of rowEdits.entries()) {
-      const column = data.columns.find((entry) => entry.key === columnKey);
+      const column = columnMap.get(columnKey);
       if (!column) {
         continue;
       }
@@ -309,12 +366,13 @@ export function applyViewerDataTableDraft(
     return {
       ...row,
       cells,
-      searchText: toSearchText(data.columns, cells),
+      searchText: toSearchText(columns, cells),
     };
   });
 
   return {
     ...data,
+    columns,
     rows,
   };
 }
@@ -323,15 +381,29 @@ export function sanitizeViewerDataTableDraft(
   sourceId: string,
   data: ViewerDataTableData,
   edits: ViewerDataTableEdit[],
+  importedColumns: ViewerDataTableColumn[] = [],
 ): { draft: ViewerDataTableDraft | null; issues: ViewerDataTableIssue[] } {
   const rowMap = new Map(data.rows.map((row) => [row.key, row]));
   const columnMap = new Map(data.columns.map((column) => [column.key, column]));
+  const importedColumnMap = new Map<string, ViewerDataTableColumn>();
   const nextEdits: ViewerDataTableEdit[] = [];
   const issues: ViewerDataTableIssue[] = [];
 
+  for (const importedColumn of importedColumns) {
+    if (!importedColumn.key) {
+      continue;
+    }
+
+    if (columnMap.has(importedColumn.key)) {
+      continue;
+    }
+
+    importedColumnMap.set(importedColumn.key, normalizeImportedColumn(importedColumn));
+  }
+
   for (const edit of edits) {
     const row = rowMap.get(edit.rowKey);
-    const column = columnMap.get(edit.columnKey);
+    const column = columnMap.get(edit.columnKey) ?? importedColumnMap.get(edit.columnKey);
     if (!row || !column) {
       issues.push({
         rowKey: edit.rowKey,
@@ -371,12 +443,20 @@ export function sanitizeViewerDataTableDraft(
     });
   }
 
-  if (nextEdits.length === 0) {
+  const referencedImportedColumns = [...new Set(
+    nextEdits
+      .map((edit) => edit.columnKey)
+      .filter((columnKey) => !columnMap.has(columnKey)),
+  )]
+    .map((columnKey) => importedColumnMap.get(columnKey))
+    .filter((column): column is ViewerDataTableColumn => Boolean(column));
+
+  if (nextEdits.length === 0 && referencedImportedColumns.length === 0) {
     return { draft: null, issues };
   }
 
   return {
-    draft: createViewerDataTableDraft(sourceId, nextEdits),
+    draft: createViewerDataTableDraft(sourceId, nextEdits, referencedImportedColumns),
     issues,
   };
 }
@@ -385,43 +465,67 @@ function buildStorageKey(sourceId: string) {
   return `${VIEWER_DATA_TABLE_DRAFT_STORAGE_PREFIX}${sourceId}`;
 }
 
+function buildLegacyStorageKey(sourceId: string) {
+  return `${LEGACY_VIEWER_DATA_TABLE_DRAFT_STORAGE_PREFIX}${sourceId}`;
+}
+
 export function readPersistedViewerDataTableDraft(sourceId: string): ViewerDataTableDraft | null {
   if (typeof window === "undefined") {
     return null;
   }
 
-  const text = window.localStorage.getItem(buildStorageKey(sourceId));
-  if (!text) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(text) as PersistedViewerDataTableDraft;
-    if (
-      parsed.version !== VIEWER_DATA_TABLE_DRAFT_VERSION ||
-      parsed.sourceId !== sourceId ||
-      !Array.isArray(parsed.edits)
-    ) {
-      return null;
+  for (const storageKey of [buildStorageKey(sourceId), buildLegacyStorageKey(sourceId)]) {
+    const text = window.localStorage.getItem(storageKey);
+    if (!text) {
+      continue;
     }
 
-    if (parsed.edits.every(isCompactPersistedEdit)) {
+    try {
+      const parsed = JSON.parse(text) as PersistedViewerDataTableDraft;
+      if (
+        (parsed.version !== 1 && parsed.version !== VIEWER_DATA_TABLE_DRAFT_VERSION) ||
+        parsed.sourceId !== sourceId ||
+        !Array.isArray(parsed.edits)
+      ) {
+        continue;
+      }
+
+      if (parsed.edits.every(isCompactPersistedEdit)) {
+        return {
+          version: VIEWER_DATA_TABLE_DRAFT_VERSION,
+          sourceId: parsed.sourceId,
+          updatedAt: parsed.updatedAt,
+          importedColumns:
+            parsed.version === 1
+              ? []
+              : (parsed.importedColumns ?? []).map(normalizeImportedColumn),
+          edits: parsed.edits.map((entry) => ({
+            rowKey: String(entry[0] ?? ""),
+            columnKey: String(entry[1] ?? ""),
+            value: buildViewerDataTableDraftValue(
+              entry[2],
+              (entry[3] ?? null) as ViewerDataTableEditableValueKind | null,
+            ),
+          })),
+        };
+      }
+
       return {
         version: VIEWER_DATA_TABLE_DRAFT_VERSION,
         sourceId: parsed.sourceId,
         updatedAt: parsed.updatedAt,
-        edits: parsed.edits.map((entry) => ({
-          rowKey: String(entry[0] ?? ""),
-          columnKey: String(entry[1] ?? ""),
-          value: buildViewerDataTableDraftValue(entry[2], (entry[3] ?? null) as ViewerDataTableEditableValueKind | null),
-        })),
+        importedColumns:
+          parsed.version === VIEWER_DATA_TABLE_DRAFT_VERSION
+            ? (parsed.importedColumns ?? []).map(normalizeImportedColumn)
+            : [],
+        edits: parsed.edits,
       };
+    } catch {
+      continue;
     }
-
-    return parsed as ViewerDataTableDraft;
-  } catch {
-    return null;
   }
+
+  return null;
 }
 
 export function writePersistedViewerDataTableDraft(draft: ViewerDataTableDraft | null) {
@@ -433,6 +537,7 @@ export function writePersistedViewerDataTableDraft(draft: ViewerDataTableDraft |
     version: draft.version,
     sourceId: draft.sourceId,
     updatedAt: draft.updatedAt,
+    importedColumns: draft.importedColumns.map(normalizeImportedColumn),
     edits: draft.edits.map((edit) => [
       edit.rowKey,
       edit.columnKey,
@@ -461,4 +566,5 @@ export function clearPersistedViewerDataTableDraft(sourceId: string) {
   }
 
   window.localStorage.removeItem(buildStorageKey(sourceId));
+  window.localStorage.removeItem(buildLegacyStorageKey(sourceId));
 }

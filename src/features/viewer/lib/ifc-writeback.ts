@@ -3,10 +3,10 @@
 import type {
   ViewerDataTableColumn,
   ViewerDataTableData,
-  ViewerDataTableDraft,
   ViewerDataTableEdit,
   ViewerDataTableExportStatus,
   ViewerDataTableIssue,
+  ViewerDataTableRow,
 } from "@/features/viewer/types";
 
 type WebIfcModule = {
@@ -26,10 +26,13 @@ type IfcPropertyLine = {
 type IfcPropertySetLine = {
   Name?: unknown;
   HasProperties?: unknown[];
+  expressID?: number;
 };
 
 type IfcElementLine = Record<string, unknown> & {
   OwnerHistory?: unknown;
+  IsDefinedBy?: Array<{ type: number; value: number }>;
+  expressID?: number;
 };
 
 type IfcApiInstance = {
@@ -45,6 +48,7 @@ type IfcApiInstance = {
   Init: () => Promise<void>;
   OpenModel: (bytes: Uint8Array) => number;
   GetLine: (modelId: number, expressId: number, flatten?: boolean, inverse?: boolean) => unknown;
+  GetLineIDsWithType: (modelId: number, type: number) => { size: () => number; get: (index: number) => number };
   GetTypeCodeFromName: (typeName: string) => number;
   CreateIfcEntity: (modelId: number, type: number, ...args: unknown[]) => unknown;
   CreateIfcType: (modelId: number, type: number, value: unknown) => unknown;
@@ -178,7 +182,134 @@ function buildRelDefinesByProperties(
     null,
     [{ type: 5, value: elementId }],
     propertySet,
-  );
+  ) as { expressID?: number };
+}
+
+function appendRelationHandle(
+  handles: Array<{ type: number; value: number }> | undefined,
+  expressId: number,
+) {
+  const nextHandles = Array.isArray(handles) ? [...handles] : [];
+  if (nextHandles.some((handle) => handle.type === 5 && handle.value === expressId)) {
+    return nextHandles;
+  }
+
+  nextHandles.push({ type: 5, value: expressId });
+  return nextHandles;
+}
+
+function readRowGlobalId(row: ViewerDataTableRow) {
+  const globalIdCell = row.cells.globalId;
+  if (!globalIdCell || globalIdCell.state !== "present") {
+    return null;
+  }
+
+  if (typeof globalIdCell.raw === "string" && globalIdCell.raw.trim().length > 0) {
+    return globalIdCell.raw.trim();
+  }
+
+  if (typeof globalIdCell.text === "string" && globalIdCell.text.trim().length > 0) {
+    return globalIdCell.text.trim();
+  }
+
+  return null;
+}
+
+function readLineGlobalId(line: unknown) {
+  if (!line || typeof line !== "object") {
+    return null;
+  }
+
+  const record = line as Record<string, unknown>;
+  const globalId = readWrappedValue(record._guid) ?? readWrappedValue(record.GlobalId);
+  return typeof globalId === "string" && globalId.trim().length > 0 ? globalId.trim() : null;
+}
+
+function buildExpressIdLookupByGlobalId(bytes: Uint8Array) {
+  const text = new TextDecoder().decode(bytes);
+  const lookup = new Map<string, number>();
+  const entityPattern = /#(\d+)\s*=\s*IFC[A-Z0-9_]+\s*\(\s*'([^']+)'/g;
+
+  for (const match of text.matchAll(entityPattern)) {
+    const expressId = Number(match[1]);
+    const globalId = String(match[2] ?? "").trim();
+    if (!globalId || !Number.isFinite(expressId)) {
+      continue;
+    }
+
+    lookup.set(globalId, expressId);
+  }
+
+  return lookup;
+}
+
+function resolveElementExpressId(
+  api: IfcApiInstance,
+  modelId: number,
+  row: ViewerDataTableRow,
+  expressIdLookupByGlobalId: Map<string, number> | null,
+) {
+  const globalId = readRowGlobalId(row);
+
+  const directLine = api.GetLine(modelId, row.localId, false, false);
+  if (!directLine) {
+    if (globalId) {
+      return expressIdLookupByGlobalId?.get(globalId) ?? null;
+    }
+
+    return null;
+  }
+
+  if (!globalId) {
+    return row.localId;
+  }
+
+  if (readLineGlobalId(directLine) === globalId) {
+    return row.localId;
+  }
+
+  if (expressIdLookupByGlobalId?.has(globalId)) {
+    return expressIdLookupByGlobalId.get(globalId) ?? null;
+  }
+
+  if (row.ifcType) {
+    const typeCode = api.GetTypeCodeFromName(row.ifcType);
+    if (Number.isFinite(typeCode) && typeCode > 0) {
+      const ids = api.GetLineIDsWithType(modelId, typeCode);
+      for (let index = 0; index < ids.size(); index += 1) {
+        const expressId = ids.get(index);
+        const line = api.GetLine(modelId, expressId, false, false);
+        if (readLineGlobalId(line) === globalId) {
+          return expressId;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+async function attachPropertySetToElement(
+  api: IfcApiInstance,
+  modelId: number,
+  ownerHistory: unknown,
+  element: IfcElementLine,
+  elementId: number,
+  propertySet: IfcPropertySetLine,
+) {
+  if (typeof propertySet.expressID !== "number") {
+    return false;
+  }
+
+  const relation = buildRelDefinesByProperties(api, modelId, ownerHistory, elementId, propertySet);
+  api.WriteLine(modelId, relation);
+  if (typeof relation.expressID !== "number") {
+    return false;
+  }
+
+  element.IsDefinedBy = appendRelationHandle(element.IsDefinedBy, relation.expressID);
+  api.WriteLine(modelId, element);
+  return true;
 }
 
 async function applyAttributeEdit(
@@ -283,6 +414,7 @@ async function applyPropertyEdit(
       column.binding.label,
       edit.value.raw,
     ) as IfcPropertyLine;
+    api.WriteLine(modelId, property);
 
     if (propertySet) {
       const existingProperties = Array.isArray(propertySet.HasProperties)
@@ -301,8 +433,31 @@ async function applyPropertyEdit(
       column.binding.group,
       [property],
     ) as IfcPropertySetLine;
-    const relation = buildRelDefinesByProperties(api, modelId, ownerHistory, elementId, propertySet);
-    api.WriteLine(modelId, relation);
+    api.WriteLine(modelId, propertySet);
+    if (typeof propertySet.expressID !== "number") {
+      return {
+        rowKey: edit.rowKey,
+        columnKey: edit.columnKey,
+        message: "Failed to create an IFC property set for export.",
+      };
+    }
+
+    const attached = await attachPropertySetToElement(
+      api,
+      modelId,
+      ownerHistory,
+      element,
+      elementId,
+      propertySet,
+    );
+    if (!attached) {
+      return {
+        rowKey: edit.rowKey,
+        columnKey: edit.columnKey,
+        message: "Failed to attach the IFC property set to the element.",
+      };
+    }
+
     return null;
   } catch (error) {
     return {
@@ -314,12 +469,31 @@ async function applyPropertyEdit(
 }
 
 export async function exportEditedIfc(input: {
-  baseData: ViewerDataTableData;
-  draft: ViewerDataTableDraft | null;
+  data: ViewerDataTableData;
   bytes: Uint8Array;
   fileName: string;
 }): Promise<ViewerDataTableExportStatus> {
-  if (!input.draft || input.draft.edits.length === 0) {
+  const liveEdits: ViewerDataTableEdit[] = [];
+  for (const row of input.data.rows) {
+    for (const [columnKey, cell] of Object.entries(row.cells)) {
+      if (cell.source !== "draft") {
+        continue;
+      }
+
+      liveEdits.push({
+        rowKey: row.key,
+        columnKey,
+        value: {
+          raw: cell.raw,
+          text: cell.text,
+          state: cell.state,
+          valueKind: cell.valueKind,
+        },
+      });
+    }
+  }
+
+  if (liveEdits.length === 0) {
     return {
       phase: "error",
       message: "No imported edits are available to export.",
@@ -332,8 +506,9 @@ export async function exportEditedIfc(input: {
   api.SetWasmPath("/wasm/", true);
   await api.Init();
 
-  const rowMap = new Map(input.baseData.rows.map((row) => [row.key, row]));
-  const columnMap = new Map(input.baseData.columns.map((column) => [column.key, column]));
+  const rowMap = new Map(input.data.rows.map((row) => [row.key, row]));
+  const columnMap = new Map(input.data.columns.map((column) => [column.key, column]));
+  let expressIdLookupByGlobalId: Map<string, number> | null = null;
   const issues: ViewerDataTableIssue[] = [];
   let appliedCount = 0;
   let modelId = -1;
@@ -341,7 +516,7 @@ export async function exportEditedIfc(input: {
   try {
     modelId = api.OpenModel(input.bytes);
 
-    for (const edit of input.draft.edits) {
+    for (const edit of liveEdits) {
       const row = rowMap.get(edit.rowKey);
       const column = columnMap.get(edit.columnKey);
       if (!row || !column) {
@@ -349,6 +524,22 @@ export async function exportEditedIfc(input: {
           rowKey: edit.rowKey,
           columnKey: edit.columnKey,
           message: "Skipped an edit because its row or column no longer exists.",
+        });
+        continue;
+      }
+
+      let elementId = resolveElementExpressId(api, modelId, row, null);
+      if (elementId === null) {
+        if (expressIdLookupByGlobalId === null) {
+          expressIdLookupByGlobalId = buildExpressIdLookupByGlobalId(input.bytes);
+        }
+        elementId = resolveElementExpressId(api, modelId, row, expressIdLookupByGlobalId);
+      }
+      if (elementId === null) {
+        issues.push({
+          rowKey: edit.rowKey,
+          columnKey: edit.columnKey,
+          message: `The IFC element could not be resolved for export${readRowGlobalId(row) ? ` (GlobalId: ${readRowGlobalId(row)})` : ""}.`,
         });
         continue;
       }
@@ -364,8 +555,8 @@ export async function exportEditedIfc(input: {
 
       const issue =
         column.binding.kind === "attribute"
-          ? await applyAttributeEdit(api, modelId, row.localId, column, edit)
-          : await applyPropertyEdit(api, modelId, row.localId, column, edit);
+          ? await applyAttributeEdit(api, modelId, elementId, column, edit)
+          : await applyPropertyEdit(api, modelId, elementId, column, edit);
       if (issue) {
         issues.push(issue);
         continue;
@@ -378,10 +569,10 @@ export async function exportEditedIfc(input: {
     downloadBytes(bytes, input.fileName, "application/octet-stream");
 
     return {
-      phase: issues.length > 0 ? "success" : "success",
+      phase: "success",
       message:
         issues.length > 0
-          ? `Exported IFC with ${appliedCount} applied edits and ${issues.length} skipped edits.`
+          ? `Exported IFC with ${appliedCount} applied edits and ${issues.length} skipped edits. ${issues[0]?.message ?? ""}`.trim()
           : `Exported IFC with ${appliedCount} applied edits.`,
       issues,
     };

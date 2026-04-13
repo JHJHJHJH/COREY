@@ -9,17 +9,20 @@ import type {
   ViewerDataTableData,
   ViewerDataTableDraft,
   ViewerDataTableEdit,
+  ViewerDataTableEditableValueKind,
   ViewerDataTableImportReport,
   ViewerDataTableIssue,
   ViewerValidationDiagnosisReport,
 } from "@/features/viewer/types";
 
-const VIEWER_DATA_TABLE_WORKBOOK_VERSION = 1;
+const VIEWER_DATA_TABLE_WORKBOOK_VERSION = 2;
 const DATA_SHEET_NAME = "Data Table";
 const META_SHEET_NAME = "_corey_meta";
 const DIAGNOSIS_CLAUSES_SHEET_NAME = "Clause Summary";
 const DIAGNOSIS_ELEMENTS_SHEET_NAME = "Element Failures";
 const TECHNICAL_COLUMNS = ["__rowKey", "__modelId", "__localId"] as const;
+const IMPORTED_COLUMN_FALLBACK_GROUP = "Excel Import";
+const WORKBOOK_GROUP_DELIMITER = "|||";
 
 type SheetJsModule = {
   read: (data: ArrayBuffer | Uint8Array, options: Record<string, unknown>) => Workbook;
@@ -59,6 +62,8 @@ type ColumnMetaRow = {
   bindingName: string;
   bindingGroup: string;
   bindingLabel: string;
+  origin: string;
+  importHeader: string;
 };
 
 async function loadSheetJs(): Promise<SheetJsModule> {
@@ -110,7 +115,7 @@ function getWorkbookColumnHeader(column: ViewerDataTableColumn) {
     return column.label;
   }
 
-  return `${column.group} - ${column.label}`;
+  return `${column.group}${WORKBOOK_GROUP_DELIMITER}${column.label}`;
 }
 
 function buildMetaRows(sourceId: string, columns: ViewerDataTableColumn[]) {
@@ -132,6 +137,8 @@ function buildMetaRows(sourceId: string, columns: ViewerDataTableColumn[]) {
       "bindingName",
       "bindingGroup",
       "bindingLabel",
+      "origin",
+      "importHeader",
     ],
   ];
 
@@ -148,6 +155,8 @@ function buildMetaRows(sourceId: string, columns: ViewerDataTableColumn[]) {
       column.binding?.kind === "attribute" ? column.binding.name : "",
       column.binding?.kind === "property" ? column.binding.group : "",
       column.binding?.kind === "property" ? column.binding.label : "",
+      column.origin,
+      column.importHeader ?? "",
     ]);
   }
 
@@ -188,6 +197,8 @@ function parseMetaRows(rows: unknown[][]) {
       bindingName: String(row[8] ?? ""),
       bindingGroup: String(row[9] ?? ""),
       bindingLabel: String(row[10] ?? ""),
+      origin: String(row[11] ?? ""),
+      importHeader: String(row[12] ?? ""),
     });
   }
 
@@ -200,6 +211,159 @@ function normalizeDisplayValue(value: unknown) {
   }
 
   return String(value);
+}
+
+function isEmptyWorkbookImportValue(value: unknown) {
+  return value === undefined || value === null || (typeof value === "string" && value.trim().length === 0);
+}
+
+function buildPropertyColumnKey(group: string, label: string) {
+  return `property:${group}::${label}`;
+}
+
+function buildDelimitedHeader(group: string, label: string) {
+  return `${group}${WORKBOOK_GROUP_DELIMITER}${label}`;
+}
+
+function parseImportedColumnHeader(header: string) {
+  const delimiters = [WORKBOOK_GROUP_DELIMITER, "-"];
+
+  for (const delimiter of delimiters) {
+    const delimiterIndex = header.indexOf(delimiter);
+    if (delimiterIndex <= 0) {
+      continue;
+    }
+
+    const group = header.slice(0, delimiterIndex).trim();
+    const label = header.slice(delimiterIndex + delimiter.length).trim();
+    if (!group || !label) {
+      continue;
+    }
+
+    return {
+      group,
+      label,
+    };
+  }
+
+  return {
+    group: IMPORTED_COLUMN_FALLBACK_GROUP,
+    label: header.trim(),
+  };
+}
+
+function isBooleanLikeValue(value: unknown) {
+  if (typeof value === "boolean") {
+    return true;
+  }
+
+  if (typeof value === "number") {
+    return value === 0 || value === 1;
+  }
+
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return ["true", "false", "yes", "no", "y", "n", "1", "0"].includes(normalized);
+}
+
+function isNumericLikeValue(value: unknown) {
+  if (typeof value === "number") {
+    return Number.isFinite(value);
+  }
+
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  if (value.trim().length === 0) {
+    return false;
+  }
+
+  return Number.isFinite(Number(value.trim()));
+}
+
+function inferImportedColumnValueKind(values: unknown[]): ViewerDataTableEditableValueKind | null {
+  if (values.length === 0) {
+    return null;
+  }
+
+  if (values.every((value) => isBooleanLikeValue(value))) {
+    return "boolean";
+  }
+
+  if (values.every((value) => isNumericLikeValue(value))) {
+    return "number";
+  }
+
+  return "string";
+}
+
+function buildImportedColumnFromHeader(
+  header: string,
+  values: unknown[],
+): ViewerDataTableColumn | null {
+  const trimmedHeader = header.trim();
+  if (!trimmedHeader) {
+    return null;
+  }
+
+  const valueKind = inferImportedColumnValueKind(values);
+  if (!valueKind) {
+    return null;
+  }
+
+  const { group, label } = parseImportedColumnHeader(trimmedHeader);
+
+  return {
+    key: buildPropertyColumnKey(group, label),
+    label,
+    kind: "property",
+    group,
+    populatedRowCount: values.length,
+    editable: true,
+    editableReason: null,
+    binding: {
+      kind: "property",
+      group,
+      label,
+    },
+    valueKind,
+    origin: "import",
+    importHeader: buildDelimitedHeader(group, label),
+  };
+}
+
+function buildImportedColumnFromMeta(metaColumn: ColumnMetaRow): ViewerDataTableColumn | null {
+  const importHeader = metaColumn.importHeader || metaColumn.header;
+  const bindingGroup = metaColumn.bindingGroup || metaColumn.group || IMPORTED_COLUMN_FALLBACK_GROUP;
+  const bindingLabel = metaColumn.bindingLabel || metaColumn.label || importHeader;
+  if (!importHeader || !bindingLabel) {
+    return null;
+  }
+
+  return {
+    key: metaColumn.columnKey || buildPropertyColumnKey(bindingGroup, bindingLabel),
+    label: metaColumn.label || bindingLabel,
+    kind: "property",
+    group: metaColumn.group || bindingGroup,
+    populatedRowCount: 0,
+    editable: metaColumn.editable !== "false",
+    editableReason: metaColumn.editable === "false" ? "This column is read-only." : null,
+    binding: {
+      kind: "property",
+      group: bindingGroup,
+      label: bindingLabel,
+    },
+    valueKind:
+      metaColumn.valueKind === "number" || metaColumn.valueKind === "boolean"
+        ? metaColumn.valueKind
+        : "string",
+    origin: "import",
+    importHeader: buildDelimitedHeader(bindingGroup, bindingLabel),
+  };
 }
 
 function buildDiagnosisClauseRows(report: ViewerValidationDiagnosisReport) {
@@ -374,7 +538,7 @@ export async function importViewerDataTableFromExcel(input: {
   const version = Number(settings.get("version") ?? Number.NaN);
   const workbookSourceId = settings.get("sourceId") ?? "";
 
-  if (version !== VIEWER_DATA_TABLE_WORKBOOK_VERSION) {
+  if (![1, VIEWER_DATA_TABLE_WORKBOOK_VERSION].includes(version)) {
     throw new Error(`Workbook version ${String(settings.get("version") ?? "unknown")} is not supported.`);
   }
 
@@ -390,8 +554,15 @@ export async function importViewerDataTableFromExcel(input: {
   });
   const headerRow = rows[0] ?? [];
   const headerIndex = new Map<string, number>();
+  const duplicateHeaders = new Set<string>();
   for (const [index, value] of headerRow.entries()) {
-    headerIndex.set(String(value), index);
+    const header = String(value ?? "");
+    if (headerIndex.has(header)) {
+      duplicateHeaders.add(header);
+      continue;
+    }
+
+    headerIndex.set(header, index);
   }
 
   for (const requiredColumn of TECHNICAL_COLUMNS) {
@@ -402,9 +573,99 @@ export async function importViewerDataTableFromExcel(input: {
 
   const baseRowMap = new Map(input.baseData.rows.map((row) => [row.key, row]));
   const currentRowMap = new Map(input.currentData.rows.map((row) => [row.key, row]));
-  const columnMap = new Map(input.baseData.columns.map((column) => [column.key, column]));
+  const baseColumnMap = new Map(input.baseData.columns.map((column) => [column.key, column]));
+  const currentColumnMap = new Map(input.currentData.columns.map((column) => [column.key, column]));
   const edits: ViewerDataTableEdit[] = [];
   const issues: ViewerDataTableIssue[] = [];
+  const importedColumnMap = new Map<string, ViewerDataTableColumn>();
+  const knownHeaders = new Set(metaColumns.map((metaColumn) => metaColumn.header));
+  const workbookColumns: Array<{ header: string; column: ViewerDataTableColumn }> = [];
+
+  for (const duplicateHeader of duplicateHeaders) {
+    if (TECHNICAL_COLUMNS.includes(duplicateHeader as (typeof TECHNICAL_COLUMNS)[number])) {
+      continue;
+    }
+
+    issues.push({
+      rowKey: null,
+      columnKey: null,
+      message: `Skipped duplicate workbook column "${duplicateHeader}".`,
+    });
+  }
+
+  for (const metaColumn of metaColumns) {
+    const existingColumn =
+      currentColumnMap.get(metaColumn.columnKey) ?? baseColumnMap.get(metaColumn.columnKey);
+    const resolvedImportedColumn =
+      metaColumn.origin === "import" ? buildImportedColumnFromMeta(metaColumn) : null;
+    const column = existingColumn ?? resolvedImportedColumn;
+    if (!column) {
+      issues.push({
+        rowKey: null,
+        columnKey: metaColumn.columnKey,
+        message: "Skipped a column that no longer exists.",
+      });
+      continue;
+    }
+
+    if (duplicateHeaders.has(metaColumn.header)) {
+      continue;
+    }
+
+    if (!headerIndex.has(metaColumn.header)) {
+      continue;
+    }
+
+    workbookColumns.push({
+      header: metaColumn.header,
+      column,
+    });
+
+    if (column.origin === "import") {
+      importedColumnMap.set(column.key, column);
+    }
+  }
+
+  for (const [header, columnIndex] of headerIndex.entries()) {
+    if (!header || TECHNICAL_COLUMNS.includes(header as (typeof TECHNICAL_COLUMNS)[number]) || knownHeaders.has(header)) {
+      continue;
+    }
+
+    if (duplicateHeaders.has(header)) {
+      continue;
+    }
+
+    const values = rows
+      .slice(1)
+      .map((row) => row[columnIndex])
+      .filter((value) => normalizeDisplayValue(value).length > 0);
+    const candidateColumn = buildImportedColumnFromHeader(header, values);
+    if (!candidateColumn) {
+      continue;
+    }
+
+    const existingColumn =
+      currentColumnMap.get(candidateColumn.key) ?? baseColumnMap.get(candidateColumn.key);
+    const column = existingColumn ?? candidateColumn;
+
+    if (workbookColumns.some((entry) => entry.column.key === column.key)) {
+      issues.push({
+        rowKey: null,
+        columnKey: column.key,
+        message: `Skipped workbook column "${header}" because another column already maps to the same IFC property.`,
+      });
+      continue;
+    }
+
+    workbookColumns.push({
+      header,
+      column,
+    });
+
+    if (column.origin === "import") {
+      importedColumnMap.set(column.key, column);
+    }
+  }
 
   for (const row of rows.slice(1)) {
     const rowKey = String(row[headerIndex.get("__rowKey") ?? -1] ?? "").trim();
@@ -423,23 +684,18 @@ export async function importViewerDataTableFromExcel(input: {
       continue;
     }
 
-    for (const metaColumn of metaColumns) {
-      const column = columnMap.get(metaColumn.columnKey);
-      if (!column) {
-        issues.push({
-          rowKey,
-          columnKey: metaColumn.columnKey,
-          message: "Skipped a column that no longer exists.",
-        });
-        continue;
-      }
-
-      const columnIndex = headerIndex.get(metaColumn.header);
+    for (const workbookColumn of workbookColumns) {
+      const column = workbookColumn.column;
+      const columnIndex = headerIndex.get(workbookColumn.header);
       if (typeof columnIndex === "undefined") {
         continue;
       }
 
       const workbookValue = row[columnIndex];
+      if (isEmptyWorkbookImportValue(workbookValue)) {
+        continue;
+      }
+
       if (!column.editable) {
         if (normalizeDisplayValue(workbookValue) !== normalizeDisplayValue(toWorkbookCellValue(currentRow, column))) {
           issues.push({
@@ -484,8 +740,13 @@ export async function importViewerDataTableFromExcel(input: {
     }
   }
 
+  const importedColumns = [...new Set(edits.map((edit) => edit.columnKey))]
+    .map((columnKey) => importedColumnMap.get(columnKey))
+    .filter((column): column is ViewerDataTableColumn => Boolean(column));
   const draft: ViewerDataTableDraft | null =
-    edits.length > 0 ? createViewerDataTableDraft(input.sourceId, edits) : null;
+    edits.length > 0 || importedColumns.length > 0
+      ? createViewerDataTableDraft(input.sourceId, edits, importedColumns)
+      : null;
 
   return {
     draft,

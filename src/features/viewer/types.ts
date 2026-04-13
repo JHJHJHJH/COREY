@@ -242,6 +242,8 @@ export interface ViewerDataTableCell {
 
 export type ViewerDataTableColumnKind = "base" | "attribute" | "property";
 
+export type ViewerDataTableColumnOrigin = "ifc" | "import";
+
 export interface ViewerDataTableColumn {
   key: string;
   label: string;
@@ -252,6 +254,8 @@ export interface ViewerDataTableColumn {
   editableReason: string | null;
   binding: ViewerDataTableColumnBinding | null;
   valueKind: ViewerDataTableEditableValueKind | null;
+  origin: ViewerDataTableColumnOrigin;
+  importHeader: string | null;
 }
 
 export interface ViewerDataTableRow {
@@ -301,9 +305,10 @@ export interface ViewerDataTableEdit {
 }
 
 export interface ViewerDataTableDraft {
-  version: 1;
+  version: 2;
   sourceId: string;
   updatedAt: string;
+  importedColumns: ViewerDataTableColumn[];
   edits: ViewerDataTableEdit[];
 }
 

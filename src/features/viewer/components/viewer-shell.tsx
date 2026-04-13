@@ -55,6 +55,7 @@ import {
   importViewerDataTableFromExcel,
 } from "@/features/viewer/lib/data-table-excel";
 import {
+  applyViewerDataTableToInspection,
   buildViewerTreeDebugSample,
   formatBytes,
   sanitizeViewerDebugValue,
@@ -724,9 +725,12 @@ export function ViewerShell() {
   const validatedSelectionDetails = useMemo<ViewerSelectionDetails>(
     () => ({
       ...selectionDetails,
-      inspection: applyViewerValidationToInspection(selectionDetails.inspection, deferredClauses),
+      inspection: applyViewerValidationToInspection(
+        applyViewerDataTableToInspection(selectionDetails.inspection, effectiveDataTableData),
+        deferredClauses,
+      ),
     }),
-    [deferredClauses, selectionDetails],
+    [deferredClauses, effectiveDataTableData, selectionDetails],
   );
   const validationDiagnosisReport = useMemo<ViewerValidationDiagnosisReport | null>(
     () =>
@@ -817,7 +821,8 @@ export function ViewerShell() {
     setDataTableDraft(persistedDraft);
     setDataTableImportReport(null);
     setDataTableActionStatus(
-      persistedDraft && persistedDraft.edits.length > 0
+      persistedDraft &&
+        (persistedDraft.edits.length > 0 || persistedDraft.importedColumns.length > 0)
         ? {
             phase: "success",
             message: `Restored ${persistedDraft.edits.length} imported edits from local draft storage.`,
@@ -1725,7 +1730,7 @@ export function ViewerShell() {
   }, [metadata?.sourceId]);
 
   const handleExportEditedIfc = useCallback(async () => {
-    if (!dataTableState.data || !metadata || !activeSourceRef.current) {
+    if (!effectiveDataTableData || !metadata || !activeSourceRef.current) {
       setDataTableActionStatus({
         phase: "error",
         message: "Load a model before exporting an edited IFC.",
@@ -1741,13 +1746,12 @@ export function ViewerShell() {
     });
 
     const result = await exportEditedIfc({
-      baseData: dataTableState.data,
-      draft: dataTableDraft,
+      data: effectiveDataTableData,
       bytes: activeSourceRef.current.bytes,
       fileName: buildViewerDataTableIfcFileName(metadata.name),
     });
     setDataTableActionStatus(result);
-  }, [dataTableDraft, dataTableState.data, metadata]);
+  }, [effectiveDataTableData, metadata]);
 
   const startDrawerResize = (side: DrawerSide) => (event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -1990,16 +1994,6 @@ export function ViewerShell() {
           disabled={draftEditCount === 0 || dataTableActionStatus.phase === "running"}
         >
           <FileOutput className="h-4 w-4" />
-        </HeaderActionButton>
-        <HeaderActionButton
-          label={isDataTableDetached ? "Show inline" : "Open window"}
-          onClick={isDataTableDetached ? showDataTableDialog : showDataTableWindow}
-        >
-          {isDataTableDetached ? (
-            <Download className="h-4 w-4" />
-          ) : (
-            <SquareArrowOutUpRight className="h-4 w-4" />
-          )}
         </HeaderActionButton>
         <HeaderActionButton
           label="Close"

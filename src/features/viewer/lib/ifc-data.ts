@@ -49,6 +49,8 @@ const VIEWER_DATA_TABLE_BASE_COLUMNS = [
       name: "type",
     } satisfies ViewerDataTableColumnBinding,
     valueKind: "string" satisfies ViewerDataTableEditableValueKind,
+    origin: "ifc" as const,
+    importHeader: null,
   },
   {
     key: "globalId",
@@ -62,6 +64,8 @@ const VIEWER_DATA_TABLE_BASE_COLUMNS = [
       name: "_guid",
     } satisfies ViewerDataTableColumnBinding,
     valueKind: "string" satisfies ViewerDataTableEditableValueKind,
+    origin: "ifc" as const,
+    importHeader: null,
   },
   {
     key: "name",
@@ -75,6 +79,8 @@ const VIEWER_DATA_TABLE_BASE_COLUMNS = [
       name: "Name",
     } satisfies ViewerDataTableColumnBinding,
     valueKind: "string" satisfies ViewerDataTableEditableValueKind,
+    origin: "ifc" as const,
+    importHeader: null,
   },
 ] satisfies ReadonlyArray<Omit<ViewerDataTableColumn, "populatedRowCount">>;
 
@@ -301,6 +307,50 @@ function buildRow(
     target,
     value: buildInspectionValue(exists, value, missingText),
   } satisfies ViewerInspectionRow;
+}
+
+function toInspectionValueFromDataTableCell(cell: ViewerDataTableCell): ViewerInspectionValue {
+  return {
+    raw: cell.raw,
+    text: cell.text,
+    state: cell.state,
+    validation: null,
+  };
+}
+
+function matchesInspectionTarget(
+  target: ViewerValidationTarget | null,
+  binding: ViewerDataTableColumnBinding | null,
+) {
+  if (!target || !binding || target.kind !== binding.kind) {
+    return false;
+  }
+
+  if (target.kind === "attribute" && binding.kind === "attribute") {
+    return target.name === binding.name;
+  }
+
+  if (target.kind === "property" && binding.kind === "property") {
+    return target.group === binding.group && target.label === binding.label;
+  }
+
+  return false;
+}
+
+function computeInspectionIssueCount(
+  summaryRows: ViewerInspectionRow[],
+  propertySets: ViewerInspectionGroup[],
+) {
+  return (
+    summaryRows.reduce((count, row) => count + Number(row.value.state !== "present"), 0) +
+    propertySets.reduce((count, group) => {
+      const rowIssueCount = group.rows.reduce(
+        (groupCount, row) => groupCount + Number(row.value.state !== "present"),
+        0,
+      );
+      return count + rowIssueCount + Number(group.rows.length === 0);
+    }, 0)
+  );
 }
 
 function getDirectPropertyValueEntries(item: ItemData) {
@@ -546,6 +596,124 @@ export function buildSelectionInspection(
   };
 }
 
+export function applyViewerDataTableToInspection(
+  inspection: ViewerElementInspection | null,
+  data: ViewerDataTableData | null,
+): ViewerElementInspection | null {
+  if (!inspection || !data) {
+    return inspection;
+  }
+
+  const rowKey = `${inspection.modelId}:${inspection.localId}`;
+  const row = data.rows.find((entry) => entry.key === rowKey);
+  if (!row) {
+    return inspection;
+  }
+
+  const columnMap = new Map(data.columns.map((column) => [column.key, column]));
+  const appliedColumnKeys = new Set<string>();
+
+  const summaryRows = inspection.summaryRows.map((summaryRow) => {
+    for (const [columnKey, cell] of Object.entries(row.cells)) {
+      const column = columnMap.get(columnKey);
+      if (!column || !matchesInspectionTarget(summaryRow.target, column.binding)) {
+        continue;
+      }
+
+      appliedColumnKeys.add(columnKey);
+      return {
+        ...summaryRow,
+        value: toInspectionValueFromDataTableCell(cell),
+      };
+    }
+
+    return summaryRow;
+  });
+
+  const propertySets = inspection.propertySets.map((group) => {
+    const nextRows = group.rows.map((groupRow) => {
+      for (const [columnKey, cell] of Object.entries(row.cells)) {
+        const column = columnMap.get(columnKey);
+        if (!column || !matchesInspectionTarget(groupRow.target, column.binding)) {
+          continue;
+        }
+
+        appliedColumnKeys.add(columnKey);
+        return {
+          ...groupRow,
+          value: toInspectionValueFromDataTableCell(cell),
+        };
+      }
+
+      return groupRow;
+    });
+
+    return {
+      ...group,
+      rows: nextRows,
+      issueCount: nextRows.reduce((count, groupRow) => count + Number(groupRow.value.state !== "present"), 0) + Number(nextRows.length === 0),
+    };
+  });
+
+  const propertySetMap = new Map(propertySets.map((group) => [group.title, group]));
+  const importedColumns = data.columns.filter(
+    (column) =>
+      column.origin === "import" &&
+      column.binding?.kind === "property" &&
+      row.cells[column.key] &&
+      !appliedColumnKeys.has(column.key),
+  );
+
+  for (const column of importedColumns) {
+    const cell = row.cells[column.key];
+    const binding = column.binding;
+    if (!cell || !binding || binding.kind !== "property") {
+      continue;
+    }
+
+    const existingGroup = propertySetMap.get(binding.group);
+    const nextRow = {
+      key: `${binding.group}:${binding.label}:import`,
+      label: binding.label,
+      target: {
+        kind: "property",
+        group: binding.group,
+        label: binding.label,
+      } satisfies ViewerValidationTarget,
+      value: toInspectionValueFromDataTableCell(cell),
+    } satisfies ViewerInspectionRow;
+
+    if (existingGroup) {
+      if (existingGroup.rows.some((groupRow) => groupRow.label === binding.label)) {
+        continue;
+      }
+
+      existingGroup.rows = [...existingGroup.rows, nextRow];
+      existingGroup.issueCount =
+        existingGroup.rows.reduce((count, groupRow) => count + Number(groupRow.value.state !== "present"), 0) +
+        Number(existingGroup.rows.length === 0);
+      continue;
+    }
+
+    const nextGroup = {
+      key: `${binding.group}:import`,
+      title: binding.group,
+      subtitle: "IFCPROPERTYSET",
+      rows: [nextRow],
+      issueCount: Number(nextRow.value.state !== "present"),
+    } satisfies ViewerInspectionGroup;
+    propertySets.push(nextGroup);
+    propertySetMap.set(nextGroup.title, nextGroup);
+  }
+
+  return {
+    ...inspection,
+    summaryRows,
+    propertySets,
+    issueCount: computeInspectionIssueCount(summaryRows, propertySets),
+  };
+}
+
 function ensureViewerDataTableColumn(
   columnMap: Map<string, ViewerDataTableColumn>,
   column: Omit<ViewerDataTableColumn, "populatedRowCount">,
@@ -744,6 +912,8 @@ function buildViewerDataTableRow(
         name: key,
       },
       valueKind: getViewerDataTableValueKind(value.value),
+      origin: "ifc",
+      importHeader: null,
     });
     cells[column.key] = mergeViewerDataTableCell(
       cells[column.key],
@@ -771,6 +941,8 @@ function buildViewerDataTableRow(
           label: row.label,
         },
         valueKind: rowValueKind,
+        origin: "ifc",
+        importHeader: null,
       });
       cells[column.key] = mergeViewerDataTableCell(
         cells[column.key],
