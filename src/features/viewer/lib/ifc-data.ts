@@ -1719,6 +1719,43 @@ function finalizeViewerGraphData(input: {
   } satisfies ViewerGraphData;
 }
 
+type ViewerGraphIndexes = {
+  nodeByKey: Map<string, ViewerGraphNode>;
+  nodeKeyByLocalId: Map<number, string>;
+  expandableNodeKeys: Set<string>;
+};
+
+const viewerGraphIndexCache = new WeakMap<ViewerGraphData, ViewerGraphIndexes>();
+
+function getViewerGraphIndexes(graph: ViewerGraphData): ViewerGraphIndexes {
+  const cached = viewerGraphIndexCache.get(graph);
+  if (cached) {
+    return cached;
+  }
+
+  const nodeByKey = new Map<string, ViewerGraphNode>();
+  const nodeKeyByLocalId = new Map<number, string>();
+  const expandableNodeKeys = new Set<string>();
+
+  for (const node of graph.nodes) {
+    nodeByKey.set(node.key, node);
+    if (node.localId !== null) {
+      nodeKeyByLocalId.set(node.localId, node.key);
+    }
+    if (node.childKeys.length > 0) {
+      expandableNodeKeys.add(node.key);
+    }
+  }
+
+  const indexes = {
+    nodeByKey,
+    nodeKeyByLocalId,
+    expandableNodeKeys,
+  } satisfies ViewerGraphIndexes;
+  viewerGraphIndexCache.set(graph, indexes);
+  return indexes;
+}
+
 export function buildViewerGraphData(input: {
   tree: ViewerTreeNode[];
   data: ViewerDataTableData | null;
@@ -1808,7 +1845,7 @@ export function buildViewerGraphData(input: {
 }
 
 export function getViewerGraphExpandableNodeKeys(graph: ViewerGraphData) {
-  return new Set(graph.nodes.filter((node) => node.childKeys.length > 0).map((node) => node.key));
+  return new Set(getViewerGraphIndexes(graph).expandableNodeKeys);
 }
 
 export function getDefaultViewerGraphCollapsedKeys(
@@ -1830,7 +1867,7 @@ export function getViewerGraphSelectedNodeKey(
     return null;
   }
 
-  return graph.nodes.find((node) => node.localId === selectedLocalId)?.key ?? null;
+  return getViewerGraphIndexes(graph).nodeKeyByLocalId.get(selectedLocalId) ?? null;
 }
 
 export function getViewerGraphNodePathKeys(graph: ViewerGraphData, nodeKey: string | null) {
@@ -1839,7 +1876,7 @@ export function getViewerGraphNodePathKeys(graph: ViewerGraphData, nodeKey: stri
     return pathKeys;
   }
 
-  const nodeByKey = new Map(graph.nodes.map((node) => [node.key, node]));
+  const { nodeByKey } = getViewerGraphIndexes(graph);
   let current = nodeByKey.get(nodeKey) ?? null;
 
   while (current) {
@@ -1864,7 +1901,7 @@ export function buildViewerGraphView(
     1,
     options.maxVisibleNodes ?? DEFAULT_VIEWER_GRAPH_MAX_VISIBLE_NODES,
   );
-  const nodeByKey = new Map(graph.nodes.map((node) => [node.key, node]));
+  const { nodeByKey } = getViewerGraphIndexes(graph);
   const matchedNodeKeys = new Set<string>();
   const searchVisibleKeys = new Set<string>();
   const addPathKeys = (nodeKey: string | null, collector: Set<string>) => {

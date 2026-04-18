@@ -10,7 +10,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   buildViewerGraphView,
   formatBytes,
@@ -222,40 +222,52 @@ export function ElementRelationshipGraph({
 }: ElementRelationshipGraphProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const graphSignature = useMemo(() => buildGraphSignature(graph), [graph]);
-  const [graphUiState, setGraphUiState] = useState(() => ({
-    graphSignature,
-    query: "",
-    zoom: 1,
-    collapsedKeys: getDefaultViewerGraphCollapsedKeys(graph),
+  const [graphUiStateBySignature, setGraphUiStateBySignature] = useState(() => ({
+    [graphSignature]: {
+      query: "",
+      zoom: 1,
+      collapsedKeys: getDefaultViewerGraphCollapsedKeys(graph),
+    },
   }));
+  const [isGraphTransitionPending, startGraphTransition] = useTransition();
   const activeGraphUiState =
-    graphUiState.graphSignature === graphSignature
-      ? graphUiState
-      : {
-          graphSignature,
-          query: "",
-          zoom: 1,
-          collapsedKeys: getDefaultViewerGraphCollapsedKeys(graph),
-        };
+    graphUiStateBySignature[graphSignature] ?? {
+      query: "",
+      zoom: 1,
+      collapsedKeys: getDefaultViewerGraphCollapsedKeys(graph),
+    };
   const { query, zoom } = activeGraphUiState;
   const deferredQuery = useDeferredValue(query);
 
   const updateGraphUiState = useCallback(
-    (updater: (current: typeof activeGraphUiState) => typeof activeGraphUiState) => {
-      setGraphUiState((current) => {
-        const base =
-          current.graphSignature === graphSignature
-            ? current
-            : {
-                graphSignature,
-                query: "",
-                zoom: 1,
-                collapsedKeys: getDefaultViewerGraphCollapsedKeys(graph),
-              };
-        return updater(base);
-      });
+    (
+      updater: (current: typeof activeGraphUiState) => typeof activeGraphUiState,
+      options?: { deferred?: boolean },
+    ) => {
+      const applyUpdate = () => {
+        setGraphUiStateBySignature((current) => {
+          const base =
+            current[graphSignature] ?? {
+              query: "",
+              zoom: 1,
+              collapsedKeys: getDefaultViewerGraphCollapsedKeys(graph),
+            };
+
+          return {
+            ...current,
+            [graphSignature]: updater(base),
+          };
+        });
+      };
+
+      if (options?.deferred) {
+        startGraphTransition(applyUpdate);
+        return;
+      }
+
+      applyUpdate();
     },
-    [graph, graphSignature],
+    [graph, graphSignature, startGraphTransition],
   );
 
   const selectedNodeKey = useMemo(
@@ -328,43 +340,55 @@ export function ElementRelationshipGraph({
 
   const toggleNode = useCallback(
     (nodeKey: string) => {
-      updateGraphUiState((current) => {
-        const next = new Set(current.collapsedKeys);
-        if (next.has(nodeKey)) {
-          next.delete(nodeKey);
-        } else {
-          next.add(nodeKey);
-        }
-        return {
-          ...current,
-          collapsedKeys: next,
-        };
-      });
+      updateGraphUiState(
+        (current) => {
+          const next = new Set(current.collapsedKeys);
+          if (next.has(nodeKey)) {
+            next.delete(nodeKey);
+          } else {
+            next.add(nodeKey);
+          }
+          return {
+            ...current,
+            collapsedKeys: next,
+          };
+        },
+        { deferred: true },
+      );
     },
     [updateGraphUiState],
   );
 
   const collapseAll = useCallback(() => {
-    updateGraphUiState((current) => ({
-      ...current,
-      collapsedKeys: getViewerGraphExpandableNodeKeys(graph),
-    }));
+    updateGraphUiState(
+      (current) => ({
+        ...current,
+        collapsedKeys: getViewerGraphExpandableNodeKeys(graph),
+      }),
+      { deferred: true },
+    );
   }, [graph, updateGraphUiState]);
 
   const expandAll = useCallback(() => {
-    updateGraphUiState((current) => ({
-      ...current,
-      collapsedKeys: new Set(),
-    }));
+    updateGraphUiState(
+      (current) => ({
+        ...current,
+        collapsedKeys: new Set(),
+      }),
+      { deferred: true },
+    );
   }, [updateGraphUiState]);
 
   const resetGraph = useCallback(() => {
-    updateGraphUiState((current) => ({
-      ...current,
-      query: "",
-      zoom: 1,
-      collapsedKeys: getDefaultViewerGraphCollapsedKeys(graph),
-    }));
+    updateGraphUiState(
+      (current) => ({
+        ...current,
+        query: "",
+        zoom: 1,
+        collapsedKeys: getDefaultViewerGraphCollapsedKeys(graph),
+      }),
+      { deferred: true },
+    );
   }, [graph, updateGraphUiState]);
 
   const focusSelection = useCallback(() => {
@@ -372,31 +396,40 @@ export function ElementRelationshipGraph({
       return;
     }
 
-    updateGraphUiState((current) => {
-      const next = new Set(current.collapsedKeys);
-      for (const pathKey of selectedPathKeys) {
-        next.delete(pathKey);
-      }
-      return {
-        ...current,
-        query: "",
-        collapsedKeys: next,
-      };
-    });
+    updateGraphUiState(
+      (current) => {
+        const next = new Set(current.collapsedKeys);
+        for (const pathKey of selectedPathKeys) {
+          next.delete(pathKey);
+        }
+        return {
+          ...current,
+          query: "",
+          collapsedKeys: next,
+        };
+      },
+      { deferred: true },
+    );
   }, [selectedNodeKey, selectedPathKeys, updateGraphUiState]);
 
   const zoomOut = useCallback(() => {
-    updateGraphUiState((current) => ({
-      ...current,
-      zoom: clamp(current.zoom - GRAPH_ZOOM_STEP, MIN_GRAPH_ZOOM, MAX_GRAPH_ZOOM),
-    }));
+    updateGraphUiState(
+      (current) => ({
+        ...current,
+        zoom: clamp(current.zoom - GRAPH_ZOOM_STEP, MIN_GRAPH_ZOOM, MAX_GRAPH_ZOOM),
+      }),
+      { deferred: true },
+    );
   }, [updateGraphUiState]);
 
   const zoomIn = useCallback(() => {
-    updateGraphUiState((current) => ({
-      ...current,
-      zoom: clamp(current.zoom + GRAPH_ZOOM_STEP, MIN_GRAPH_ZOOM, MAX_GRAPH_ZOOM),
-    }));
+    updateGraphUiState(
+      (current) => ({
+        ...current,
+        zoom: clamp(current.zoom + GRAPH_ZOOM_STEP, MIN_GRAPH_ZOOM, MAX_GRAPH_ZOOM),
+      }),
+      { deferred: true },
+    );
   }, [updateGraphUiState]);
 
   const hasGraph = graph.totalNodeCount > 0;
@@ -424,6 +457,7 @@ export function ElementRelationshipGraph({
             <span>{graphView.nodes.length} rendered</span>
             <span>{visibleElementCount} selectable</span>
             {searchActive ? <span>{graphView.matchCount} matches</span> : null}
+            {isGraphTransitionPending ? <span>Updating graph…</span> : null}
             {graphView.omittedNodeCount > 0 ? (
               <span>{graphView.omittedNodeCount} over render cap</span>
             ) : null}
@@ -464,25 +498,45 @@ export function ElementRelationshipGraph({
             ) : null}
           </label>
 
-          <GraphToolButton label="Collapse graph" disabled={!hasGraph} onClick={collapseAll}>
+          <GraphToolButton
+            label="Collapse graph"
+            disabled={!hasGraph || isGraphTransitionPending}
+            onClick={collapseAll}
+          >
             <ChevronsDownUp className="h-4 w-4" />
           </GraphToolButton>
-          <GraphToolButton label="Expand graph" disabled={!hasGraph} onClick={expandAll}>
+          <GraphToolButton
+            label="Expand graph"
+            disabled={!hasGraph || isGraphTransitionPending}
+            onClick={expandAll}
+          >
             <ChevronsUpDown className="h-4 w-4" />
           </GraphToolButton>
-          <GraphToolButton label="Focus selected element" disabled={!activeNode} onClick={focusSelection}>
+          <GraphToolButton
+            label="Focus selected element"
+            disabled={!activeNode || isGraphTransitionPending}
+            onClick={focusSelection}
+          >
             <Focus className="h-4 w-4" />
           </GraphToolButton>
-          <GraphToolButton label="Zoom out" disabled={!hasGraph || zoom <= MIN_GRAPH_ZOOM} onClick={zoomOut}>
+          <GraphToolButton
+            label="Zoom out"
+            disabled={!hasGraph || isGraphTransitionPending || zoom <= MIN_GRAPH_ZOOM}
+            onClick={zoomOut}
+          >
             <ZoomOut className="h-4 w-4" />
           </GraphToolButton>
-          <GraphToolButton label="Zoom in" disabled={!hasGraph || zoom >= MAX_GRAPH_ZOOM} onClick={zoomIn}>
+          <GraphToolButton
+            label="Zoom in"
+            disabled={!hasGraph || isGraphTransitionPending || zoom >= MAX_GRAPH_ZOOM}
+            onClick={zoomIn}
+          >
             <ZoomIn className="h-4 w-4" />
           </GraphToolButton>
           <button
             type="button"
             onClick={resetGraph}
-            disabled={!hasGraph}
+            disabled={!hasGraph || isGraphTransitionPending}
             className="inline-flex h-10 cursor-pointer items-center rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-45"
           >
             Reset
@@ -530,11 +584,6 @@ export function ElementRelationshipGraph({
               className="block"
               style={{ width: `${renderedWidth}px`, height: `${renderedHeight}px` }}
             >
-              <defs>
-                <filter id="graph-node-shadow" x="-8%" y="-30%" width="116%" height="160%">
-                  <feDropShadow dx="0" dy="8" stdDeviation="8" floodColor="rgba(10,48,128,0.12)" />
-                </filter>
-              </defs>
 
               <g>
                 {graphView.edges.map((edge) => {
@@ -598,16 +647,24 @@ export function ElementRelationshipGraph({
                       key={node.key}
                       transform={`translate(${x}, ${y})`}
                       role={node.localId !== null ? "button" : "treeitem"}
-                      tabIndex={node.localId !== null ? 0 : -1}
+                      tabIndex={node.localId !== null && !isGraphTransitionPending ? 0 : -1}
                       aria-label={node.localId !== null ? `Select ${node.label}` : node.label}
                       aria-selected={selected}
+                      aria-disabled={node.localId !== null ? isGraphTransitionPending : undefined}
                       onClick={() => {
+                        if (isGraphTransitionPending) {
+                          return;
+                        }
                         if (node.localId !== null) {
                           onSelectElement(node.localId);
                         }
                       }}
                       onKeyDown={(event) => {
-                        if (node.localId === null || (event.key !== "Enter" && event.key !== " ")) {
+                        if (
+                          isGraphTransitionPending ||
+                          node.localId === null ||
+                          (event.key !== "Enter" && event.key !== " ")
+                        ) {
                           return;
                         }
 
@@ -618,13 +675,20 @@ export function ElementRelationshipGraph({
                     >
                       <title>{node.category ? `${node.category} - ${node.label}` : node.label}</title>
                       <rect
+                        x="2"
+                        y="4"
+                        width={GRAPH_NODE_WIDTH}
+                        height={GRAPH_NODE_HEIGHT}
+                        rx="8"
+                        fill="rgba(10,48,128,0.08)"
+                      />
+                      <rect
                         width={GRAPH_NODE_WIDTH}
                         height={GRAPH_NODE_HEIGHT}
                         rx="8"
                         fill={tone.fill}
                         stroke={tone.stroke}
                         strokeWidth={selected ? 2 : 1}
-                        filter="url(#graph-node-shadow)"
                       />
                       <rect
                         x="8"
@@ -658,14 +722,21 @@ export function ElementRelationshipGraph({
                         <g
                           transform={`translate(${GRAPH_NODE_WIDTH - 28}, 10)`}
                           role="button"
-                          tabIndex={0}
+                          tabIndex={isGraphTransitionPending ? -1 : 0}
                           aria-label={collapsed ? "Expand graph node" : "Collapse graph node"}
+                          aria-disabled={isGraphTransitionPending}
                           onClick={(event) => {
+                            if (isGraphTransitionPending) {
+                              return;
+                            }
                             event.stopPropagation();
                             toggleNode(node.key);
                           }}
                           onKeyDown={(event) => {
-                            if (event.key !== "Enter" && event.key !== " ") {
+                            if (
+                              isGraphTransitionPending ||
+                              (event.key !== "Enter" && event.key !== " ")
+                            ) {
                               return;
                             }
 
