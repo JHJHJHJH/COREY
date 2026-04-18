@@ -190,6 +190,52 @@ export interface ViewerTreeNode {
   children: ViewerTreeNode[];
 }
 
+export type ViewerGraphNodeKind = "model" | "category" | "spatial" | "element";
+
+export type ViewerGraphEdgeRelation = "contains" | "groups";
+
+export interface ViewerGraphNode {
+  key: string;
+  modelId: string;
+  localId: number | null;
+  rowKey: string | null;
+  kind: ViewerGraphNodeKind;
+  label: string;
+  category: string | null;
+  depth: number;
+  parentKey: string | null;
+  childKeys: string[];
+  directChildCount: number;
+  descendantCount: number;
+  searchText: string;
+}
+
+export interface ViewerGraphEdge {
+  key: string;
+  sourceKey: string;
+  targetKey: string;
+  relation: ViewerGraphEdgeRelation;
+}
+
+export interface ViewerGraphData {
+  nodes: ViewerGraphNode[];
+  edges: ViewerGraphEdge[];
+  rootKeys: string[];
+  totalNodeCount: number;
+  totalEdgeCount: number;
+  maxDepth: number;
+}
+
+export interface ViewerGraphView {
+  nodes: ViewerGraphNode[];
+  edges: ViewerGraphEdge[];
+  matchedNodeKeys: Set<string>;
+  selectedPathKeys: Set<string>;
+  selectedNodeKey: string | null;
+  matchCount: number;
+  omittedNodeCount: number;
+}
+
 export interface ViewerCategorySummary {
   category: string;
   count: number;
