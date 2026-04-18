@@ -12,6 +12,10 @@ import type {
   ViewerDataTableSort,
   ViewerElementInspection,
   ViewerDebugValue,
+  ViewerGraphData,
+  ViewerGraphEdge,
+  ViewerGraphNode,
+  ViewerGraphView,
   ViewerInspectionGroup,
   ViewerInspectionRow,
   ViewerInspectionValue,
@@ -1525,6 +1529,450 @@ export function filterTree(
   return nodes
     .map((node) => prune(node))
     .filter((node): node is ViewerTreeNode => node !== null);
+}
+
+const DEFAULT_VIEWER_GRAPH_MAX_VISIBLE_NODES = 900;
+
+function normalizeGraphSearchText(parts: Array<string | number | null | undefined>) {
+  return parts
+    .filter((part): part is string | number => part !== null && part !== undefined)
+    .map((part) => String(part).trim().toLowerCase())
+    .filter(Boolean)
+    .join(" ");
+}
+
+function inferModelIdFromTree(nodes: ViewerTreeNode[]) {
+  const queue = [...nodes];
+
+  while (queue.length > 0) {
+    const node = queue.shift();
+    if (!node) {
+      continue;
+    }
+
+    if (node.localId !== null) {
+      const suffix = `:${node.localId}`;
+      if (node.key.endsWith(suffix)) {
+        return node.key.slice(0, -suffix.length);
+      }
+    }
+
+    queue.push(...node.children);
+  }
+
+  return null;
+}
+
+function reserveGraphKey(usedKeys: Set<string>, preferredKey: string, fallbackKey: string) {
+  if (!usedKeys.has(preferredKey)) {
+    usedKeys.add(preferredKey);
+    return preferredKey;
+  }
+
+  let index = 1;
+  let nextKey = `${preferredKey}:graph:${fallbackKey}`;
+  while (usedKeys.has(nextKey)) {
+    index += 1;
+    nextKey = `${preferredKey}:graph:${fallbackKey}:${index}`;
+  }
+
+  usedKeys.add(nextKey);
+  return nextKey;
+}
+
+function addViewerGraphNode(input: {
+  nodes: ViewerGraphNode[];
+  edges: ViewerGraphEdge[];
+  nodeByKey: Map<string, ViewerGraphNode>;
+  modelId: string;
+  key: string;
+  parentKey: string | null;
+  localId: number | null;
+  rowKey: string | null;
+  kind: ViewerGraphNode["kind"];
+  label: string;
+  category: string | null;
+  depth: number;
+  searchText: string;
+  relation?: ViewerGraphEdge["relation"];
+}) {
+  const node = {
+    key: input.key,
+    modelId: input.modelId,
+    localId: input.localId,
+    rowKey: input.rowKey,
+    kind: input.kind,
+    label: input.label,
+    category: input.category,
+    depth: input.depth,
+    parentKey: input.parentKey,
+    childKeys: [],
+    directChildCount: 0,
+    descendantCount: 0,
+    searchText: input.searchText,
+  } satisfies ViewerGraphNode;
+
+  input.nodes.push(node);
+  input.nodeByKey.set(node.key, node);
+
+  if (input.parentKey) {
+    const parent = input.nodeByKey.get(input.parentKey);
+    parent?.childKeys.push(node.key);
+    input.edges.push({
+      key: `${input.parentKey}->${node.key}`,
+      sourceKey: input.parentKey,
+      targetKey: node.key,
+      relation: input.relation ?? "contains",
+    });
+  }
+
+  return node;
+}
+
+function getViewerGraphRowSearchParts(row: ViewerDataTableRow | null) {
+  if (!row) {
+    return [];
+  }
+
+  return [
+    row.selection.label,
+    row.ifcType,
+    row.localId,
+    `#${row.localId}`,
+    row.searchText,
+  ];
+}
+
+function buildFallbackGraphFromRows(input: {
+  modelId: string;
+  modelLabel: string;
+  data: ViewerDataTableData;
+  usedKeys: Set<string>;
+  nodes: ViewerGraphNode[];
+  edges: ViewerGraphEdge[];
+  nodeByKey: Map<string, ViewerGraphNode>;
+  rootKeys: string[];
+}) {
+  const rootKey = reserveGraphKey(input.usedKeys, `${input.modelId}:graph:model`, "model");
+  addViewerGraphNode({
+    nodes: input.nodes,
+    edges: input.edges,
+    nodeByKey: input.nodeByKey,
+    modelId: input.modelId,
+    key: rootKey,
+    parentKey: null,
+    localId: null,
+    rowKey: null,
+    kind: "model",
+    label: input.modelLabel,
+    category: null,
+    depth: 0,
+    searchText: normalizeGraphSearchText([input.modelLabel, input.modelId]),
+  });
+  input.rootKeys.push(rootKey);
+
+  for (const row of input.data.rows) {
+    const rowKey = reserveGraphKey(input.usedKeys, row.key, `row-${row.localId}`);
+    addViewerGraphNode({
+      nodes: input.nodes,
+      edges: input.edges,
+      nodeByKey: input.nodeByKey,
+      modelId: row.modelId,
+      key: rowKey,
+      parentKey: rootKey,
+      localId: row.localId,
+      rowKey: row.key,
+      kind: "element",
+      label: row.selection.label,
+      category: row.ifcType,
+      depth: 1,
+      searchText: normalizeGraphSearchText(getViewerGraphRowSearchParts(row)),
+    });
+  }
+}
+
+function finalizeViewerGraphData(input: {
+  nodes: ViewerGraphNode[];
+  edges: ViewerGraphEdge[];
+  rootKeys: string[];
+}) {
+  const nodeByKey = new Map(input.nodes.map((node) => [node.key, node]));
+  let maxDepth = 0;
+
+  for (let index = input.nodes.length - 1; index >= 0; index -= 1) {
+    const node = input.nodes[index];
+    node.directChildCount = node.childKeys.length;
+    node.descendantCount = node.childKeys.reduce((count, childKey) => {
+      const child = nodeByKey.get(childKey);
+      return count + (child ? child.descendantCount + 1 : 0);
+    }, 0);
+    maxDepth = Math.max(maxDepth, node.depth);
+  }
+
+  return {
+    nodes: input.nodes,
+    edges: input.edges,
+    rootKeys: input.rootKeys,
+    totalNodeCount: input.nodes.length,
+    totalEdgeCount: input.edges.length,
+    maxDepth,
+  } satisfies ViewerGraphData;
+}
+
+type ViewerGraphIndexes = {
+  nodeByKey: Map<string, ViewerGraphNode>;
+  nodeKeyByLocalId: Map<number, string>;
+  expandableNodeKeys: Set<string>;
+};
+
+const viewerGraphIndexCache = new WeakMap<ViewerGraphData, ViewerGraphIndexes>();
+
+function getViewerGraphIndexes(graph: ViewerGraphData): ViewerGraphIndexes {
+  const cached = viewerGraphIndexCache.get(graph);
+  if (cached) {
+    return cached;
+  }
+
+  const nodeByKey = new Map<string, ViewerGraphNode>();
+  const nodeKeyByLocalId = new Map<number, string>();
+  const expandableNodeKeys = new Set<string>();
+
+  for (const node of graph.nodes) {
+    nodeByKey.set(node.key, node);
+    if (node.localId !== null) {
+      nodeKeyByLocalId.set(node.localId, node.key);
+    }
+    if (node.childKeys.length > 0) {
+      expandableNodeKeys.add(node.key);
+    }
+  }
+
+  const indexes = {
+    nodeByKey,
+    nodeKeyByLocalId,
+    expandableNodeKeys,
+  } satisfies ViewerGraphIndexes;
+  viewerGraphIndexCache.set(graph, indexes);
+  return indexes;
+}
+
+export function buildViewerGraphData(input: {
+  tree: ViewerTreeNode[];
+  data: ViewerDataTableData | null;
+  modelId?: string | null;
+  modelLabel?: string | null;
+}) {
+  const modelId =
+    input.modelId ??
+    input.data?.rows[0]?.modelId ??
+    inferModelIdFromTree(input.tree) ??
+    "model";
+  const modelLabel = input.modelLabel ?? modelId;
+  const rowsByIdentity = new Map(
+    (input.data?.rows ?? []).map((row) => [`${row.modelId}:${row.localId}`, row]),
+  );
+  const nodes: ViewerGraphNode[] = [];
+  const edges: ViewerGraphEdge[] = [];
+  const nodeByKey = new Map<string, ViewerGraphNode>();
+  const usedKeys = new Set<string>();
+  const rootKeys: string[] = [];
+
+  const visitTreeNode = (
+    treeNode: ViewerTreeNode,
+    depth: number,
+    parentKey: string | null,
+    pathKey: string,
+  ) => {
+    const key = reserveGraphKey(usedKeys, treeNode.key, pathKey);
+    const row =
+      treeNode.localId === null
+        ? null
+        : rowsByIdentity.get(`${modelId}:${treeNode.localId}`) ?? null;
+    const label = row?.selection.label ?? treeNode.label;
+    const category = row?.ifcType ?? treeNode.category;
+    const kind: ViewerGraphNode["kind"] =
+      treeNode.localId === null ? "spatial" : row ? "element" : "spatial";
+
+    addViewerGraphNode({
+      nodes,
+      edges,
+      nodeByKey,
+      modelId,
+      key,
+      parentKey,
+      localId: treeNode.localId,
+      rowKey: row?.key ?? null,
+      kind,
+      label,
+      category,
+      depth,
+      searchText: normalizeGraphSearchText([
+        label,
+        category,
+        treeNode.localId,
+        treeNode.localId !== null ? `#${treeNode.localId}` : null,
+        ...getViewerGraphRowSearchParts(row),
+      ]),
+    });
+
+    if (!parentKey) {
+      rootKeys.push(key);
+    }
+
+    treeNode.children.forEach((child, index) => {
+      visitTreeNode(child, depth + 1, key, `${pathKey}-${index}`);
+    });
+  };
+
+  input.tree.forEach((root, index) => {
+    visitTreeNode(root, 0, null, `root-${index}`);
+  });
+
+  if (nodes.length === 0 && input.data) {
+    buildFallbackGraphFromRows({
+      modelId,
+      modelLabel,
+      data: input.data,
+      usedKeys,
+      nodes,
+      edges,
+      nodeByKey,
+      rootKeys,
+    });
+  }
+
+  return finalizeViewerGraphData({ nodes, edges, rootKeys });
+}
+
+export function getViewerGraphExpandableNodeKeys(graph: ViewerGraphData) {
+  return new Set(getViewerGraphIndexes(graph).expandableNodeKeys);
+}
+
+export function getDefaultViewerGraphCollapsedKeys(
+  graph: ViewerGraphData,
+  expandedDepth = Number.POSITIVE_INFINITY,
+) {
+  return new Set(
+    graph.nodes
+      .filter((node) => node.childKeys.length > 0 && node.depth >= expandedDepth)
+      .map((node) => node.key),
+  );
+}
+
+export function getViewerGraphSelectedNodeKey(
+  graph: ViewerGraphData,
+  selectedLocalId: number | null | undefined,
+) {
+  if (selectedLocalId === null || selectedLocalId === undefined) {
+    return null;
+  }
+
+  return getViewerGraphIndexes(graph).nodeKeyByLocalId.get(selectedLocalId) ?? null;
+}
+
+export function getViewerGraphNodePathKeys(graph: ViewerGraphData, nodeKey: string | null) {
+  const pathKeys = new Set<string>();
+  if (!nodeKey) {
+    return pathKeys;
+  }
+
+  const { nodeByKey } = getViewerGraphIndexes(graph);
+  let current = nodeByKey.get(nodeKey) ?? null;
+
+  while (current) {
+    pathKeys.add(current.key);
+    current = current.parentKey ? nodeByKey.get(current.parentKey) ?? null : null;
+  }
+
+  return pathKeys;
+}
+
+export function buildViewerGraphView(
+  graph: ViewerGraphData,
+  options: {
+    collapsedKeys: ReadonlySet<string>;
+    query: string;
+    selectedLocalId?: number | null;
+    maxVisibleNodes?: number;
+  },
+): ViewerGraphView {
+  const normalizedQuery = options.query.trim().toLowerCase();
+  const maxVisibleNodes = Math.max(
+    1,
+    options.maxVisibleNodes ?? DEFAULT_VIEWER_GRAPH_MAX_VISIBLE_NODES,
+  );
+  const { nodeByKey } = getViewerGraphIndexes(graph);
+  const matchedNodeKeys = new Set<string>();
+  const searchVisibleKeys = new Set<string>();
+  const addPathKeys = (nodeKey: string | null, collector: Set<string>) => {
+    let current = nodeKey ? nodeByKey.get(nodeKey) ?? null : null;
+
+    while (current) {
+      collector.add(current.key);
+      current = current.parentKey ? nodeByKey.get(current.parentKey) ?? null : null;
+    }
+  };
+
+  if (normalizedQuery) {
+    for (const node of graph.nodes) {
+      if (!node.searchText.includes(normalizedQuery)) {
+        continue;
+      }
+
+      matchedNodeKeys.add(node.key);
+      addPathKeys(node.key, searchVisibleKeys);
+    }
+  }
+
+  const selectedNodeKey = getViewerGraphSelectedNodeKey(graph, options.selectedLocalId);
+  const selectedPathKeys = new Set<string>();
+  addPathKeys(selectedNodeKey, selectedPathKeys);
+  const visibleNodes: ViewerGraphNode[] = [];
+  let omittedNodeCount = 0;
+
+  const visit = (nodeKey: string) => {
+    const node = nodeByKey.get(nodeKey);
+    if (!node) {
+      return;
+    }
+
+    if (normalizedQuery && !searchVisibleKeys.has(node.key)) {
+      return;
+    }
+
+    if (visibleNodes.length < maxVisibleNodes) {
+      visibleNodes.push(node);
+    } else {
+      omittedNodeCount += 1;
+    }
+
+    if (!normalizedQuery && options.collapsedKeys.has(node.key)) {
+      return;
+    }
+
+    for (const childKey of node.childKeys) {
+      visit(childKey);
+    }
+  };
+
+  for (const rootKey of graph.rootKeys) {
+    visit(rootKey);
+  }
+
+  const visibleKeySet = new Set(visibleNodes.map((node) => node.key));
+  const visibleEdges = graph.edges.filter(
+    (edge) => visibleKeySet.has(edge.sourceKey) && visibleKeySet.has(edge.targetKey),
+  );
+
+  return {
+    nodes: visibleNodes,
+    edges: visibleEdges,
+    matchedNodeKeys,
+    selectedPathKeys,
+    selectedNodeKey,
+    matchCount: matchedNodeKeys.size,
+    omittedNodeCount,
+  } satisfies ViewerGraphView;
 }
 
 function buildDebugTruncationNote(count: number, kind: string) {

@@ -3,14 +3,12 @@
 import {
   ClipboardCheck,
   CircleAlert,
-  Download,
   FileOutput,
   FileSpreadsheet,
   Import,
   PanelLeftOpen,
   PanelRightOpen,
   RotateCcw,
-  SquareArrowOutUpRight,
   Upload,
   X,
 } from "lucide-react";
@@ -35,6 +33,7 @@ import { useViewerRules } from "@/features/rules/rules-provider";
 import { DataTablePanel } from "@/features/viewer/components/data-table-panel";
 import { DebugPanel } from "@/features/viewer/components/debug-panel";
 import { DetachedWindow } from "@/features/viewer/components/detached-window";
+import { ElementRelationshipGraph } from "@/features/viewer/components/element-relationship-graph";
 import { ModelTreePanel } from "@/features/viewer/components/model-tree-panel";
 import { IfcViewport } from "@/features/viewer/components/ifc-viewport";
 import { PropertiesPanel } from "@/features/viewer/components/properties-panel";
@@ -56,6 +55,7 @@ import {
 } from "@/features/viewer/lib/data-table-excel";
 import {
   applyViewerDataTableToInspection,
+  buildViewerGraphData,
   buildViewerTreeDebugSample,
   formatBytes,
   sanitizeViewerDebugValue,
@@ -662,6 +662,7 @@ export function ViewerShell() {
   const [showProperties, setShowProperties] = useState(true);
   const [showDataTable, setShowDataTable] = useState(false);
   const [showDataTableInWindow, setShowDataTableInWindow] = useState(false);
+  const [showGraphWindow, setShowGraphWindow] = useState(false);
   const [showValidationReport, setShowValidationReport] = useState(false);
   const [treeDrawerWidth, setTreeDrawerWidth] = useState(DEFAULT_TREE_DRAWER_WIDTH);
   const [propertiesDrawerWidth, setPropertiesDrawerWidth] = useState(
@@ -718,6 +719,16 @@ export function ViewerShell() {
       data: effectiveDataTableData,
     }),
     [dataTableState, effectiveDataTableData],
+  );
+  const relationshipGraph = useMemo(
+    () =>
+      buildViewerGraphData({
+        tree,
+        data: effectiveDataTableData,
+        modelId: metadata?.name ?? null,
+        modelLabel: metadata?.name ?? null,
+      }),
+    [effectiveDataTableData, metadata?.name, tree],
   );
   const isDataTableSyncedToView = dataTableVisibleRowKeysInView !== null;
   const indexedIfcTypes = useMemo(() => effectiveDataTableData?.ifcTypes ?? [], [effectiveDataTableData]);
@@ -1128,6 +1139,12 @@ export function ViewerShell() {
       setShowDataTableInWindow(false);
     }
   }, [showDataTable]);
+
+  useEffect(() => {
+    if (!hasModel) {
+      setShowGraphWindow(false);
+    }
+  }, [hasModel]);
 
   useEffect(() => {
     syncWorkspaceLayout();
@@ -1874,6 +1891,14 @@ export function ViewerShell() {
     setShowDataTableInWindow(false);
   }, []);
 
+  const hideGraphWindow = useCallback(() => {
+    setShowGraphWindow(false);
+  }, []);
+
+  const handleGraphElementSelect = useCallback((localId: number) => {
+    void viewportRef.current?.selectNode(localId);
+  }, []);
+
   useEffect(() => {
     setDataTableVisibleRowKeysInView(null);
   }, [metadata?.sourceId]);
@@ -2233,6 +2258,7 @@ export function ViewerShell() {
                 <ViewerToolbar
                   disabled={!hasModel}
                   dataTableOpen={showDataTable}
+                  graphOpen={showGraphWindow}
                   session={session}
                   status={status}
                   onToggleDataTable={() => {
@@ -2241,6 +2267,9 @@ export function ViewerShell() {
                     } else {
                       showDataTableWindow();
                     }
+                  }}
+                  onToggleGraph={() => {
+                    setShowGraphWindow((current) => !current);
                   }}
                   onToolChange={(tool) => {
                     setSession((current) => ({ ...current, activeTool: tool }));
@@ -2324,6 +2353,26 @@ export function ViewerShell() {
                 <div className="flex h-screen min-h-0 flex-col bg-[color:var(--panel-bg)] text-[color:var(--foreground)]">
                   {dataTableSurface}
                 </div>
+              </DetachedWindow>
+            ) : null}
+            {showGraphWindow ? (
+              <DetachedWindow
+                title={`Element Relationships${metadata ? ` · ${metadata.name}` : ""}`}
+                name="corey-element-relationships"
+                width={1}
+                height={1}
+                fullscreen
+                preferExtendedScreen
+                onClose={hideGraphWindow}
+                onOpenBlocked={hideGraphWindow}
+              >
+                <ElementRelationshipGraph
+                  metadata={metadata}
+                  graph={relationshipGraph}
+                  activeSelection={session.selected}
+                  onSelectElement={handleGraphElementSelect}
+                  onClose={hideGraphWindow}
+                />
               </DetachedWindow>
             ) : null}
             {showValidationReport ? (

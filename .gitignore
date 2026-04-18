@@ -43,3 +43,6 @@ next-env.d.ts
 # local IFC fixtures
 /public/resources/*.ifc
 !/public/resources/testmodel.ifc
+
+#videos
+/playwright-artifacts/*
