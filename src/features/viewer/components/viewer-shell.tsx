@@ -2370,6 +2370,7 @@ export function ViewerShell() {
                   metadata={metadata}
                   graph={relationshipGraph}
                   activeSelection={session.selected}
+                  selectionDetails={validatedSelectionDetails}
                   onSelectElement={handleGraphElementSelect}
                   onClose={hideGraphWindow}
                 />
