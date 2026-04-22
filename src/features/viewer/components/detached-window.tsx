@@ -122,6 +122,15 @@ async function resolvePopupPlacement({
   }
 }
 
+function shouldRenderInline() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const searchParams = new URLSearchParams(window.location.search);
+  return searchParams.get("inline-popups") === "1";
+}
+
 export function DetachedWindow({
   title,
   name,
@@ -135,10 +144,12 @@ export function DetachedWindow({
 }: DetachedWindowProps) {
   const container = useMemo(() => document.createElement("div"), []);
   const popupRef = useRef<Window | null>(null);
+  const inlineActiveRef = useRef(false);
   const placementRef = useRef<PopupPlacement | null>(null);
   const initialWidthRef = useRef(width);
   const initialHeightRef = useRef(height);
   const initialTitleRef = useRef(title);
+  const renderInline = useMemo(() => shouldRenderInline(), []);
   const storeRef = useRef({
     listeners: new Set<() => void>(),
     notify() {
@@ -156,13 +167,48 @@ export function DetachedWindow({
     },
     () => {
       const popup = popupRef.current;
-      return Boolean(popup && !popup.closed);
+      return inlineActiveRef.current || Boolean(popup && !popup.closed);
     },
     () => false,
   );
 
   useEffect(() => {
     const store = storeRef.current;
+    if (renderInline) {
+      const host = document.createElement("div");
+      host.dataset.detachedWindow = name;
+      Object.assign(host.style, {
+        position: "fixed",
+        inset: "0",
+        zIndex: "2147483000",
+        background: "var(--background)",
+        width: "100vw",
+        height: "100vh",
+      });
+      if (!fullscreen) {
+        Object.assign(host.style, {
+          inset: "24px",
+          width: `${Math.round(width)}px`,
+          height: `${Math.round(height)}px`,
+          maxWidth: "calc(100vw - 48px)",
+          maxHeight: "calc(100vh - 48px)",
+          margin: "auto",
+          border: "1px solid var(--viewer-border)",
+          boxShadow: "var(--viewer-shadow)",
+        });
+      }
+      document.body.appendChild(host);
+      host.appendChild(container);
+      inlineActiveRef.current = true;
+      store.notify();
+
+      return () => {
+        inlineActiveRef.current = false;
+        store.notify();
+        host.remove();
+      };
+    }
+
     let closed = false;
     let nextPopup: Window | null = null;
 
@@ -233,7 +279,7 @@ export function DetachedWindow({
       store.notify();
       nextPopup?.close();
     };
-  }, [container, fullscreen, name, onClose, onOpenBlocked, preferExtendedScreen]);
+  }, [container, fullscreen, height, name, onClose, onOpenBlocked, preferExtendedScreen, renderInline, width]);
 
   useEffect(() => {
     const popup = popupRef.current;
