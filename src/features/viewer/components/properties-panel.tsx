@@ -2,8 +2,8 @@
 
 import { CircleAlert, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { buildPropertiesPanelViewModel } from "@/features/viewer/lib/properties-panel-insights";
 import type {
-  ViewerElementInspection,
   ViewerInspectionGroup,
   ViewerInspectionRow,
   ViewerInspectionValue,
@@ -376,53 +376,163 @@ function ValidationSummaryBanner({
   );
 }
 
+function InsightMetricList({
+  rows,
+}: {
+  rows: ReadonlyArray<{ label: string; value: string }>;
+}) {
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)]">
+      <div className="divide-y divide-[color:var(--viewer-border)]">
+        {rows.map((row) => (
+          <div
+            key={row.label}
+            className="grid gap-1.5 px-2.5 py-2 md:grid-cols-[minmax(0,9rem)_minmax(0,1fr)] md:items-start md:gap-x-3"
+          >
+            <div className="min-w-0 break-words text-xs font-semibold tracking-[0.08em] [overflow-wrap:anywhere] text-[color:var(--muted-ink)]">
+              {row.label}
+            </div>
+            <div className="min-w-0 break-words text-sm leading-6 [overflow-wrap:anywhere] text-[color:var(--foreground)]">
+              {row.value}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function InspectionContent({
-  inspection,
+  details,
+  showEmptyRows,
+  onToggleShowEmptyRows,
   onOpenDetails,
 }: {
-  inspection: ViewerElementInspection;
+  details: ViewerSelectionDetails;
+  showEmptyRows: boolean;
+  onToggleShowEmptyRows: () => void;
   onOpenDetails: (payload: Omit<ValidationPopupPayload, "selectionKey">) => void;
 }) {
+  const viewModel = buildPropertiesPanelViewModel(details, { showEmptyRows });
+  const inspection = details.inspection;
+  if (!viewModel || !inspection || !details.selection) {
+    return null;
+  }
+
   return (
     <div className="space-y-4">
-      <section className="space-y-2">
-        <div>
-          <h2 className="break-words text-base font-semibold text-[color:var(--foreground)]">
-            {inspection.title}
-          </h2>
-          <div className="mt-1 text-xs uppercase tracking-[0.16em] text-[color:var(--muted-ink)]">
-            Model {inspection.modelId} | Local ID #{inspection.localId}
+      <section className="rounded-2xl border border-[color:var(--viewer-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(244,247,255,0.96))] px-3 py-3.5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center rounded-full border border-[#b7c8ff] bg-[#edf4ff] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#244a9a]">
+                {viewModel.summary.ifcClass}
+              </span>
+              <span className="inline-flex items-center rounded-full border border-[color:var(--viewer-border)] bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)]">
+                {viewModel.summary.localIdLabel}
+              </span>
+              {viewModel.summary.issueCount > 0 ? (
+                <span className="inline-flex items-center rounded-full border border-[#d8af80] bg-[#fff7ed] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#915217]">
+                  {viewModel.summary.issueCount} issue{viewModel.summary.issueCount === 1 ? "" : "s"}
+                </span>
+              ) : null}
+            </div>
+            <h2 className="mt-3 break-words text-base font-semibold text-[color:var(--foreground)]">
+              {viewModel.summary.title}
+            </h2>
+            {viewModel.summary.subtitle ? (
+              <div className="mt-1 text-sm text-[color:var(--muted-ink)]">{viewModel.summary.subtitle}</div>
+            ) : null}
           </div>
         </div>
 
-        <ValidationSummaryBanner summary={inspection.validationSummary} onOpenDetails={onOpenDetails} />
-
-        <div className="overflow-hidden rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)]">
-          <div className="divide-y divide-[color:var(--viewer-border)]">
-            {inspection.summaryRows.map((row) => (
-              <InspectionRowView key={row.key} row={row} onOpenDetails={onOpenDetails} />
-            ))}
-          </div>
+        <div className="mt-3 text-xs uppercase tracking-[0.16em] text-[color:var(--muted-ink)]">
+          Model {inspection.modelId} · Local ID {viewModel.summary.localIdLabel}
         </div>
       </section>
+
+      <ValidationSummaryBanner summary={inspection.validationSummary} onOpenDetails={onOpenDetails} />
+
+      <section className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+            Key Attributes
+          </div>
+          <button
+            type="button"
+            onClick={onToggleShowEmptyRows}
+            className="text-[11px] font-semibold text-[#244a9a] transition hover:text-[#1d3f82]"
+          >
+            {showEmptyRows ? "Hide empty attributes" : "Show empty attributes"}
+          </button>
+        </div>
+
+        {viewModel.keyAttributeRows.length > 0 ? (
+          <div className="overflow-hidden rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)]">
+            <div className="divide-y divide-[color:var(--viewer-border)]">
+              {viewModel.keyAttributeRows.map((row) => (
+                <InspectionRowView key={row.key} row={row} onOpenDetails={onOpenDetails} />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-[color:var(--viewer-border)] bg-white/35 px-3 py-3 text-sm text-[color:var(--muted-ink)]">
+            No high-value attributes are available for this element.
+          </div>
+        )}
+
+        {!showEmptyRows && viewModel.hiddenEmptyRowCount > 0 ? (
+          <div className="text-xs text-[color:var(--muted-ink)]">
+            {viewModel.hiddenEmptyRowCount} empty attribute{viewModel.hiddenEmptyRowCount === 1 ? "" : "s"} hidden to keep this panel focused.
+          </div>
+        ) : null}
+      </section>
+
+      {viewModel.graphContextRows.length > 0 ? (
+        <section className="space-y-2">
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+            Graph Context
+          </div>
+          <InsightMetricList rows={viewModel.graphContextRows} />
+        </section>
+      ) : null}
 
       <section className="space-y-2">
         <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
           Property Sets
         </div>
 
-        {inspection.propertySets.length > 0 ? (
+        {viewModel.propertySets.length > 0 ? (
           <div className="space-y-2">
-            {inspection.propertySets.map((group) => (
+            {viewModel.propertySets.map((group) => (
               <PropertySetGroup key={group.key} group={group} onOpenDetails={onOpenDetails} />
             ))}
           </div>
         ) : (
           <div className="rounded-xl border border-dashed border-[color:var(--viewer-border)] bg-white/35 px-3 py-3 text-sm text-[color:var(--muted-ink)]">
-            No property sets were found for this element.
+            No populated property sets were found for this element.
           </div>
         )}
       </section>
+
+      {viewModel.rawAttributeRows.length > 0 ? (
+        <section className="space-y-2">
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+            Raw Identifiers
+          </div>
+          <div className="overflow-hidden rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)]">
+            <div className="divide-y divide-[color:var(--viewer-border)]">
+              {viewModel.rawAttributeRows.map((row) => (
+                <InspectionRowView key={row.key} row={row} onOpenDetails={onOpenDetails} />
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -437,8 +547,10 @@ export function PropertiesPanel({ embedded = false, details }: PropertiesPanelPr
     ? `${details.selection.modelId}:${details.selection.localId}`
     : "none";
   const [popupPayload, setPopupPayload] = useState<ValidationPopupPayload | null>(null);
+  const [showEmptyRowsBySelection, setShowEmptyRowsBySelection] = useState<Record<string, boolean>>({});
   const popupRef = useRef<HTMLDivElement | null>(null);
   const activePopup = popupPayload?.selectionKey === selectionKey ? popupPayload : null;
+  const showEmptyRows = showEmptyRowsBySelection[selectionKey] ?? false;
 
   useEffect(() => {
     if (!activePopup) {
@@ -504,7 +616,17 @@ export function PropertiesPanel({ embedded = false, details }: PropertiesPanelPr
         ) : details.loading && !details.inspection ? (
           <LoadingState selection={details.selection} />
         ) : details.inspection ? (
-          <InspectionContent inspection={details.inspection} onOpenDetails={openValidationPopup} />
+          <InspectionContent
+            details={details}
+            showEmptyRows={showEmptyRows}
+            onToggleShowEmptyRows={() =>
+              setShowEmptyRowsBySelection((current) => ({
+                ...current,
+                [selectionKey]: !(current[selectionKey] ?? false),
+              }))
+            }
+            onOpenDetails={openValidationPopup}
+          />
         ) : (
           <UnavailableState selection={details.selection} />
         )}

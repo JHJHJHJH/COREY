@@ -22,6 +22,7 @@ import {
   getPrimarySelection,
   readNameMaps,
 } from "@/features/viewer/lib/ifc-data";
+import { installViewerConsoleNoiseFilter } from "@/features/viewer/lib/viewer-console-noise";
 import type {
   ViewerElementIdMap,
   ModelMetadata,
@@ -836,6 +837,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       return;
     }
 
+    const removeConsoleNoiseFilter = installViewerConsoleNoiseFilter();
     let cancelled = false;
 
     const initialize = async () => {
@@ -1037,6 +1039,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       window.removeEventListener("keydown", handleKeyDown);
       runtimeRef.current?.components.dispose();
       runtimeRef.current = null;
+      removeConsoleNoiseFilter();
     };
   }, []);
 

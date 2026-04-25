@@ -597,6 +597,7 @@ export function buildSelectionInspection(
     propertySets,
     issueCount,
     validationSummary: null,
+    graphContext: null,
   };
 }
 

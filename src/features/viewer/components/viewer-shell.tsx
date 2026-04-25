@@ -60,6 +60,7 @@ import {
   formatBytes,
   sanitizeViewerDebugValue,
 } from "@/features/viewer/lib/ifc-data";
+import { buildSelectionGraphContext } from "@/features/viewer/lib/graph-view-ux";
 import { LocalFileModelSource } from "@/features/viewer/lib/model-source";
 import { buildViewerValidationDiagnosisReport } from "@/features/viewer/lib/validation-report";
 import { exportEditedIfc } from "@/features/viewer/lib/ifc-writeback";
@@ -736,12 +737,25 @@ export function ViewerShell() {
   const validatedSelectionDetails = useMemo<ViewerSelectionDetails>(
     () => ({
       ...selectionDetails,
-      inspection: applyViewerValidationToInspection(
-        applyViewerDataTableToInspection(selectionDetails.inspection, effectiveDataTableData),
-        deferredClauses,
-      ),
+      inspection: (() => {
+        const inspection = applyViewerValidationToInspection(
+          applyViewerDataTableToInspection(selectionDetails.inspection, effectiveDataTableData),
+          deferredClauses,
+        );
+        if (!inspection) {
+          return null;
+        }
+
+        return {
+          ...inspection,
+          graphContext: buildSelectionGraphContext({
+            nodes: relationshipGraph.nodes,
+            selectedLocalId: selectionDetails.selection?.localId ?? null,
+          }),
+        };
+      })(),
     }),
-    [deferredClauses, effectiveDataTableData, selectionDetails],
+    [deferredClauses, effectiveDataTableData, relationshipGraph.nodes, selectionDetails],
   );
   const validationDiagnosisReport = useMemo<ViewerValidationDiagnosisReport | null>(
     () =>

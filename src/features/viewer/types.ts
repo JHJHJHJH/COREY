@@ -394,6 +394,19 @@ export interface ViewerInspectionGroup {
   issueCount: number;
 }
 
+export interface ViewerSelectionGraphContext {
+  directRelationshipCount: number;
+  childCount: number;
+  descendantCount: number;
+  depth: number;
+  parentLabel: string | null;
+  parentCategory: string | null;
+  isSearchMatch: boolean;
+  searchQuery: string | null;
+  matchCount: number | null;
+  activeMatchIndex: number | null;
+}
+
 export interface ViewerElementInspection {
   title: string;
   modelId: string;
@@ -402,6 +415,7 @@ export interface ViewerElementInspection {
   propertySets: ViewerInspectionGroup[];
   issueCount: number;
   validationSummary: ViewerValidationSummary | null;
+  graphContext: ViewerSelectionGraphContext | null;
 }
 
 export interface ViewerSelectionDetails {

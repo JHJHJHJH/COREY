@@ -1,7 +1,7 @@
 "use client";
 
 import cytoscape from "cytoscape";
-import { Focus, LocateFixed, Search, Workflow, X, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Focus, LocateFixed, Search, Workflow, X, ZoomIn, ZoomOut } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { PropertiesPanel } from "@/features/viewer/components/properties-panel";
 import {
@@ -12,7 +12,18 @@ import {
   getViewerGraphNodePathKeys,
   getViewerGraphSelectedNodeKey,
 } from "@/features/viewer/lib/ifc-data";
-import { buildCompoundLayoutGraph } from "@/features/viewer/lib/graph-compounds";
+import { buildCompoundLayoutGraph, buildCompoundNodePositionOverrides } from "@/features/viewer/lib/graph-compounds";
+import {
+  buildGraphFocusContext,
+  buildSelectionGraphContext,
+  getAdaptiveLabelVisibility,
+  getGraphPanDelta,
+  getGraphSearchSummary,
+  getOrderedVisibleMatchedNodeKeys,
+  getSparseOverviewTuning,
+  getWrappedMatchIndex,
+  resolveActiveMatchNodeKey,
+} from "@/features/viewer/lib/graph-view-ux";
 import type {
   ModelMetadata,
   ViewerGraphData,
@@ -200,6 +211,56 @@ const CYTOSCAPE_STYLE = [
     },
   },
   {
+    selector: "node.active-match-node",
+    style: {
+      "background-color": "#fff7ed",
+      "border-color": "#c2410c",
+      "border-width": 5,
+      color: "#7c2d12",
+      "z-index": 18,
+    },
+  },
+  {
+    selector: "node.context-node",
+    style: {
+      opacity: 1,
+    },
+  },
+  {
+    selector: "node.priority-label-node",
+    style: {
+      "font-size": 11,
+      "text-max-width": 156,
+      "text-opacity": 1,
+    },
+  },
+  {
+    selector: "node.suppressed-label-node",
+    style: {
+      "text-opacity": 0,
+    },
+  },
+  {
+    selector: "node.deemphasized-node",
+    style: {
+      opacity: 0.24,
+    },
+  },
+  {
+    selector: "edge.context-edge",
+    style: {
+      width: 2,
+      "line-color": "rgba(59,130,246,0.35)",
+      "target-arrow-color": "rgba(59,130,246,0.35)",
+    },
+  },
+  {
+    selector: "edge.deemphasized-edge",
+    style: {
+      opacity: 0.18,
+    },
+  },
+  {
     selector: "node.path-node",
     style: {
       "border-color": "#0a5cff",
@@ -252,8 +313,11 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-function getGraphLayoutOptions(hasCompoundGroups: boolean): cytoscape.LayoutOptions {
-  if (hasCompoundGroups) {
+function getGraphLayoutOptions(input: {
+  hasCompoundGroups: boolean;
+  breadthfirstSpacingFactor: number;
+}): cytoscape.LayoutOptions {
+  if (input.hasCompoundGroups) {
     return {
       name: "cose",
       animate: false,
@@ -279,15 +343,18 @@ function getGraphLayoutOptions(hasCompoundGroups: boolean): cytoscape.LayoutOpti
     directed: true,
     fit: true,
     padding: 40,
-    spacingFactor: 1.05,
+    spacingFactor: input.breadthfirstSpacingFactor,
     animate: false,
     avoidOverlap: true,
     nodeDimensionsIncludeLabels: true,
   };
 }
 
-function runGraphLayout(cy: cytoscape.Core, hasCompoundGroups: boolean) {
-  if (hasCompoundGroups) {
+function runGraphLayout(
+  cy: cytoscape.Core,
+  input: { hasCompoundGroups: boolean; breadthfirstSpacingFactor: number },
+) {
+  if (input.hasCompoundGroups) {
     cy.layout({
       name: "breadthfirst",
       directed: true,
@@ -300,7 +367,7 @@ function runGraphLayout(cy: cytoscape.Core, hasCompoundGroups: boolean) {
     }).run();
   }
 
-  cy.layout(getGraphLayoutOptions(hasCompoundGroups)).run();
+  cy.layout(getGraphLayoutOptions(input)).run();
 }
 
 function normalizeIfcClass(category: string | null) {
@@ -489,6 +556,12 @@ function buildCytoscapeElements(input: {
   compoundLayoutGraph: ReturnType<typeof buildCompoundLayoutGraph>;
   matchedNodeKeys: ReadonlySet<string>;
   collapsedCompoundIds: ReadonlySet<string>;
+  contextNodeKeys: ReadonlySet<string>;
+  deemphasizedNodeKeys: ReadonlySet<string>;
+  priorityLabelNodeKeys: ReadonlySet<string>;
+  suppressedLabelNodeKeys: ReadonlySet<string>;
+  contextEdgeKeys: ReadonlySet<string>;
+  deemphasizedEdgeKeys: ReadonlySet<string>;
 }) {
   const compoundElements: cytoscape.ElementDefinition[] = input.compoundLayoutGraph.groups.map((group) => {
     const representativeNode = input.compoundLayoutGraph.visibleNodes.find(
@@ -556,7 +629,15 @@ function buildCytoscapeElements(input: {
     const colors = getNodeColors(node);
     const size = getNodeSize(node);
     const selectableElement = node.localId !== null;
-    const classes = [input.matchedNodeKeys.has(node.key) ? "matched-node" : null].filter(Boolean).join(" ");
+    const classes = [
+      input.matchedNodeKeys.has(node.key) ? "matched-node" : null,
+      input.contextNodeKeys.has(node.key) ? "context-node" : null,
+      input.deemphasizedNodeKeys.has(node.key) ? "deemphasized-node" : null,
+      input.priorityLabelNodeKeys.has(node.key) ? "priority-label-node" : null,
+      input.suppressedLabelNodeKeys.has(node.key) ? "suppressed-label-node" : null,
+    ]
+      .filter(Boolean)
+      .join(" ");
 
     return {
       data: {
@@ -587,6 +668,12 @@ function buildCytoscapeElements(input: {
       target: edge.targetKey,
       relation: edge.relation,
     },
+    classes: [
+      input.contextEdgeKeys.has(edge.key) ? "context-edge" : null,
+      input.deemphasizedEdgeKeys.has(edge.key) ? "deemphasized-edge" : null,
+    ]
+      .filter(Boolean)
+      .join(" "),
     selectable: false,
   }));
 
@@ -629,6 +716,10 @@ export function ElementRelationshipGraph({
     graphSignature,
     value: "",
   }));
+  const [activeMatchState, setActiveMatchState] = useState(() => ({
+    graphSignature,
+    nodeKey: null as string | null,
+  }));
   const [collapsedState, setCollapsedState] = useState(() => ({
     [graphSignature]: getDefaultViewerGraphCollapsedKeys(removeCategoryGrouping(graph), 2),
   }));
@@ -640,6 +731,10 @@ export function ElementRelationshipGraph({
   const setGraphQuery = useCallback(
     (value: string) => {
       setQueryState({ graphSignature, value });
+      setActiveMatchState({
+        graphSignature,
+        nodeKey: null,
+      });
     },
     [graphSignature],
   );
@@ -761,15 +856,6 @@ export function ElementRelationshipGraph({
     [expandedCollapsedCompoundIds, graphView.edges, graphView.nodes],
   );
 
-  const elements = useMemo(
-    () =>
-      buildCytoscapeElements({
-        compoundLayoutGraph: renderCompoundLayoutGraph,
-        matchedNodeKeys: graphView.matchedNodeKeys,
-        collapsedCompoundIds: expandedCollapsedCompoundIds,
-      }),
-    [expandedCollapsedCompoundIds, graphView.matchedNodeKeys, renderCompoundLayoutGraph],
-  );
   const hasCompoundGroups = renderCompoundLayoutGraph.groups.length > 0;
 
   const activeNode = useMemo(
@@ -796,6 +882,147 @@ export function ElementRelationshipGraph({
     () => renderCompoundLayoutGraph.visibleNodes.filter((node) => node.localId !== null).length,
     [renderCompoundLayoutGraph.visibleNodes],
   );
+  const orderedMatchedNodeKeys = useMemo(
+    () => getOrderedVisibleMatchedNodeKeys(renderCompoundLayoutGraph.visibleNodes, graphView.matchedNodeKeys),
+    [graphView.matchedNodeKeys, renderCompoundLayoutGraph.visibleNodes],
+  );
+  const preferredActiveMatchNodeKey =
+    activeMatchState.graphSignature === graphSignature ? activeMatchState.nodeKey : null;
+  const activeMatchNodeKey = useMemo(
+    () => resolveActiveMatchNodeKey(orderedMatchedNodeKeys, preferredActiveMatchNodeKey),
+    [orderedMatchedNodeKeys, preferredActiveMatchNodeKey],
+  );
+  const activeMatchIndex = activeMatchNodeKey ? orderedMatchedNodeKeys.indexOf(activeMatchNodeKey) : -1;
+  const sparseOverviewTuning = useMemo(
+    () =>
+      getSparseOverviewTuning({
+        visibleNodeCount: renderCompoundLayoutGraph.visibleNodes.length,
+        hasCompoundGroups,
+        searchActive,
+        focusNodeKey: selectedNodeKey ?? activeMatchNodeKey,
+      }),
+    [
+      activeMatchNodeKey,
+      hasCompoundGroups,
+      renderCompoundLayoutGraph.visibleNodes.length,
+      searchActive,
+      selectedNodeKey,
+    ],
+  );
+  const graphFocusNodeKey = selectedNodeKey ?? activeMatchNodeKey;
+  const graphFocusContext = useMemo(
+    () =>
+      buildGraphFocusContext({
+        nodeKeys: renderCompoundLayoutGraph.visibleNodes.map((node) => node.key),
+        edges: renderCompoundLayoutGraph.layoutEdges,
+        focusNodeKey: graphFocusNodeKey,
+      }),
+    [graphFocusNodeKey, renderCompoundLayoutGraph.layoutEdges, renderCompoundLayoutGraph.visibleNodes],
+  );
+  const contextEdgeKeys = useMemo(
+    () =>
+      new Set(
+        renderCompoundLayoutGraph.layoutEdges
+          .filter(
+            (edge) =>
+              graphFocusContext.contextNodeKeys.has(edge.sourceKey) &&
+              graphFocusContext.contextNodeKeys.has(edge.targetKey),
+          )
+          .map((edge) => edge.key),
+      ),
+    [graphFocusContext.contextNodeKeys, renderCompoundLayoutGraph.layoutEdges],
+  );
+  const deemphasizedEdgeKeys = useMemo(
+    () =>
+      new Set(
+        renderCompoundLayoutGraph.layoutEdges
+          .filter((edge) => !contextEdgeKeys.has(edge.key))
+          .map((edge) => edge.key),
+      ),
+    [contextEdgeKeys, renderCompoundLayoutGraph.layoutEdges],
+  );
+  const adaptiveLabelVisibility = useMemo(
+    () =>
+      getAdaptiveLabelVisibility({
+        nodeKeys: renderCompoundLayoutGraph.visibleNodes.map((node) => node.key),
+        sparseOverview: sparseOverviewTuning.isSparseOverview,
+        searchActive,
+        focusNodeKey: graphFocusNodeKey,
+        deemphasizedNodeKeys: graphFocusContext.deemphasizedNodeKeys,
+        selectedPathKeys,
+      }),
+    [
+      graphFocusContext.deemphasizedNodeKeys,
+      graphFocusNodeKey,
+      renderCompoundLayoutGraph.visibleNodes,
+      searchActive,
+      selectedPathKeys,
+      sparseOverviewTuning.isSparseOverview,
+    ],
+  );
+  const elements = useMemo(
+    () =>
+      buildCytoscapeElements({
+        compoundLayoutGraph: renderCompoundLayoutGraph,
+        matchedNodeKeys: graphView.matchedNodeKeys,
+        collapsedCompoundIds: expandedCollapsedCompoundIds,
+        contextNodeKeys: graphFocusContext.contextNodeKeys,
+        deemphasizedNodeKeys: graphFocusContext.deemphasizedNodeKeys,
+        priorityLabelNodeKeys: adaptiveLabelVisibility.priorityLabelNodeKeys,
+        suppressedLabelNodeKeys: adaptiveLabelVisibility.suppressedLabelNodeKeys,
+        contextEdgeKeys,
+        deemphasizedEdgeKeys,
+      }),
+    [
+      adaptiveLabelVisibility.priorityLabelNodeKeys,
+      adaptiveLabelVisibility.suppressedLabelNodeKeys,
+      contextEdgeKeys,
+      deemphasizedEdgeKeys,
+      expandedCollapsedCompoundIds,
+      graphFocusContext.contextNodeKeys,
+      graphFocusContext.deemphasizedNodeKeys,
+      graphView.matchedNodeKeys,
+      renderCompoundLayoutGraph,
+    ],
+  );
+  const searchSummary = useMemo(
+    () =>
+      searchActive
+        ? getGraphSearchSummary({
+            query: deferredQuery,
+            matchCount: graphView.matchCount,
+            activeMatchIndex,
+          })
+        : null,
+    [activeMatchIndex, deferredQuery, graphView.matchCount, searchActive],
+  );
+  const graphSelectionDetails = useMemo<ViewerSelectionDetails>(
+    () => ({
+      ...selectionDetails,
+      inspection: selectionDetails.inspection
+        ? {
+            ...selectionDetails.inspection,
+            graphContext: buildSelectionGraphContext({
+              nodes: graph.nodes,
+              selectedLocalId: activeSelection?.localId ?? null,
+              matchedNodeKeys: graphView.matchedNodeKeys,
+              orderedMatchedNodeKeys,
+              activeMatchNodeKey,
+              searchQuery: deferredQuery,
+            }),
+          }
+        : null,
+    }),
+    [
+      activeMatchNodeKey,
+      activeSelection?.localId,
+      deferredQuery,
+      graph.nodes,
+      graphView.matchedNodeKeys,
+      orderedMatchedNodeKeys,
+      selectionDetails,
+    ],
+  );
 
   const fitGraph = useCallback(() => {
     const cy = cyRef.current;
@@ -804,9 +1031,29 @@ export function ElementRelationshipGraph({
     }
 
     shouldAutoFitRef.current = true;
-    cy.fit(cy.elements(), 56);
+    cy.fit(cy.elements(), sparseOverviewTuning.fitPadding);
     setZoom(cy.zoom());
-  }, []);
+  }, [sparseOverviewTuning.fitPadding]);
+
+  const fitMatchedResults = useCallback(() => {
+    const cy = cyRef.current;
+    if (!cy || orderedMatchedNodeKeys.length === 0) {
+      return;
+    }
+
+    let matchedNodes = cy.collection();
+    for (const nodeKey of orderedMatchedNodeKeys) {
+      matchedNodes = matchedNodes.union(cy.getElementById(nodeKey));
+    }
+
+    if (matchedNodes.length === 0) {
+      return;
+    }
+
+    shouldAutoFitRef.current = false;
+    cy.fit(matchedNodes, 110);
+    setZoom(cy.zoom());
+  }, [orderedMatchedNodeKeys]);
 
   const focusNode = useCallback((nodeKey: string | null) => {
     const cy = cyRef.current;
@@ -836,6 +1083,71 @@ export function ElementRelationshipGraph({
 
     setGraphQuery(`#${activeSelection.localId}`);
   }, [activeSelection, focusNode, selectedNodeKey, setGraphQuery]);
+
+  const moveActiveMatch = useCallback(
+    (direction: 1 | -1) => {
+      if (orderedMatchedNodeKeys.length === 0) {
+        return;
+      }
+
+      const currentIndex = activeMatchIndex >= 0 ? activeMatchIndex : 0;
+      const nextIndex = getWrappedMatchIndex({
+        currentIndex,
+        totalCount: orderedMatchedNodeKeys.length,
+        direction,
+      });
+
+      setActiveMatchState({
+        graphSignature,
+        nodeKey: orderedMatchedNodeKeys[nextIndex] ?? null,
+      });
+    },
+    [activeMatchIndex, graphSignature, orderedMatchedNodeKeys],
+  );
+
+  const focusActiveMatch = useCallback(() => {
+    if (!searchActive || !activeMatchNodeKey) {
+      return;
+    }
+
+    shouldAutoFitRef.current = false;
+    focusNode(activeMatchNodeKey);
+  }, [activeMatchNodeKey, focusNode, searchActive]);
+
+  const handlePreviousMatch = useCallback(() => {
+    moveActiveMatch(-1);
+  }, [moveActiveMatch]);
+
+  const handleNextMatch = useCallback(() => {
+    moveActiveMatch(1);
+  }, [moveActiveMatch]);
+
+  useEffect(() => {
+    if (!searchActive) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      if (event.key === "[") {
+        event.preventDefault();
+        handlePreviousMatch();
+      }
+
+      if (event.key === "]") {
+        event.preventDefault();
+        handleNextMatch();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [handleNextMatch, handlePreviousMatch, searchActive]);
 
   const toggleCompoundCollapsed = useCallback(
     (compoundId: string | null) => {
@@ -925,6 +1237,22 @@ export function ElementRelationshipGraph({
     setZoom(cy.zoom());
   }, []);
 
+  const panGraph = useCallback((direction: "up" | "down" | "left" | "right") => {
+    const cy = cyRef.current;
+    if (!cy) {
+      return;
+    }
+
+    const delta = getGraphPanDelta({
+      direction,
+      viewportWidth: cy.width(),
+      viewportHeight: cy.height(),
+    });
+
+    shouldAutoFitRef.current = false;
+    cy.panBy(delta);
+  }, []);
+
   useEffect(() => {
     if (!containerRef.current || cyRef.current) {
       return;
@@ -938,7 +1266,6 @@ export function ElementRelationshipGraph({
       maxZoom: MAX_GRAPH_ZOOM,
       boxSelectionEnabled: false,
       autoungrabify: true,
-      wheelSensitivity: 0.18,
     });
 
     const handleTap = (event: cytoscape.EventObject) => {
@@ -1001,7 +1328,32 @@ export function ElementRelationshipGraph({
       return;
     }
 
-    runGraphLayout(cy, hasCompoundGroups);
+    runGraphLayout(cy, {
+      hasCompoundGroups,
+      breadthfirstSpacingFactor: sparseOverviewTuning.breadthfirstSpacingFactor,
+    });
+
+    if (hasCompoundGroups) {
+      const compoundPositionEntries = renderCompoundLayoutGraph.groups.map(
+        (group) => [group.anchorNodeId, cy.getElementById(group.anchorNodeId).position()] as const,
+      );
+      const visibleNodePositionEntries = renderCompoundLayoutGraph.visibleNodes.map(
+        (node) => [node.key, cy.getElementById(node.key).position()] as const,
+      );
+      const positionOverrides = buildCompoundNodePositionOverrides({
+        groups: renderCompoundLayoutGraph.groups,
+        visibleNodes: renderCompoundLayoutGraph.visibleNodes,
+        nodePositions: new Map([...compoundPositionEntries, ...visibleNodePositionEntries]),
+      });
+
+      if (positionOverrides.size > 0) {
+        cy.batch(() => {
+          for (const [nodeKey, position] of positionOverrides) {
+            cy.getElementById(nodeKey).position(position);
+          }
+        });
+      }
+    }
 
     if (relayoutFrameRef.current !== null) {
       window.cancelAnimationFrame(relayoutFrameRef.current);
@@ -1015,7 +1367,7 @@ export function ElementRelationshipGraph({
       }
       cy.resize();
       if (shouldAutoFitRef.current) {
-        cy.fit(cy.elements(), 56);
+        cy.fit(cy.elements(), sparseOverviewTuning.fitPadding);
         shouldAutoFitRef.current = false;
       }
       setZoom(cy.zoom());
@@ -1027,7 +1379,22 @@ export function ElementRelationshipGraph({
         relayoutFrameRef.current = null;
       }
     };
-  }, [elements, hasCompoundGroups, renderCompoundLayoutGraph.visibleNodes]);
+  }, [
+    elements,
+    hasCompoundGroups,
+    renderCompoundLayoutGraph.groups,
+    renderCompoundLayoutGraph.visibleNodes,
+    sparseOverviewTuning.breadthfirstSpacingFactor,
+    sparseOverviewTuning.fitPadding,
+  ]);
+
+  useEffect(() => {
+    if (!searchActive || !activeMatchNodeKey) {
+      return;
+    }
+
+    focusActiveMatch();
+  }, [activeMatchNodeKey, focusActiveMatch, searchActive]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -1036,11 +1403,15 @@ export function ElementRelationshipGraph({
     }
 
     cy.batch(() => {
-      cy.nodes().removeClass("path-node selected-node");
+      cy.nodes().removeClass("path-node selected-node active-match-node");
       cy.edges().removeClass("path-edge");
 
       for (const nodeKey of selectedPathKeys) {
         cy.getElementById(nodeKey).addClass("path-node");
+      }
+
+      if (activeMatchNodeKey) {
+        cy.getElementById(activeMatchNodeKey).addClass("active-match-node");
       }
 
       if (selectedNodeKey) {
@@ -1051,7 +1422,7 @@ export function ElementRelationshipGraph({
         cy.getElementById(edgeKey).addClass("path-edge");
       }
     });
-  }, [selectedNodeKey, selectedPathEdgeKeys, selectedPathKeys]);
+  }, [activeMatchNodeKey, selectedNodeKey, selectedPathEdgeKeys, selectedPathKeys]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -1093,6 +1464,11 @@ export function ElementRelationshipGraph({
             <span>{renderCompoundLayoutGraph.visibleNodes.length} rendered</span>
             <span>{visibleElementCount} selectable</span>
             {searchActive ? <span>{graphView.matchCount} matches</span> : null}
+            {searchActive && activeMatchIndex >= 0 ? (
+              <span>
+                Match {activeMatchIndex + 1} of {orderedMatchedNodeKeys.length}
+              </span>
+            ) : null}
             {expandableCompoundCount > 0 ? <span>{expandableCompoundCount} compound groups</span> : null}
             {graphView.omittedNodeCount > 0 ? (
               <span>{graphView.omittedNodeCount} over render cap</span>
@@ -1147,6 +1523,18 @@ export function ElementRelationshipGraph({
           <GraphToolButton label="Fit graph" disabled={!hasGraph || renderCompoundLayoutGraph.visibleNodes.length === 0} onClick={fitGraph}>
             <LocateFixed className="h-4 w-4" />
           </GraphToolButton>
+          <GraphToolButton label="Drag up" disabled={!hasGraph} onClick={() => panGraph("up")}>
+            <ArrowUp className="h-4 w-4" />
+          </GraphToolButton>
+          <GraphToolButton label="Drag left" disabled={!hasGraph} onClick={() => panGraph("left")}>
+            <ArrowLeft className="h-4 w-4" />
+          </GraphToolButton>
+          <GraphToolButton label="Drag down" disabled={!hasGraph} onClick={() => panGraph("down")}>
+            <ArrowDown className="h-4 w-4" />
+          </GraphToolButton>
+          <GraphToolButton label="Drag right" disabled={!hasGraph} onClick={() => panGraph("right")}>
+            <ArrowRight className="h-4 w-4" />
+          </GraphToolButton>
           <GraphToolButton label="Zoom out" disabled={!hasGraph || zoom <= MIN_GRAPH_ZOOM} onClick={() => zoomBy(1 / GRAPH_ZOOM_STEP)}>
             <ZoomOut className="h-4 w-4" />
           </GraphToolButton>
@@ -1166,6 +1554,73 @@ export function ElementRelationshipGraph({
           </GraphToolButton>
         </div>
       </header>
+
+      {searchActive ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--viewer-border)] bg-white/70 px-4 py-2.5">
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-[color:var(--foreground)]">{searchSummary?.label}</div>
+            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted-ink)]">
+              <span>{searchSummary?.detail}</span>
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-800">
+                <span className="h-2 w-2 rounded-full bg-amber-500" />
+                Active match
+              </span>
+              {selectedNodeKey ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-800">
+                  <span className="h-2 w-2 rounded-full bg-emerald-600" />
+                  Selected
+                </span>
+              ) : null}
+              {graphFocusNodeKey ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-800">
+                  <span className="h-2 w-2 rounded-full bg-sky-500" />
+                  Related context
+                </span>
+              ) : null}
+              {graphFocusContext.deemphasizedNodeKeys.size > 0 ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-700">
+                  <span className="h-2 w-2 rounded-full bg-slate-400" />
+                  Background dimmed
+                </span>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handlePreviousMatch}
+              disabled={orderedMatchedNodeKeys.length === 0}
+              className="inline-flex h-9 cursor-pointer items-center rounded-lg border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 text-xs font-semibold uppercase tracking-[0.1em] text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              Prev
+            </button>
+            <button
+              type="button"
+              onClick={handleNextMatch}
+              disabled={orderedMatchedNodeKeys.length === 0}
+              className="inline-flex h-9 cursor-pointer items-center rounded-lg border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 text-xs font-semibold uppercase tracking-[0.1em] text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              Next
+            </button>
+            <button
+              type="button"
+              onClick={fitMatchedResults}
+              disabled={orderedMatchedNodeKeys.length === 0}
+              className="inline-flex h-9 cursor-pointer items-center rounded-lg border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 text-xs font-semibold uppercase tracking-[0.1em] text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              Fit results
+            </button>
+            <button
+              type="button"
+              onClick={() => setGraphQuery("")}
+              className="inline-flex h-9 cursor-pointer items-center rounded-lg border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 text-xs font-semibold uppercase tracking-[0.1em] text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]"
+            >
+              Clear search
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex min-h-0 flex-1">
         <div className="relative min-w-0 flex-1 bg-[linear-gradient(180deg,rgba(255,255,255,0.82),rgba(246,249,255,0.96))]">
@@ -1187,7 +1642,7 @@ export function ElementRelationshipGraph({
                   No Matching Nodes
                 </div>
                 <div className="mt-2 text-sm text-[color:var(--foreground)]">
-                  Clear the search to return to the relationship graph.
+                  {searchSummary?.detail ?? "Clear the search to return to the relationship graph."}
                 </div>
               </div>
             </div>
@@ -1215,7 +1670,7 @@ export function ElementRelationshipGraph({
         </div>
 
         <aside className="min-h-0 w-[24rem] shrink-0 border-l border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]">
-          <PropertiesPanel embedded details={selectionDetails} />
+          <PropertiesPanel embedded details={graphSelectionDetails} />
         </aside>
       </div>
     </section>

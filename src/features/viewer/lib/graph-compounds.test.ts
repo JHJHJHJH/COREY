@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { ViewerGraphEdge, ViewerGraphNode } from "../types";
-import { buildCompoundLayoutGraph } from "./graph-compounds.ts";
+import { buildCompoundLayoutGraph, buildCompoundNodePositionOverrides } from "./graph-compounds.ts";
+
 
 function makeNode(overrides: Partial<ViewerGraphNode> & Pick<ViewerGraphNode, "key" | "kind" | "label">): ViewerGraphNode {
   return {
@@ -167,4 +168,99 @@ test("non-dense sibling sets keep original edges and do not create compounds", (
       ["parent", "slab-1"],
     ],
   );
+});
+
+test("buildCompoundNodePositionOverrides repacks nested compound groups relative to moved parent subtrees", () => {
+  const nodes: ViewerGraphNode[] = [
+    makeNode({
+      key: "root",
+      kind: "spatial",
+      label: "Root",
+      category: "IFCPROJECT",
+      localId: 1,
+      childKeys: ["parent-a", "parent-b", "parent-c"],
+      directChildCount: 3,
+    }),
+    makeNode({
+      key: "parent-a",
+      kind: "element",
+      label: "Parent A",
+      category: "IFCBEAM",
+      localId: 10,
+      parentKey: "root",
+      childKeys: ["leaf-a1", "leaf-a2", "leaf-a3"],
+      directChildCount: 3,
+    }),
+    makeNode({
+      key: "parent-b",
+      kind: "element",
+      label: "Parent B",
+      category: "IFCBEAM",
+      localId: 11,
+      parentKey: "root",
+      childKeys: ["leaf-b1", "leaf-b2", "leaf-b3"],
+      directChildCount: 3,
+    }),
+    makeNode({
+      key: "parent-c",
+      kind: "element",
+      label: "Parent C",
+      category: "IFCBEAM",
+      localId: 12,
+      parentKey: "root",
+      childKeys: ["leaf-c1", "leaf-c2", "leaf-c3"],
+      directChildCount: 3,
+    }),
+    makeNode({ key: "leaf-a1", kind: "element", label: "Leaf A1", category: "IFCWALL", localId: 21, parentKey: "parent-a" }),
+    makeNode({ key: "leaf-a2", kind: "element", label: "Leaf A2", category: "IFCWALL", localId: 22, parentKey: "parent-a" }),
+    makeNode({ key: "leaf-a3", kind: "element", label: "Leaf A3", category: "IFCWALL", localId: 23, parentKey: "parent-a" }),
+    makeNode({ key: "leaf-b1", kind: "element", label: "Leaf B1", category: "IFCWALL", localId: 24, parentKey: "parent-b" }),
+    makeNode({ key: "leaf-b2", kind: "element", label: "Leaf B2", category: "IFCWALL", localId: 25, parentKey: "parent-b" }),
+    makeNode({ key: "leaf-b3", kind: "element", label: "Leaf B3", category: "IFCWALL", localId: 26, parentKey: "parent-b" }),
+    makeNode({ key: "leaf-c1", kind: "element", label: "Leaf C1", category: "IFCWALL", localId: 27, parentKey: "parent-c" }),
+    makeNode({ key: "leaf-c2", kind: "element", label: "Leaf C2", category: "IFCWALL", localId: 28, parentKey: "parent-c" }),
+    makeNode({ key: "leaf-c3", kind: "element", label: "Leaf C3", category: "IFCWALL", localId: 29, parentKey: "parent-c" }),
+  ];
+
+  const result = buildCompoundNodePositionOverrides({
+    groups: [
+      {
+        id: "root::compound::IFCBEAM",
+        anchorNodeId: "root::compound::IFCBEAM::anchor",
+        label: "IFCBEAM",
+        childNodeKeys: ["parent-a", "parent-b", "parent-c"],
+        parentNodeKey: "root",
+      },
+      {
+        id: "parent-a::compound::IFCWALL",
+        anchorNodeId: "parent-a::compound::IFCWALL::anchor",
+        label: "IFCWALL",
+        childNodeKeys: ["leaf-a1", "leaf-a2", "leaf-a3"],
+        parentNodeKey: "parent-a",
+      },
+    ],
+    visibleNodes: nodes,
+    nodePositions: new Map([
+      ["root::compound::IFCBEAM::anchor", { x: 300, y: 100 }],
+      ["parent-a::compound::IFCWALL::anchor", { x: 100, y: 200 }],
+      ["parent-a", { x: 40, y: 30 }],
+      ["parent-b", { x: 80, y: 30 }],
+      ["parent-c", { x: 120, y: 30 }],
+      ["leaf-a1", { x: 20, y: 260 }],
+      ["leaf-a2", { x: 40, y: 260 }],
+      ["leaf-a3", { x: 60, y: 260 }],
+      ["leaf-b1", { x: 80, y: 260 }],
+      ["leaf-b2", { x: 100, y: 260 }],
+      ["leaf-b3", { x: 120, y: 260 }],
+      ["leaf-c1", { x: 140, y: 260 }],
+      ["leaf-c2", { x: 160, y: 260 }],
+      ["leaf-c3", { x: 180, y: 260 }],
+    ]),
+  });
+
+  assert.deepEqual(result.get("parent-a"), { x: 192, y: 178 });
+  assert.deepEqual(result.get("parent-a::compound::IFCWALL::anchor"), { x: 252, y: 348 });
+  assert.deepEqual(result.get("leaf-a1"), { x: 144, y: 426 });
+  assert.deepEqual(result.get("leaf-a2"), { x: 252, y: 426 });
+  assert.deepEqual(result.get("leaf-a3"), { x: 360, y: 426 });
 });
