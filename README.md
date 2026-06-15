@@ -33,7 +33,21 @@ pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:3000`.
+Open `http://localhost:4000`.
+
+## Docker
+
+Build and run the app with Postgres and MinIO:
+
+```bash
+docker compose up --build
+```
+
+Open `http://localhost:4000`.
+
+The compose stack runs database migrations before starting the app. Container
+environment values are wired to the internal compose services, while
+`.env.example` remains the template for local non-Docker development.
 
 ## Verification
 

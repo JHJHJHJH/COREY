@@ -5,7 +5,8 @@ Status of moving COREY's local-first features behind a server API. The app was
 
 Infrastructure (local dev): see `docker-compose.yml` — Postgres (Prisma) for
 relational data and MinIO (S3) for model bytes. Copy `.env.example` → `.env`,
-run `docker compose up -d`, then `pnpm db:deploy` and `pnpm dev`.
+run `docker compose up -d postgres minio minio-init`, then `pnpm db:deploy` and
+`pnpm dev`. For the full containerized app, run `docker compose up --build`.
 
 ## Context
 
