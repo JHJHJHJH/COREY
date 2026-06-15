@@ -11,18 +11,15 @@ import {
   ScanSearch,
   Slice,
   Table,
-  Workflow,
 } from "lucide-react";
 import type { ViewerSessionState, ViewerStatus, ViewerTool } from "@/features/viewer/types";
 
 type ViewerToolbarProps = {
   disabled: boolean;
   dataTableOpen: boolean;
-  graphOpen: boolean;
   session: ViewerSessionState;
   status: ViewerStatus;
   onToggleDataTable: () => void;
-  onToggleGraph: () => void;
   onToolChange: (tool: ViewerTool) => void;
   onFocusSelection: () => void;
   onShowAll: () => void;
@@ -88,11 +85,9 @@ function ActionButton({
 export function ViewerToolbar({
   disabled,
   dataTableOpen,
-  graphOpen,
   session,
   status,
   onToggleDataTable,
-  onToggleGraph,
   onToolChange,
   onFocusSelection,
   onShowAll,
@@ -186,19 +181,9 @@ export function ViewerToolbar({
       <div className="pointer-events-none absolute bottom-0 right-3 z-20 sm:right-4">
         <div className="pointer-events-auto flex overflow-hidden rounded-t-2xl border border-b-0 border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/95 shadow-[var(--viewer-shadow)] backdrop-blur">
           <ActionButton
-            label={graphOpen ? "Hide graph viewport" : "Open graph viewport"}
-            active={graphOpen}
-            className="h-11 w-auto gap-2 rounded-none px-4 hover:bg-[color:var(--surface-hover)]"
-            onClick={onToggleGraph}
-            disabled={disabled}
-          >
-            <Workflow className="h-4 w-4" />
-            <span className="text-xs font-semibold tracking-[0.08em] uppercase">Graph</span>
-          </ActionButton>
-          <ActionButton
             label={dataTableOpen ? "Hide data table" : "Open data table"}
             active={dataTableOpen}
-            className="h-11 w-auto gap-2 rounded-none border-l border-[color:var(--viewer-border)] px-4 hover:bg-[color:var(--surface-hover)]"
+            className="h-11 w-auto gap-2 rounded-none px-4 hover:bg-[color:var(--surface-hover)]"
             onClick={onToggleDataTable}
           >
             <Table className="h-4 w-4" />

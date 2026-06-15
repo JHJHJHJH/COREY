@@ -12,7 +12,6 @@
     "@thatopen/components": "^3.3.3",
     "@thatopen/components-front": "^3.3.3",
     "@thatopen/fragments": "^3.3.7",
-    "cytoscape": "^3.33.2",
     "lucide-react": "^1.7.0",
     "next": "16.2.2",
     "react": "19.2.4",

@@ -14,9 +14,19 @@
     {
       "splitTerminals": [
         {
-          "name": "bca-codex",
+          "name": "codex",
           "commands": [
-            "codex"
+            "codex --yolo"
+          ]
+        }
+      ]
+    },
+        {
+      "splitTerminals": [
+        {
+          "name": "claude",
+          "commands": [
+            "claude --dangerously-skip-permissions"
           ]
         }
       ]
