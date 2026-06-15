@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleAlert, FileSpreadsheet, X } from "lucide-react";
+import { CircleAlert, FileSpreadsheet, History, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import type {
   ModelMetadata,
@@ -8,17 +8,23 @@ import type {
   ViewerValidationDiagnosisClause,
   ViewerValidationDiagnosisElement,
   ViewerValidationDiagnosisReport,
+  ViewerValidationReportSummary,
 } from "@/features/viewer/types";
 
 type ValidationDiagnosisReportProps = {
   metadata: ModelMetadata | null;
   report: ViewerValidationDiagnosisReport | null;
+  currentReport: ViewerValidationDiagnosisReport | null;
+  savedReports: ViewerValidationReportSummary[];
+  activeSavedReportId: string | null;
   validationPhase: "idle" | "running" | "ready" | "error";
   validationMessage: string;
   statusMessage?: string;
   activeSelection: ViewerSelection | null;
   onExport: () => void;
   onShowClauseInTable: (clauseId: string) => void;
+  onUseCurrentReport: () => void;
+  onRestoreReport: (reportId: string) => void;
   onSelectElement: (element: ViewerValidationDiagnosisElement) => void;
   onClose: () => void;
 };
@@ -27,6 +33,82 @@ function severityTone(result: "warn" | "error") {
   return result === "error"
     ? "border-[#d3a08e] bg-[#fff0ea] text-[#8a3e1f]"
     : "border-[#d8af80] bg-[#fff7ed] text-[#915217]";
+}
+
+function formatSavedReportDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown date";
+  }
+
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function SavedReportPicker({
+  currentReport,
+  savedReports,
+  activeSavedReportId,
+  onUseCurrentReport,
+  onRestoreReport,
+}: {
+  currentReport: ViewerValidationDiagnosisReport | null;
+  savedReports: ViewerValidationReportSummary[];
+  activeSavedReportId: string | null;
+  onUseCurrentReport: () => void;
+  onRestoreReport: (reportId: string) => void;
+}) {
+  if (!currentReport && savedReports.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 border-t border-[color:var(--viewer-border)] pt-3">
+      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+        <History className="h-3.5 w-3.5" />
+        Saved Runs
+      </div>
+      <div className="mt-2 flex max-w-full gap-2 overflow-x-auto pb-1">
+        {currentReport ? (
+          <button
+            type="button"
+            onClick={onUseCurrentReport}
+            className={`shrink-0 rounded-xl border px-3 py-2 text-left text-xs transition ${
+              activeSavedReportId
+                ? "border-[color:var(--viewer-border)] bg-white/70 text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
+                : "border-[#88b59d] bg-[#edf7f1] text-[#1e6b45]"
+            }`}
+          >
+            <div className="font-semibold">Current Run</div>
+            <div className="mt-1 text-[11px] opacity-80">
+              {currentReport.flaggedElementCount} flagged · {currentReport.failedClauseCount} clauses
+            </div>
+          </button>
+        ) : null}
+        {savedReports.map((savedReport) => (
+          <button
+            key={savedReport.reportId}
+            type="button"
+            onClick={() => onRestoreReport(savedReport.reportId)}
+            className={`shrink-0 rounded-xl border px-3 py-2 text-left text-xs transition ${
+              activeSavedReportId === savedReport.reportId
+                ? "border-[#88b59d] bg-[#edf7f1] text-[#1e6b45]"
+                : "border-[color:var(--viewer-border)] bg-white/70 text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
+            }`}
+          >
+            <div className="font-semibold">{formatSavedReportDate(savedReport.createdAt)}</div>
+            <div className="mt-1 text-[11px] opacity-80">
+              {savedReport.flaggedElementCount} flagged · {savedReport.failedClauseCount} clauses
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function summaryCard({
@@ -247,12 +329,17 @@ function ClauseDetails({
 export function ValidationDiagnosisReport({
   metadata,
   report,
+  currentReport,
+  savedReports,
+  activeSavedReportId,
   validationPhase,
   validationMessage,
   statusMessage = "",
   activeSelection,
   onExport,
   onShowClauseInTable,
+  onUseCurrentReport,
+  onRestoreReport,
   onSelectElement,
   onClose,
 }: ValidationDiagnosisReportProps) {
@@ -290,6 +377,13 @@ export function ValidationDiagnosisReport({
             {statusMessage ? (
               <div className="mt-2 text-xs text-[color:var(--muted-ink)]">{statusMessage}</div>
             ) : null}
+            <SavedReportPicker
+              currentReport={currentReport}
+              savedReports={savedReports}
+              activeSavedReportId={activeSavedReportId}
+              onUseCurrentReport={onUseCurrentReport}
+              onRestoreReport={onRestoreReport}
+            />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -320,12 +414,12 @@ export function ValidationDiagnosisReport({
             title="Load a model to diagnose clause errors"
             message="The diagnosis report uses the current validation result and model rows. Open an IFC file and run validation first."
           />
-        ) : validationPhase === "running" ? (
+        ) : validationPhase === "running" && !activeSavedReportId ? (
           <EmptyState
             title="Validation is still running"
             message={validationMessage}
           />
-        ) : validationPhase === "error" ? (
+        ) : validationPhase === "error" && !activeSavedReportId ? (
           <EmptyState
             title="Validation could not be completed"
             message={validationMessage}

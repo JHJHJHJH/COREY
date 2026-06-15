@@ -52,6 +52,22 @@ export interface ViewerValidationConfig {
   clauses: ViewerValidationClause[];
 }
 
+export type ViewerRuleTemplateSourceKind = "starter" | "industry-mapping";
+
+export interface ViewerRuleTemplateSummary {
+  templateId: string;
+  name: string;
+  description: string;
+  ruleCount: number;
+  sourceKind: ViewerRuleTemplateSourceKind;
+  sourceFileName: string | null;
+  updatedAt: string;
+}
+
+export interface ViewerRuleTemplateRecord extends ViewerRuleTemplateSummary {
+  config: ViewerValidationConfig;
+}
+
 export interface ViewerValidationRuleFailure {
   clauseId: string;
   clauseTitle: string;
@@ -149,6 +165,22 @@ export interface ViewerValidationDiagnosisReport {
   clauses: ViewerValidationDiagnosisClause[];
 }
 
+export interface ViewerValidationReportSummary {
+  reportId: string;
+  modelId: string;
+  sourceId: string;
+  modelName: string | null;
+  flaggedElementCount: number;
+  warnElementCount: number;
+  errorElementCount: number;
+  failedClauseCount: number;
+  createdAt: string;
+}
+
+export interface ViewerValidationReportRecord extends ViewerValidationReportSummary {
+  report: ViewerValidationDiagnosisReport;
+}
+
 export interface ViewerValidationClauseTableView {
   clauseId: string;
   clauseTitle: string;
@@ -169,6 +201,7 @@ export interface ModelMetadata {
   size: number;
   loadStatus: LoadStatus;
   sourceId?: string;
+  serverModelId?: string;
 }
 
 export interface ModelSourceResult {
@@ -176,10 +209,23 @@ export interface ModelSourceResult {
   metadata: ModelMetadata;
 }
 
+export type ModelSourceKind = "local-file" | "remote";
+
+export type ModelSourceInput =
+  | { kind: "file"; file: File }
+  | { kind: "remote"; modelId: string };
+
 export interface ModelSource {
   id: string;
-  kind: "local-file";
-  read(file: File): Promise<ModelSourceResult>;
+  kind: ModelSourceKind;
+  read(input: ModelSourceInput): Promise<ModelSourceResult>;
+}
+
+export interface ServerModelSummary {
+  modelId: string;
+  name: string;
+  size: number;
+  uploadedAt: string;
 }
 
 export interface ViewerTreeNode {

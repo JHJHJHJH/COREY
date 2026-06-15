@@ -1,5 +1,3 @@
-"use client";
-
 import type {
   ViewerDataTableCell,
   ViewerDataTableColumn,
@@ -32,10 +30,30 @@ type PersistedViewerDataTableDraft =
     }
   | ViewerDataTableDraft;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function isCompactPersistedEdit(
-  entry: ViewerDataTableEdit | [string, string, unknown, ViewerDataTableEditableValueKind | null],
+  entry: unknown,
 ): entry is [string, string, unknown, ViewerDataTableEditableValueKind | null] {
   return Array.isArray(entry);
+}
+
+function normalizeEditableValueKind(value: unknown): ViewerDataTableEditableValueKind | null {
+  if (value === "string" || value === "number" || value === "boolean") {
+    return value;
+  }
+
+  return null;
+}
+
+function normalizeUpdatedAt(value: unknown) {
+  if (typeof value === "string" && value.trim().length > 0 && Number.isFinite(Date.parse(value))) {
+    return value;
+  }
+
+  return new Date().toISOString();
 }
 
 function normalizeValue(value: unknown): unknown {
@@ -155,7 +173,10 @@ function normalizeImportedColumn(column: ViewerDataTableColumn): ViewerDataTable
   return {
     key: String(column.key ?? ""),
     label: String(column.label ?? ""),
-    kind: column.kind,
+    kind:
+      column.kind === "base" || column.kind === "attribute" || column.kind === "property"
+        ? column.kind
+        : "property",
     group: column.group ? String(column.group) : null,
     populatedRowCount:
       typeof column.populatedRowCount === "number" && Number.isFinite(column.populatedRowCount)
@@ -164,9 +185,45 @@ function normalizeImportedColumn(column: ViewerDataTableColumn): ViewerDataTable
     editable: Boolean(column.editable),
     editableReason: column.editableReason ? String(column.editableReason) : null,
     binding: column.binding ?? null,
-    valueKind: column.valueKind ?? null,
+    valueKind: normalizeEditableValueKind(column.valueKind),
     origin: column.origin === "import" ? "import" : "ifc",
     importHeader: column.importHeader ? String(column.importHeader) : null,
+  };
+}
+
+function normalizePersistedEdit(entry: unknown): ViewerDataTableEdit | null {
+  if (isCompactPersistedEdit(entry)) {
+    const rowKey = String(entry[0] ?? "");
+    const columnKey = String(entry[1] ?? "");
+    if (!rowKey || !columnKey) {
+      return null;
+    }
+
+    return {
+      rowKey,
+      columnKey,
+      value: buildViewerDataTableDraftValue(entry[2], normalizeEditableValueKind(entry[3])),
+    };
+  }
+
+  if (!isRecord(entry)) {
+    return null;
+  }
+
+  const rowKey = String(entry.rowKey ?? "");
+  const columnKey = String(entry.columnKey ?? "");
+  if (!rowKey || !columnKey) {
+    return null;
+  }
+
+  const value = isRecord(entry.value) ? entry.value : {};
+  return {
+    rowKey,
+    columnKey,
+    value: buildViewerDataTableDraftValue(
+      "raw" in value ? value.raw : undefined,
+      normalizeEditableValueKind(value.valueKind),
+    ),
   };
 }
 
@@ -469,6 +526,59 @@ function buildLegacyStorageKey(sourceId: string) {
   return `${LEGACY_VIEWER_DATA_TABLE_DRAFT_STORAGE_PREFIX}${sourceId}`;
 }
 
+export function serializeViewerDataTableDraft(
+  draft: ViewerDataTableDraft,
+): PersistedViewerDataTableDraft {
+  return {
+    version: draft.version,
+    sourceId: draft.sourceId,
+    updatedAt: draft.updatedAt,
+    importedColumns: draft.importedColumns.map(normalizeImportedColumn),
+    edits: draft.edits.map((edit) => [
+      edit.rowKey,
+      edit.columnKey,
+      edit.value.raw,
+      edit.value.valueKind,
+    ] as [string, string, unknown, ViewerDataTableEditableValueKind | null]),
+  };
+}
+
+export function parseStoredViewerDataTableDraft(
+  sourceId: string,
+  input: unknown,
+): ViewerDataTableDraft {
+  if (!isRecord(input)) {
+    throw new Error("Stored data-table draft must be an object.");
+  }
+
+  if (
+    (input.version !== 1 && input.version !== VIEWER_DATA_TABLE_DRAFT_VERSION) ||
+    input.sourceId !== sourceId ||
+    !Array.isArray(input.edits)
+  ) {
+    throw new Error("Stored data-table draft does not match this model.");
+  }
+
+  const importedColumns =
+    input.version === VIEWER_DATA_TABLE_DRAFT_VERSION && Array.isArray(input.importedColumns)
+      ? input.importedColumns
+          .filter(isRecord)
+          .map((column) => normalizeImportedColumn(column as unknown as ViewerDataTableColumn))
+          .filter((column) => column.key.length > 0)
+      : [];
+  const edits = input.edits
+    .map(normalizePersistedEdit)
+    .filter((edit): edit is ViewerDataTableEdit => Boolean(edit));
+
+  return {
+    version: VIEWER_DATA_TABLE_DRAFT_VERSION,
+    sourceId,
+    updatedAt: normalizeUpdatedAt(input.updatedAt),
+    importedColumns,
+    edits,
+  };
+}
+
 export function readPersistedViewerDataTableDraft(sourceId: string): ViewerDataTableDraft | null {
   if (typeof window === "undefined") {
     return null;
@@ -482,44 +592,7 @@ export function readPersistedViewerDataTableDraft(sourceId: string): ViewerDataT
 
     try {
       const parsed = JSON.parse(text) as PersistedViewerDataTableDraft;
-      if (
-        (parsed.version !== 1 && parsed.version !== VIEWER_DATA_TABLE_DRAFT_VERSION) ||
-        parsed.sourceId !== sourceId ||
-        !Array.isArray(parsed.edits)
-      ) {
-        continue;
-      }
-
-      if (parsed.edits.every(isCompactPersistedEdit)) {
-        return {
-          version: VIEWER_DATA_TABLE_DRAFT_VERSION,
-          sourceId: parsed.sourceId,
-          updatedAt: parsed.updatedAt,
-          importedColumns:
-            parsed.version === 1
-              ? []
-              : (parsed.importedColumns ?? []).map(normalizeImportedColumn),
-          edits: parsed.edits.map((entry) => ({
-            rowKey: String(entry[0] ?? ""),
-            columnKey: String(entry[1] ?? ""),
-            value: buildViewerDataTableDraftValue(
-              entry[2],
-              (entry[3] ?? null) as ViewerDataTableEditableValueKind | null,
-            ),
-          })),
-        };
-      }
-
-      return {
-        version: VIEWER_DATA_TABLE_DRAFT_VERSION,
-        sourceId: parsed.sourceId,
-        updatedAt: parsed.updatedAt,
-        importedColumns:
-          parsed.version === VIEWER_DATA_TABLE_DRAFT_VERSION
-            ? (parsed.importedColumns ?? []).map(normalizeImportedColumn)
-            : [],
-        edits: parsed.edits,
-      };
+      return parseStoredViewerDataTableDraft(sourceId, parsed);
     } catch {
       continue;
     }
@@ -533,21 +606,11 @@ export function writePersistedViewerDataTableDraft(draft: ViewerDataTableDraft |
     return { ok: true as const };
   }
 
-  const persistedDraft: PersistedViewerDataTableDraft = {
-    version: draft.version,
-    sourceId: draft.sourceId,
-    updatedAt: draft.updatedAt,
-    importedColumns: draft.importedColumns.map(normalizeImportedColumn),
-    edits: draft.edits.map((edit) => [
-      edit.rowKey,
-      edit.columnKey,
-      edit.value.raw,
-      edit.value.valueKind,
-    ] as [string, string, unknown, ViewerDataTableEditableValueKind | null]),
-  };
-
   try {
-    window.localStorage.setItem(buildStorageKey(draft.sourceId), JSON.stringify(persistedDraft));
+    window.localStorage.setItem(
+      buildStorageKey(draft.sourceId),
+      JSON.stringify(serializeViewerDataTableDraft(draft)),
+    );
     return { ok: true as const };
   } catch (error) {
     return {

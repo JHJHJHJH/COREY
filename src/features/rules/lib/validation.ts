@@ -149,6 +149,10 @@ function sanitizeValidationValue(value: unknown): ViewerValidationValue {
   };
 }
 
+function sanitizeValidationFailureSeverity(value: unknown): ViewerValidationFailureSeverity {
+  return value === "warn" ? "warn" : "error";
+}
+
 function sanitizeValidationRow(row: unknown): ViewerValidationRow {
   if (!isRecord(row)) {
     throw new Error("Each validation row must be an object.");
@@ -174,6 +178,71 @@ function sanitizeValidationRow(row: unknown): ViewerValidationRow {
     localId: row.localId,
     ifcType: typeof row.ifcType === "string" && row.ifcType.trim().length > 0 ? row.ifcType : null,
     values,
+  };
+}
+
+function sanitizeValidationRuleFailure(input: unknown): ViewerValidationRuleFailure {
+  if (!isRecord(input)) {
+    throw new Error("Each validation rule failure must be an object.");
+  }
+
+  const clauseId = normalizeStoredText(String(input.clauseId ?? ""));
+  const clauseTitle = normalizeStoredText(String(input.clauseTitle ?? "")) || "Untitled clause";
+  const ruleId = normalizeStoredText(String(input.ruleId ?? ""));
+  const description = normalizeStoredText(String(input.description ?? ""));
+
+  if (!clauseId || !ruleId || !description) {
+    throw new Error("Each validation rule failure requires clauseId, ruleId, and description.");
+  }
+
+  return {
+    clauseId,
+    clauseTitle,
+    ruleId,
+    result: sanitizeValidationFailureSeverity(input.result),
+    description,
+  };
+}
+
+function sanitizeValidationClauseFailure(input: unknown): ViewerValidationClauseFailure {
+  if (!isRecord(input)) {
+    throw new Error("Each validation clause failure must be an object.");
+  }
+
+  const clauseId = normalizeStoredText(String(input.clauseId ?? ""));
+  const clauseTitle = normalizeStoredText(String(input.clauseTitle ?? "")) || "Untitled clause";
+  if (!clauseId) {
+    throw new Error("Each validation clause failure requires a clauseId.");
+  }
+
+  return {
+    clauseId,
+    clauseTitle,
+    result: sanitizeValidationFailureSeverity(input.result),
+    rules: Array.isArray(input.rules)
+      ? input.rules.map((failure) => sanitizeValidationRuleFailure(failure))
+      : [],
+  };
+}
+
+function sanitizeValidationElementResult(input: unknown): ViewerValidationElementResult {
+  if (!isRecord(input)) {
+    throw new Error("Each validation element result must be an object.");
+  }
+
+  const modelId = normalizeStoredText(String(input.modelId ?? ""));
+  const localId = coerceFiniteNumber(input.localId);
+  if (!modelId || localId === null) {
+    throw new Error("Each validation element result requires modelId and localId.");
+  }
+
+  return {
+    modelId,
+    localId: Math.trunc(localId),
+    result: sanitizeValidationFailureSeverity(input.result),
+    failedClauses: Array.isArray(input.failedClauses)
+      ? input.failedClauses.map((failure) => sanitizeValidationClauseFailure(failure))
+      : [],
   };
 }
 
@@ -722,6 +791,40 @@ export function parseViewerValidationRunPayload(input: unknown): ViewerValidatio
     sourceId: input.sourceId,
     clauses: config.clauses,
     rows: input.rows.map((row) => sanitizeValidationRow(row)),
+  };
+}
+
+export function parseViewerValidationRunResult(
+  input: unknown,
+  expectedSourceId?: string,
+): ViewerValidationRunResult {
+  if (!isRecord(input)) {
+    throw new Error("Validation result must be an object.");
+  }
+
+  const sourceId = normalizeStoredText(String(input.sourceId ?? ""));
+  if (!sourceId) {
+    throw new Error("Validation result requires a sourceId.");
+  }
+
+  if (expectedSourceId && sourceId !== expectedSourceId) {
+    throw new Error("Validation result does not match this model.");
+  }
+
+  const failedClauses = Array.isArray(input.failedClauses)
+    ? input.failedClauses.map((failure) => sanitizeValidationClauseFailure(failure))
+    : [];
+
+  return {
+    sourceId,
+    results: Array.isArray(input.results)
+      ? input.results.map((result) => sanitizeValidationElementResult(result))
+      : [],
+    failedClauseCount:
+      typeof input.failedClauseCount === "number" && Number.isFinite(input.failedClauseCount)
+        ? Math.max(0, Math.trunc(input.failedClauseCount))
+        : failedClauses.length,
+    failedClauses,
   };
 }
 

@@ -3,6 +3,7 @@
 import {
   ClipboardCheck,
   CircleAlert,
+  CloudUpload,
   FileOutput,
   FileSpreadsheet,
   Import,
@@ -21,6 +22,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type SetStateAction,
 } from "react";
 import {
   applyViewerValidationToInspection,
@@ -29,6 +31,7 @@ import {
   groupViewerValidationResultsBySeverity,
   VIEWER_VALIDATION_CONFIG_VERSION,
 } from "@/features/rules/lib/validation";
+import { evaluateViewerValidationViaApi } from "@/features/rules/lib/validation-api";
 import { useViewerRules } from "@/features/rules/rules-provider";
 import { DataTablePanel } from "@/features/viewer/components/data-table-panel";
 import { DebugPanel } from "@/features/viewer/components/debug-panel";
@@ -45,6 +48,17 @@ import {
   writePersistedViewerDataTableDraft,
 } from "@/features/viewer/lib/data-table-draft";
 import {
+  clearServerViewerDataTableDraft,
+  readServerViewerDataTableDraft,
+  writeServerViewerDataTableDraft,
+} from "@/features/viewer/lib/data-table-draft-api";
+import {
+  exportEditedIfcViaApi,
+  exportViewerDataTableToExcelViaApi,
+  exportViewerValidationDiagnosisToExcelViaApi,
+  importViewerDataTableFromExcelViaApi,
+} from "@/features/viewer/lib/data-table-compute-api";
+import {
   buildViewerDataTableExcelFileName,
   buildViewerDataTableIfcFileName,
   buildViewerValidationDiagnosisExcelFileName,
@@ -58,8 +72,15 @@ import {
   formatBytes,
   sanitizeViewerDebugValue,
 } from "@/features/viewer/lib/ifc-data";
-import { LocalFileModelSource } from "@/features/viewer/lib/model-source";
+import { LocalFileModelSource, RemoteModelSource } from "@/features/viewer/lib/model-source";
+import { uploadModelToServer } from "@/features/viewer/lib/model-api";
+import { ServerModelsMenu } from "@/features/viewer/components/server-models-menu";
 import { buildViewerValidationDiagnosisReport } from "@/features/viewer/lib/validation-report";
+import {
+  listServerViewerValidationReports,
+  readServerViewerValidationReport,
+  saveServerViewerValidationReport,
+} from "@/features/viewer/lib/validation-report-api";
 import { exportEditedIfc } from "@/features/viewer/lib/ifc-writeback";
 import type {
   ModelMetadata,
@@ -77,6 +98,7 @@ import type {
   ViewerStatus,
   ViewerValidationHighlights,
   ViewerValidationClauseTableView,
+  ViewerValidationReportSummary,
   ViewerValidationRunPayload,
   ViewerValidationRunResult,
   ViewerTreeNode,
@@ -117,9 +139,11 @@ const MIN_DATA_TABLE_DIALOG_HEIGHT = 260;
 const MAX_DATA_TABLE_DIALOG_WIDTH = Number.POSITIVE_INFINITY;
 const MAX_DATA_TABLE_DIALOG_HEIGHT = Number.POSITIVE_INFINITY;
 const DATA_TABLE_DIALOG_MARGIN = 12;
+const VALIDATION_API_ROW_THRESHOLD = 1000;
 
 const validationWorkerUrl = new URL("../../rules/workers/validation-worker.ts", import.meta.url);
 const source = new LocalFileModelSource();
+const remoteSource = new RemoteModelSource();
 
 const emptyValidationHighlights: ViewerValidationHighlights = {
   warn: {},
@@ -605,6 +629,10 @@ export function ViewerShell() {
   const propertiesDrawerRef = useRef<HTMLDivElement | null>(null);
   const dataTableDialogRef = useRef<HTMLDivElement | null>(null);
   const activeSourceRef = useRef<ModelSourceResult | null>(null);
+  const dataTableDraftPersistenceVersionRef = useRef(0);
+  const dataTableDraftWriteThroughRef = useRef(false);
+  const persistedValidationResultRef = useRef<ViewerValidationRunResult | null>(null);
+  const [savingToServer, setSavingToServer] = useState(false);
   const validationWorkerRef = useRef<Worker | null>(null);
   const validationAbortControllerRef = useRef<AbortController | null>(null);
   const validationRunIdRef = useRef(0);
@@ -655,6 +683,10 @@ export function ViewerShell() {
   );
   const [validationResult, setValidationResult] = useState<ViewerValidationRunResult | null>(null);
   const [validationReportStatus, setValidationReportStatus] = useState(initialValidationReportStatus);
+  const [savedValidationReports, setSavedValidationReports] = useState<ViewerValidationReportSummary[]>([]);
+  const [restoredValidationReport, setRestoredValidationReport] =
+    useState<ViewerValidationDiagnosisReport | null>(null);
+  const [activeSavedValidationReportId, setActiveSavedValidationReportId] = useState<string | null>(null);
   const [selectedValidationClauseId, setSelectedValidationClauseId] = useState("");
   const [showTree, setShowTree] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
@@ -720,6 +752,17 @@ export function ViewerShell() {
   const isDataTableSyncedToView = dataTableVisibleRowKeysInView !== null;
   const indexedIfcTypes = useMemo(() => effectiveDataTableData?.ifcTypes ?? [], [effectiveDataTableData]);
   const draftEditCount = dataTableDraft?.edits.length ?? 0;
+  const commitDataTableDraft = useCallback(
+    (
+      next: SetStateAction<ViewerDataTableDraft | null>,
+      options: { writeThrough?: boolean } = {},
+    ) => {
+      dataTableDraftWriteThroughRef.current = options.writeThrough ?? false;
+      dataTableDraftPersistenceVersionRef.current += 1;
+      setDataTableDraft(next);
+    },
+    [],
+  );
   const validatedSelectionDetails = useMemo<ViewerSelectionDetails>(
     () => ({
       ...selectionDetails,
@@ -739,16 +782,17 @@ export function ViewerShell() {
       }),
     [effectiveDataTableData, metadata, validationResult],
   );
+  const activeValidationDiagnosisReport = restoredValidationReport ?? validationDiagnosisReport;
   const validationClauseTableViews = useMemo<ViewerValidationClauseTableView[]>(
     () =>
-      validationDiagnosisReport?.clauses.map((clause) => ({
+      activeValidationDiagnosisReport?.clauses.map((clause) => ({
         clauseId: clause.clauseId,
         clauseTitle: clause.clauseTitle,
         result: clause.result,
         elementCount: clause.elementCount,
         rowKeys: clause.elements.map((element) => element.rowKey),
       })) ?? [],
-    [validationDiagnosisReport],
+    [activeValidationDiagnosisReport],
   );
   const debugTreeSample = useMemo(
     () => (tree.length > 0 ? buildViewerTreeDebugSample(tree) : null),
@@ -810,31 +854,75 @@ export function ViewerShell() {
 
   useEffect(() => {
     const sourceId = metadata?.sourceId;
+    const serverModelId = metadata?.serverModelId;
     if (!sourceId || !dataTableState.data) {
-      setDataTableDraft(null);
+      commitDataTableDraft(null);
       return;
     }
 
-    const persistedDraft = readPersistedViewerDataTableDraft(sourceId);
-    setDataTableDraft(persistedDraft);
+    const cachedDraft = readPersistedViewerDataTableDraft(sourceId);
+    commitDataTableDraft(cachedDraft);
     setDataTableImportReport(null);
     setDataTableActionStatus(
-      persistedDraft &&
-        (persistedDraft.edits.length > 0 || persistedDraft.importedColumns.length > 0)
+      cachedDraft &&
+        (cachedDraft.edits.length > 0 || cachedDraft.importedColumns.length > 0)
         ? {
             phase: "success",
-            message: `Restored ${persistedDraft.edits.length} imported edits from local draft storage.`,
+            message: `Restored ${cachedDraft.edits.length} imported edits from draft cache.`,
             issues: [],
           }
         : initialDataTableActionStatus,
     );
-  }, [dataTableState.data, metadata?.sourceId]);
+
+    if (!serverModelId) {
+      return;
+    }
+
+    const cacheHydrationVersion = dataTableDraftPersistenceVersionRef.current;
+    const controller = new AbortController();
+
+    readServerViewerDataTableDraft(serverModelId, controller.signal)
+      .then((serverDraft) => {
+        if (dataTableDraftPersistenceVersionRef.current !== cacheHydrationVersion) {
+          return;
+        }
+
+        if (serverDraft) {
+          writePersistedViewerDataTableDraft(serverDraft);
+        } else {
+          clearPersistedViewerDataTableDraft(sourceId);
+        }
+        commitDataTableDraft(serverDraft);
+        setDataTableActionStatus(
+          serverDraft &&
+            (serverDraft.edits.length > 0 || serverDraft.importedColumns.length > 0)
+            ? {
+                phase: "success",
+                message: `Restored ${serverDraft.edits.length} imported edits from server draft.`,
+                issues: [],
+              }
+            : initialDataTableActionStatus,
+        );
+      })
+      .catch(() => {
+        // Offline / server error — keep the cache snapshot.
+      });
+
+    return () => controller.abort();
+  }, [commitDataTableDraft, dataTableState.data, metadata?.serverModelId, metadata?.sourceId]);
 
   useEffect(() => {
     const sourceId = metadata?.sourceId;
+    const serverModelId = metadata?.serverModelId;
     if (!sourceId) {
       return;
     }
+
+    if (!dataTableDraftWriteThroughRef.current) {
+      return;
+    }
+
+    const controller = serverModelId ? new AbortController() : null;
 
     if (dataTableDraft) {
       const persisted = writePersistedViewerDataTableDraft(dataTableDraft);
@@ -845,11 +933,103 @@ export function ViewerShell() {
           issues: current.issues,
         }));
       }
-      return;
+
+      if (serverModelId && dataTableDraft.sourceId === serverModelId) {
+        void writeServerViewerDataTableDraft(dataTableDraft, controller?.signal).catch(() => {
+          // Best-effort write-through; localStorage keeps the latest draft for reload.
+        });
+      }
+
+      return () => controller?.abort();
     }
 
     clearPersistedViewerDataTableDraft(sourceId);
-  }, [dataTableDraft, metadata?.sourceId]);
+    if (serverModelId) {
+      void clearServerViewerDataTableDraft(serverModelId, controller?.signal).catch(() => {
+        // Best-effort delete; the next successful write replaces server state.
+      });
+    }
+
+    return () => controller?.abort();
+  }, [dataTableDraft, metadata?.serverModelId, metadata?.sourceId]);
+
+  useEffect(() => {
+    setRestoredValidationReport(null);
+    setActiveSavedValidationReportId(null);
+  }, [validationResult]);
+
+  useEffect(() => {
+    const serverModelId = metadata?.serverModelId;
+    persistedValidationResultRef.current = null;
+    setSavedValidationReports([]);
+    setRestoredValidationReport(null);
+    setActiveSavedValidationReportId(null);
+
+    if (!serverModelId) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    listServerViewerValidationReports(serverModelId, controller.signal)
+      .then((reports) => {
+        setSavedValidationReports(reports);
+      })
+      .catch(() => {
+        // Offline / server error — validation still runs locally.
+      });
+
+    return () => controller.abort();
+  }, [metadata?.serverModelId]);
+
+  useEffect(() => {
+    const serverModelId = metadata?.serverModelId;
+    if (
+      !serverModelId ||
+      validationState.phase !== "ready" ||
+      !validationResult ||
+      !validationDiagnosisReport ||
+      validationDiagnosisReport.sourceId !== serverModelId ||
+      persistedValidationResultRef.current === validationResult
+    ) {
+      return;
+    }
+
+    persistedValidationResultRef.current = validationResult;
+    const controller = new AbortController();
+
+    saveServerViewerValidationReport(serverModelId, validationDiagnosisReport, controller.signal)
+      .then((record) => {
+        setSavedValidationReports((current) => [
+          record,
+          ...current.filter((report) => report.reportId !== record.reportId),
+        ].slice(0, 25));
+        setValidationReportStatus({
+          phase: "success",
+          message: "Saved validation report to server.",
+        });
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setValidationReportStatus({
+          phase: "error",
+          message:
+            error instanceof Error
+              ? `Validation report was not saved: ${error.message}`
+              : "Validation report was not saved.",
+        });
+      });
+
+    return () => controller.abort();
+  }, [
+    metadata?.serverModelId,
+    validationDiagnosisReport,
+    validationResult,
+    validationState.phase,
+  ]);
 
   const stopValidationWorker = useCallback(() => {
     validationWorkerRef.current?.terminate();
@@ -1371,7 +1551,11 @@ export function ViewerShell() {
 
     const runToken = ++validationRunIdRef.current;
     const runId = String(runToken);
-    let fallbackStarted = false;
+    const shouldRunViaApi =
+      Boolean(metadata.serverModelId) ||
+      validationPayload.rows.length >= VALIDATION_API_ROW_THRESHOLD;
+    let apiStarted = false;
+    let workerStarted = false;
 
     const commitSuccess = (mode: "worker" | "api", result: ViewerValidationRunResult) => {
       if (validationRunIdRef.current !== runToken) {
@@ -1413,12 +1597,12 @@ export function ViewerShell() {
       });
     };
 
-    const fallbackToApi = async () => {
-      if (fallbackStarted || validationRunIdRef.current !== runToken) {
+    const runApiValidation = async (strategy: "primary" | "fallback") => {
+      if (apiStarted || validationRunIdRef.current !== runToken) {
         return;
       }
 
-      fallbackStarted = true;
+      apiStarted = true;
       stopValidationWorker();
 
       const controller = new AbortController();
@@ -1432,28 +1616,25 @@ export function ViewerShell() {
           progress: 0,
           issueCount: 0,
           failedClauseCount: 0,
-          message: `Validating ${validationPayload.rows.length} elements via API fallback...`,
+          message:
+            strategy === "primary"
+              ? `Validating ${validationPayload.rows.length} elements via API...`
+              : `Validating ${validationPayload.rows.length} elements via API fallback...`,
         });
       });
 
       try {
-        const response = await fetch("/api/rules/evaluate", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(validationPayload),
-          signal: controller.signal,
-        });
-
-        const body = (await response.json()) as ViewerValidationRunResult & { error?: string };
-        if (!response.ok) {
-          throw new Error(body.error ?? "Validation API request failed.");
-        }
-
-        commitSuccess("api", body);
+        commitSuccess(
+          "api",
+          await evaluateViewerValidationViaApi(validationPayload, controller.signal),
+        );
       } catch (error) {
         if (controller.signal.aborted || validationRunIdRef.current !== runToken) {
+          return;
+        }
+
+        if (strategy === "primary") {
+          runWorkerValidation("fallback");
           return;
         }
 
@@ -1468,7 +1649,15 @@ export function ViewerShell() {
       }
     };
 
-    startTransition(() => {
+    const runWorkerValidation = (strategy: "primary" | "fallback") => {
+      if (workerStarted || validationRunIdRef.current !== runToken) {
+        return;
+      }
+
+      workerStarted = true;
+      stopValidationRequest();
+
+      startTransition(() => {
         setValidationResult(null);
         setValidationState({
           phase: "running",
@@ -1476,61 +1665,93 @@ export function ViewerShell() {
           progress: 0,
           issueCount: 0,
           failedClauseCount: 0,
-          message: `Validating ${validationPayload.rows.length} elements in a worker...`,
+          message:
+            strategy === "primary"
+              ? `Validating ${validationPayload.rows.length} elements in a worker...`
+              : `Validating ${validationPayload.rows.length} elements in a worker fallback...`,
         });
-    });
-
-    try {
-      const worker = new Worker(validationWorkerUrl, { type: "module" });
-      validationWorkerRef.current = worker;
-
-      worker.onmessage = (event: MessageEvent<ViewerValidationWorkerMessage>) => {
-        const message = event.data;
-
-        if (validationRunIdRef.current !== runToken || message.runId !== runId) {
-          return;
-        }
-
-        if (message.type === "progress") {
-          const progress =
-            message.totalRowCount === 0
-              ? 100
-              : Math.floor((message.processedRowCount / message.totalRowCount) * 100);
-
-          startTransition(() => {
-            setValidationState({
-              phase: "running",
-              mode: "worker",
-              progress,
-              issueCount: 0,
-              failedClauseCount: 0,
-              message: `Validating ${message.totalRowCount} elements in a worker... ${progress}%`,
-            });
-          });
-          return;
-        }
-
-        if (message.type === "result") {
-          stopValidationWorker();
-          commitSuccess("worker", message.result);
-          return;
-        }
-
-        void fallbackToApi();
-      };
-
-      worker.onerror = (event) => {
-        event.preventDefault();
-        void fallbackToApi();
-      };
-
-      worker.postMessage({
-        type: "run",
-        runId,
-        payload: validationPayload,
       });
-    } catch {
-      void fallbackToApi();
+
+      try {
+        const worker = new Worker(validationWorkerUrl, { type: "module" });
+        validationWorkerRef.current = worker;
+
+        worker.onmessage = (event: MessageEvent<ViewerValidationWorkerMessage>) => {
+          const message = event.data;
+
+          if (validationRunIdRef.current !== runToken || message.runId !== runId) {
+            return;
+          }
+
+          if (message.type === "progress") {
+            const progress =
+              message.totalRowCount === 0
+                ? 100
+                : Math.floor((message.processedRowCount / message.totalRowCount) * 100);
+
+            startTransition(() => {
+              setValidationState({
+                phase: "running",
+                mode: "worker",
+                progress,
+                issueCount: 0,
+                failedClauseCount: 0,
+                message: `Validating ${message.totalRowCount} elements in a worker... ${progress}%`,
+              });
+            });
+            return;
+          }
+
+          if (message.type === "result") {
+            stopValidationWorker();
+            commitSuccess("worker", message.result);
+            return;
+          }
+
+          stopValidationWorker();
+          if (strategy === "primary") {
+            void runApiValidation("fallback");
+            return;
+          }
+
+          commitError("worker", message.message);
+        };
+
+        worker.onerror = (event) => {
+          event.preventDefault();
+          stopValidationWorker();
+
+          if (strategy === "primary") {
+            void runApiValidation("fallback");
+            return;
+          }
+
+          commitError("worker", "Validation worker failed.");
+        };
+
+        worker.postMessage({
+          type: "run",
+          runId,
+          payload: validationPayload,
+        });
+      } catch (error) {
+        stopValidationWorker();
+        if (strategy === "primary") {
+          void runApiValidation("fallback");
+          return;
+        }
+
+        commitError(
+          "worker",
+          error instanceof Error ? error.message : "Validation worker failed.",
+        );
+      }
+    };
+
+    if (shouldRunViaApi) {
+      void runApiValidation("primary");
+    } else {
+      runWorkerValidation("primary");
     }
 
     return () => {
@@ -1554,16 +1775,90 @@ export function ViewerShell() {
     inputRef.current?.click();
   };
 
-  const loadModelFromFile = useCallback(async (file: File) => {
-    const sourceResult = await source.read(file);
+  const loadModelFromSource = useCallback(async (sourceResult: ModelSourceResult) => {
     activeSourceRef.current = sourceResult;
     startTransition(() => {
-      setDataTableDraft(null);
+      commitDataTableDraft(null);
       setDataTableImportReport(null);
       setDataTableActionStatus(initialDataTableActionStatus);
     });
     await viewportRef.current?.loadIfc(sourceResult);
-  }, []);
+  }, [commitDataTableDraft]);
+
+  const loadModelFromFile = useCallback(
+    async (file: File) => {
+      await loadModelFromSource(await source.read({ kind: "file", file }));
+    },
+    [loadModelFromSource],
+  );
+
+  const loadModelById = useCallback(
+    async (modelId: string) => {
+      startTransition(() => {
+        setStatus({ phase: "loading", message: "Fetching model from server..." });
+      });
+
+      try {
+        await loadModelFromSource(await remoteSource.read({ kind: "remote", modelId }));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error";
+        startTransition(() => {
+          setStatus({ phase: "error", message: `Failed to load server model: ${message}` });
+        });
+      }
+    },
+    [loadModelFromSource],
+  );
+
+  const handleSaveToServer = useCallback(async () => {
+    const activeSource = activeSourceRef.current;
+    if (!activeSource) {
+      return;
+    }
+
+    const previousSourceId = activeSource.metadata.sourceId;
+    setSavingToServer(true);
+    try {
+      const summary = await uploadModelToServer(
+        activeSource.metadata.name,
+        activeSource.bytes as BodyInit,
+      );
+      const rekeyedDraft = dataTableDraft
+        ? { ...dataTableDraft, sourceId: summary.modelId, updatedAt: new Date().toISOString() }
+        : null;
+      if (rekeyedDraft) {
+        writePersistedViewerDataTableDraft(rekeyedDraft);
+      }
+      if (previousSourceId && previousSourceId !== summary.modelId) {
+        clearPersistedViewerDataTableDraft(previousSourceId);
+      }
+
+      activeSourceRef.current = {
+        ...activeSource,
+        metadata: {
+          ...activeSource.metadata,
+          sourceId: summary.modelId,
+          serverModelId: summary.modelId,
+        },
+      };
+      commitDataTableDraft(rekeyedDraft, { writeThrough: true });
+      setMetadata((current) =>
+        current
+          ? { ...current, sourceId: summary.modelId, serverModelId: summary.modelId }
+          : current,
+      );
+      startTransition(() => {
+        setStatus({ phase: "loaded", message: `Saved “${summary.name}” to server.` });
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      startTransition(() => {
+        setStatus({ phase: "error", message: `Failed to save to server: ${message}` });
+      });
+    } finally {
+      setSavingToServer(false);
+    }
+  }, [commitDataTableDraft, dataTableDraft]);
 
   const handleLoadBundledModel = async () => {
     startTransition(() => {
@@ -1628,12 +1923,33 @@ export function ViewerShell() {
     });
 
     try {
-      const result = await importViewerDataTableFromExcel({
-        file,
-        sourceId: metadata.sourceId,
-        baseData: dataTableState.data,
-        currentData: effectiveDataTableData,
-      });
+      let result;
+      try {
+        result = metadata.serverModelId
+          ? await importViewerDataTableFromExcelViaApi({
+              file,
+              sourceId: metadata.sourceId,
+              baseData: dataTableState.data,
+              currentData: effectiveDataTableData,
+            })
+          : await importViewerDataTableFromExcel({
+              file,
+              sourceId: metadata.sourceId,
+              baseData: dataTableState.data,
+              currentData: effectiveDataTableData,
+            });
+      } catch (error) {
+        if (!metadata.serverModelId) {
+          throw error;
+        }
+
+        result = await importViewerDataTableFromExcel({
+          file,
+          sourceId: metadata.sourceId,
+          baseData: dataTableState.data,
+          currentData: effectiveDataTableData,
+        });
+      }
       const importedColumnKeys = [
         ...new Set(result.draft?.edits.map((edit) => edit.columnKey) ?? []),
       ];
@@ -1641,7 +1957,7 @@ export function ViewerShell() {
       const skippedCellCount = result.report.skippedCellCount;
 
       startTransition(() => {
-        setDataTableDraft(result.draft);
+        commitDataTableDraft(result.draft, { writeThrough: true });
         setDataTableImportReport(result.report);
         setDataTableImportFocus((current) => ({
           revision: current.revision + Number(importedEditCount > 0),
@@ -1694,11 +2010,31 @@ export function ViewerShell() {
     });
 
     try {
-      const result = await exportViewerDataTableToExcel({
-        data: effectiveDataTableData,
-        sourceId: metadata.sourceId,
-        fileName: buildViewerDataTableExcelFileName(metadata.name),
-      });
+      const fileName = buildViewerDataTableExcelFileName(metadata.name);
+      let result;
+      try {
+        result = metadata.serverModelId
+          ? await exportViewerDataTableToExcelViaApi({
+              data: effectiveDataTableData,
+              sourceId: metadata.sourceId,
+              fileName,
+            })
+          : await exportViewerDataTableToExcel({
+              data: effectiveDataTableData,
+              sourceId: metadata.sourceId,
+              fileName,
+            });
+      } catch (error) {
+        if (!metadata.serverModelId) {
+          throw error;
+        }
+
+        result = await exportViewerDataTableToExcel({
+          data: effectiveDataTableData,
+          sourceId: metadata.sourceId,
+          fileName,
+        });
+      }
       setDataTableActionStatus({
         phase: "success",
         message: `Exported ${effectiveDataTableData.rows.length} rows to ${result.fileName}.`,
@@ -1715,7 +2051,7 @@ export function ViewerShell() {
 
   const handleClearImportedEdits = useCallback(() => {
     const sourceId = metadata?.sourceId;
-    setDataTableDraft(null);
+    commitDataTableDraft(null, { writeThrough: true });
     setDataTableImportReport(null);
     if (sourceId) {
       clearPersistedViewerDataTableDraft(sourceId);
@@ -1725,7 +2061,7 @@ export function ViewerShell() {
       message: "Cleared imported data-table edits.",
       issues: [],
     });
-  }, [metadata?.sourceId]);
+  }, [commitDataTableDraft, metadata?.sourceId]);
 
   const handleExportEditedIfc = useCallback(async () => {
     if (!effectiveDataTableData || !metadata || !activeSourceRef.current) {
@@ -1743,11 +2079,26 @@ export function ViewerShell() {
       issues: [],
     });
 
-    const result = await exportEditedIfc({
-      data: effectiveDataTableData,
-      bytes: activeSourceRef.current.bytes,
-      fileName: buildViewerDataTableIfcFileName(metadata.name),
-    });
+    const fileName = buildViewerDataTableIfcFileName(metadata.name);
+    let result = metadata.serverModelId
+      ? await exportEditedIfcViaApi({
+          modelId: metadata.serverModelId,
+          data: effectiveDataTableData,
+          fileName,
+        })
+      : await exportEditedIfc({
+          data: effectiveDataTableData,
+          bytes: activeSourceRef.current.bytes,
+          fileName,
+        });
+
+    if (result.phase === "error" && metadata.serverModelId) {
+      result = await exportEditedIfc({
+        data: effectiveDataTableData,
+        bytes: activeSourceRef.current.bytes,
+        fileName,
+      });
+    }
     setDataTableActionStatus(result);
   }, [effectiveDataTableData, metadata]);
 
@@ -1787,8 +2138,48 @@ export function ViewerShell() {
     setShowDataTableInWindow(true);
   }, []);
 
+  const handleUseCurrentValidationReport = useCallback(() => {
+    setRestoredValidationReport(null);
+    setActiveSavedValidationReportId(null);
+  }, []);
+
+  const handleRestoreValidationReport = useCallback(
+    async (reportId: string) => {
+      const serverModelId = metadata?.serverModelId;
+      if (!serverModelId) {
+        setValidationReportStatus({
+          phase: "error",
+          message: "Load a server model before restoring a saved report.",
+        });
+        return;
+      }
+
+      setValidationReportStatus({
+        phase: "running",
+        message: "Restoring saved validation report...",
+      });
+
+      try {
+        const record = await readServerViewerValidationReport(serverModelId, reportId);
+        setRestoredValidationReport(record.report);
+        setActiveSavedValidationReportId(record.reportId);
+        setShowValidationReport(true);
+        setValidationReportStatus({
+          phase: "success",
+          message: `Restored saved report from ${new Date(record.createdAt).toLocaleString()}.`,
+        });
+      } catch (error) {
+        setValidationReportStatus({
+          phase: "error",
+          message: error instanceof Error ? error.message : "Validation report could not be restored.",
+        });
+      }
+    },
+    [metadata?.serverModelId],
+  );
+
   const handleExportValidationDiagnosis = useCallback(async () => {
-    if (!metadata || !validationDiagnosisReport) {
+    if (!metadata || !activeValidationDiagnosisReport) {
       setValidationReportStatus({
         phase: "error",
         message: "Load a validated model before exporting a diagnosis report.",
@@ -1802,10 +2193,28 @@ export function ViewerShell() {
     });
 
     try {
-      const result = await exportViewerValidationDiagnosisToExcel({
-        report: validationDiagnosisReport,
-        fileName: buildViewerValidationDiagnosisExcelFileName(metadata.name),
-      });
+      const fileName = buildViewerValidationDiagnosisExcelFileName(metadata.name);
+      let result;
+      try {
+        result = metadata.serverModelId
+          ? await exportViewerValidationDiagnosisToExcelViaApi({
+              report: activeValidationDiagnosisReport,
+              fileName,
+            })
+          : await exportViewerValidationDiagnosisToExcel({
+              report: activeValidationDiagnosisReport,
+              fileName,
+            });
+      } catch (error) {
+        if (!metadata.serverModelId) {
+          throw error;
+        }
+
+        result = await exportViewerValidationDiagnosisToExcel({
+          report: activeValidationDiagnosisReport,
+          fileName,
+        });
+      }
 
       setValidationReportStatus({
         phase: "success",
@@ -1817,7 +2226,7 @@ export function ViewerShell() {
         message: error instanceof Error ? error.message : "Diagnosis Excel export failed.",
       });
     }
-  }, [metadata, validationDiagnosisReport]);
+  }, [activeValidationDiagnosisReport, metadata]);
 
   const syncDataTableToView = useCallback(() => {
     if (!effectiveDataTableData) {
@@ -1882,26 +2291,26 @@ export function ViewerShell() {
   }, [metadata?.sourceId]);
 
   useEffect(() => {
-    if (validationState.phase === "running" || validationResult === null) {
+    if (validationState.phase === "running" || (validationResult === null && !restoredValidationReport)) {
       setValidationReportStatus(initialValidationReportStatus);
     }
-  }, [validationResult, validationState.phase]);
+  }, [restoredValidationReport, validationResult, validationState.phase]);
 
   useEffect(() => {
-    if (!validationDiagnosisReport) {
+    if (!activeValidationDiagnosisReport) {
       setSelectedValidationClauseId("");
       return;
     }
 
     if (
       !selectedValidationClauseId ||
-      validationDiagnosisReport.clauses.some((clause) => clause.clauseId === selectedValidationClauseId)
+      activeValidationDiagnosisReport.clauses.some((clause) => clause.clauseId === selectedValidationClauseId)
     ) {
       return;
     }
 
     setSelectedValidationClauseId("");
-  }, [selectedValidationClauseId, validationDiagnosisReport]);
+  }, [activeValidationDiagnosisReport, selectedValidationClauseId]);
 
   useEffect(() => {
     if (!isDataTableSyncedToView) {
@@ -2061,6 +2470,22 @@ export function ViewerShell() {
                 <Upload className="h-4 w-4" />
                 <span>Open IFC</span>
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleSaveToServer();
+                }}
+                disabled={!metadata || savingToServer}
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-4 text-sm font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <CloudUpload className="h-4 w-4" />
+                <span>{savingToServer ? "Saving…" : "Save to server"}</span>
+              </button>
+              <ServerModelsMenu
+                onLoadModel={(modelId) => {
+                  void loadModelById(modelId);
+                }}
+              />
               <Link
                 href="/rules"
                 className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-4 text-sm text-[color:var(--foreground)] no-underline transition hover:bg-[color:var(--surface-strong)]"
@@ -2336,7 +2761,10 @@ export function ViewerShell() {
               >
                 <ValidationDiagnosisReport
                   metadata={metadata}
-                  report={validationDiagnosisReport}
+                  report={activeValidationDiagnosisReport}
+                  currentReport={validationDiagnosisReport}
+                  savedReports={savedValidationReports}
+                  activeSavedReportId={activeSavedValidationReportId}
                   validationPhase={validationState.phase}
                   validationMessage={validationState.message}
                   statusMessage={validationReportStatus.message}
@@ -2345,6 +2773,10 @@ export function ViewerShell() {
                     void handleExportValidationDiagnosis();
                   }}
                   onShowClauseInTable={handleShowClauseInDataTable}
+                  onUseCurrentReport={handleUseCurrentValidationReport}
+                  onRestoreReport={(reportId) => {
+                    void handleRestoreValidationReport(reportId);
+                  }}
                   onSelectElement={(element) => {
                     void handleValidationDiagnosisElementSelect(element);
                   }}

@@ -9,7 +9,14 @@ import {
   parseViewerValidationConfigText,
   serializeViewerValidationConfig,
 } from "@/features/rules/lib/validation";
+import {
+  listRuleTemplates,
+  readRuleTemplate,
+  ruleTemplateConfigEndpoint,
+  ruleTemplateSourceEndpoint,
+} from "@/features/rules/lib/rule-template-api";
 import type {
+  ViewerRuleTemplateSummary,
   ViewerValidationCheck,
   ViewerValidationClause,
   ViewerValidationRule,
@@ -19,31 +26,6 @@ type RulesScreenProps = {
   mode: "modal" | "page";
   onClose?: () => void;
 };
-
-const STARTER_TEMPLATES = [
-  {
-    id: "testmodel-simple",
-    name: "Testmodel Simple",
-    description: "2 slab checks grouped into one clause to force demo highlights.",
-    href: "/resources/testmodel-rules-simple.json",
-    ruleCount: 2,
-  },
-  {
-    id: "testmodel-comprehensive",
-    name: "Testmodel Comprehensive",
-    description: "67 grouped rules for IfcSlab, IfcColumn, and IfcBeam with broad expected highlights.",
-    href: "/resources/testmodel-rules-comprehensive.json",
-    ruleCount: 67,
-  },
-  {
-    id: "industry-mapping-bca-column-beam",
-    name: "BCA - Column + Beam",
-    description:
-      "55 generated checks grouped by Agency + Identified Component from the industry mapping CSV.",
-    href: "/resources/industry-mapping-bca-column-beam.json",
-    ruleCount: 55,
-  },
-] as const;
 
 function inputClassName() {
   return "w-full rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-2 text-sm text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent)] disabled:cursor-not-allowed disabled:bg-[color:var(--panel-bg)] disabled:text-[color:var(--muted-ink)] disabled:opacity-80";
@@ -452,11 +434,41 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
     useViewerRules();
   const [importError, setImportError] = useState<string | null>(null);
   const [loadingTemplateId, setLoadingTemplateId] = useState<string | null>(null);
+  const [starterTemplates, setStarterTemplates] = useState<ViewerRuleTemplateSummary[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(true);
+  const [templatesError, setTemplatesError] = useState<string | null>(null);
 
   const totalRuleCount = useMemo(
     () => config.clauses.reduce((count, clause) => count + clause.rules.length, 0),
     [config.clauses],
   );
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    setTemplatesLoading(true);
+    listRuleTemplates(controller.signal)
+      .then((templates) => {
+        setStarterTemplates(templates);
+        setTemplatesError(null);
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setTemplatesError(
+          error instanceof Error ? error.message : "Starter templates could not be listed.",
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setTemplatesLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, []);
 
   const handleExport = () => {
     const blob = new Blob([serializeViewerValidationConfig(config)], {
@@ -487,20 +499,12 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
     }
   };
 
-  const handleLoadStarterTemplate = async (template: (typeof STARTER_TEMPLATES)[number]) => {
+  const handleLoadStarterTemplate = async (template: ViewerRuleTemplateSummary) => {
     try {
-      setLoadingTemplateId(template.id);
+      setLoadingTemplateId(template.templateId);
 
-      const response = await fetch(template.href, {
-        cache: "no-store",
-      });
-
-      if (!response.ok) {
-        throw new Error(`Starter template could not be loaded (${response.status}).`);
-      }
-
-      const importedConfig = parseViewerValidationConfigText(await response.text());
-      replaceConfig(importedConfig);
+      const importedTemplate = await readRuleTemplate(template.templateId);
+      replaceConfig(importedTemplate.config);
       setImportError(null);
     } catch (error) {
       setImportError(
@@ -580,43 +584,70 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
             </div>
 
             <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {STARTER_TEMPLATES.map((template) => {
-                const isLoading = loadingTemplateId === template.id;
+              {templatesLoading ? (
+                <div className="rounded-[1rem] border border-[color:var(--viewer-border)] bg-white/70 px-2.5 py-2.5 text-xs text-[color:var(--muted-ink)]">
+                  Loading templates...
+                </div>
+              ) : templatesError ? (
+                <div className="rounded-[1rem] border border-[#c78972] bg-[#fff0ea] px-2.5 py-2.5 text-xs text-[#8a3e1f]">
+                  {templatesError}
+                </div>
+              ) : starterTemplates.length === 0 ? (
+                <div className="rounded-[1rem] border border-[color:var(--viewer-border)] bg-white/70 px-2.5 py-2.5 text-xs text-[color:var(--muted-ink)]">
+                  No templates available.
+                </div>
+              ) : (
+                starterTemplates.map((template) => {
+                  const isLoading = loadingTemplateId === template.templateId;
 
-                return (
-                  <section
-                    key={template.id}
-                    className="rounded-[1rem] border border-[color:var(--viewer-border)] bg-white/70 px-2.5 py-2.5"
-                  >
-                    <div className="flex h-full items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h2 className="text-sm font-semibold text-[color:var(--foreground)]">
-                          {template.name}
-                        </h2>
-                        <p className="mt-0.5 text-[11px] leading-4 text-[color:var(--muted-ink)]">
-                          {template.description}
-                        </p>
-                        <p className="mt-1 text-[11px] leading-4 text-[color:var(--muted-ink)]">
-                          {template.ruleCount} rules
-                        </p>
+                  return (
+                    <section
+                      key={template.templateId}
+                      className="rounded-[1rem] border border-[color:var(--viewer-border)] bg-white/70 px-2.5 py-2.5"
+                    >
+                      <div className="flex h-full items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h2 className="text-sm font-semibold text-[color:var(--foreground)]">
+                            {template.name}
+                          </h2>
+                          <p className="mt-0.5 text-[11px] leading-4 text-[color:var(--muted-ink)]">
+                            {template.description}
+                          </p>
+                          <p className="mt-1 text-[11px] leading-4 text-[color:var(--muted-ink)]">
+                            {template.ruleCount} rules
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5 self-center">
+                          <button
+                            type="button"
+                            onClick={() => void handleLoadStarterTemplate(template)}
+                            disabled={loadingTemplateId !== null}
+                            className={`${compactButtonClassName()} disabled:cursor-wait disabled:opacity-60`}
+                          >
+                            {isLoading ? "..." : "Load"}
+                          </button>
+                          <a
+                            href={ruleTemplateConfigEndpoint(template.templateId)}
+                            download
+                            className={compactButtonClassName()}
+                          >
+                            JSON
+                          </a>
+                          {template.sourceFileName ? (
+                            <a
+                              href={ruleTemplateSourceEndpoint(template.templateId)}
+                              download
+                              className={compactButtonClassName()}
+                            >
+                              CSV
+                            </a>
+                          ) : null}
+                        </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-1.5 self-center">
-                        <button
-                          type="button"
-                          onClick={() => void handleLoadStarterTemplate(template)}
-                          disabled={loadingTemplateId !== null}
-                          className={`${compactButtonClassName()} disabled:cursor-wait disabled:opacity-60`}
-                        >
-                          {isLoading ? "..." : "Load"}
-                        </button>
-                        <a href={template.href} download className={compactButtonClassName()}>
-                          JSON
-                        </a>
-                      </div>
-                    </div>
-                  </section>
-                );
-              })}
+                    </section>
+                  );
+                })
+              )}
             </div>
           </aside>
         </div>

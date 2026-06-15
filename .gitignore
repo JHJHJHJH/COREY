@@ -46,3 +46,10 @@ next-env.d.ts
 
 #videos
 /playwright-artifacts/*
+
+# server model store (local filesystem backend)
+/.data
+/src/generated/prisma
+
+# local env (use .env.example as the template)
+/.env

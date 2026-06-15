@@ -1,0 +1,90 @@
+// Prisma schema for COREY's server-side persistence (Postgres).
+// Model bytes live in MinIO (S3); this database holds model metadata and the
+// validation rules configuration, data-table drafts, and validation reports. See
+// docker-compose.yml for local services.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Metadata for an uploaded IFC model. The bytes are stored in object storage
+/// under the key `${id}.ifc`; this row is the stable record downstream
+/// persistence (rules results, drafts) keys off via `id`.
+model ModelRecord {
+  id                String                   @id @default(uuid())
+  name              String
+  size              Int
+  uploadedAt        DateTime                 @default(now())
+  draft             DraftRecord?
+  validationReports ValidationReportRecord[]
+
+  @@map("model_records")
+}
+
+/// The validation rules configuration. Single logical document today (id
+/// "default"), stored as JSON so the `ViewerValidationConfig` shape can evolve
+/// without migrations.
+model RuleConfig {
+  id        String   @id
+  config    Json
+  updatedAt DateTime @updatedAt
+
+  @@map("rule_configs")
+}
+
+/// Server-managed validation template catalog. Built-in starter templates are
+/// seeded from the existing resource files, then served through API routes so
+/// clients no longer fetch validation catalogs directly from public assets.
+model RuleTemplateRecord {
+  id             String   @id
+  name           String
+  description    String
+  sourceKind     String   @default("starter")
+  sourceFileName String?
+  sourceText     String?
+  config         Json
+  ruleCount      Int
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([sortOrder, name])
+  @@map("rule_template_records")
+}
+
+/// Imported data-table edits for a server-backed IFC model. One draft per
+/// model today; the row is keyed by the stable model id so local cache entries
+/// can be promoted to durable server state.
+model DraftRecord {
+  modelId   String      @id
+  draft     Json
+  updatedAt DateTime    @updatedAt
+  model     ModelRecord @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@map("draft_records")
+}
+
+/// Persisted clause diagnosis reports. Each validation run can create a new
+/// row; summaries are duplicated into scalar columns so the report picker can
+/// list runs without reading every JSON document.
+model ValidationReportRecord {
+  id                  String      @id @default(uuid())
+  modelId             String
+  sourceId            String
+  modelName           String?
+  flaggedElementCount Int
+  warnElementCount    Int
+  errorElementCount   Int
+  failedClauseCount   Int
+  report              Json
+  createdAt           DateTime    @default(now())
+  model               ModelRecord @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@index([modelId, createdAt])
+  @@map("validation_report_records")
+}

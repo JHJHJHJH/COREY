@@ -2,7 +2,9 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
+  useEffect,
   useMemo,
   useSyncExternalStore,
   type PropsWithChildren,
@@ -33,12 +35,17 @@ type ViewerRulesContextValue = {
 };
 
 const ViewerRulesContext = createContext<ViewerRulesContextValue | null>(null);
+const RULES_CONFIG_ENDPOINT = "/api/rules/config";
+
+// Postgres (via /api/rules/config) is the source of truth. localStorage is an
+// offline cache, read through useSyncExternalStore so it stays SSR-safe and the
+// UI paints instantly; the server snapshot hydrates over it on mount.
 const rulesStoreListeners = new Set<() => void>();
 const emptyConfigSnapshot = createEmptyViewerValidationConfig();
 let cachedConfigText: string | null = null;
 let cachedConfigSnapshot: ViewerValidationConfig = emptyConfigSnapshot;
 
-function readStoredConfig() {
+function readCacheSnapshot(): ViewerValidationConfig {
   if (typeof window === "undefined") {
     return emptyConfigSnapshot;
   }
@@ -66,76 +73,94 @@ function readStoredConfig() {
   }
 }
 
-function emitRulesStoreChange() {
-  for (const listener of rulesStoreListeners) {
-    listener();
-  }
-}
-
-function writeStoredConfig(config: ViewerValidationConfig) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const sanitizedConfig = sanitizeViewerValidationConfig(config);
-  const text = JSON.stringify(sanitizedConfig);
-  cachedConfigText = text;
-  cachedConfigSnapshot = sanitizedConfig;
-  window.localStorage.setItem(VIEWER_VALIDATION_STORAGE_KEY, text);
-  emitRulesStoreChange();
+function getServerSnapshot() {
+  return emptyConfigSnapshot;
 }
 
 function subscribeToRulesStore(listener: () => void) {
   rulesStoreListeners.add(listener);
-
-  const handleStorage = (event: StorageEvent) => {
-    if (event.key === VIEWER_VALIDATION_STORAGE_KEY) {
-      listener();
-    }
-  };
-
-  if (typeof window !== "undefined") {
-    window.addEventListener("storage", handleStorage);
-  }
-
   return () => {
     rulesStoreListeners.delete(listener);
-    if (typeof window !== "undefined") {
-      window.removeEventListener("storage", handleStorage);
-    }
   };
+}
+
+function writeCache(config: ViewerValidationConfig): ViewerValidationConfig {
+  const sanitized = sanitizeViewerValidationConfig(config);
+  cachedConfigText = JSON.stringify(sanitized);
+  cachedConfigSnapshot = sanitized;
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(VIEWER_VALIDATION_STORAGE_KEY, cachedConfigText);
+  }
+  for (const listener of rulesStoreListeners) {
+    listener();
+  }
+  return sanitized;
 }
 
 export function ViewerRulesProvider({ children }: PropsWithChildren) {
   const config = useSyncExternalStore(
     subscribeToRulesStore,
-    readStoredConfig,
-    () => emptyConfigSnapshot,
+    readCacheSnapshot,
+    getServerSnapshot,
   );
+
+  // Hydrate the cache from the server on mount.
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetch(RULES_CONFIG_ENDPOINT, { signal: controller.signal, cache: "no-store" })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Rules config request failed (${response.status}).`);
+        }
+        return response.json() as Promise<ViewerValidationConfig>;
+      })
+      .then((serverConfig) => {
+        writeCache(serverConfig);
+      })
+      .catch(() => {
+        // Offline / server error — keep whatever the cache provided.
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  // Optimistically update the cache, then write through to the server.
+  const persist = useCallback((nextConfig: ViewerValidationConfig) => {
+    const sanitized = writeCache(nextConfig);
+
+    void fetch(RULES_CONFIG_ENDPOINT, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(sanitized),
+    }).catch(() => {
+      // Best-effort write-through; the cache holds the latest edit for retry on reload.
+    });
+  }, []);
 
   const value = useMemo<ViewerRulesContextValue>(
     () => ({
       config,
       addClause() {
-        writeStoredConfig({
+        persist({
           ...config,
           clauses: [...config.clauses, createViewerValidationClause()],
         });
       },
       updateClause(clauseId, nextClause) {
-        writeStoredConfig({
+        persist({
           ...config,
           clauses: config.clauses.map((clause) => (clause.id === clauseId ? nextClause : clause)),
         });
       },
       removeClause(clauseId) {
-        writeStoredConfig({
+        persist({
           ...config,
           clauses: config.clauses.filter((clause) => clause.id !== clauseId),
         });
       },
       addRule(clauseId) {
-        writeStoredConfig({
+        persist({
           ...config,
           clauses: config.clauses.map((clause) =>
             clause.id === clauseId
@@ -148,7 +173,7 @@ export function ViewerRulesProvider({ children }: PropsWithChildren) {
         });
       },
       updateRule(clauseId, ruleId, nextRule) {
-        writeStoredConfig({
+        persist({
           ...config,
           clauses: config.clauses.map((clause) =>
             clause.id === clauseId
@@ -161,7 +186,7 @@ export function ViewerRulesProvider({ children }: PropsWithChildren) {
         });
       },
       removeRule(clauseId, ruleId) {
-        writeStoredConfig({
+        persist({
           ...config,
           clauses: config.clauses.map((clause) =>
             clause.id === clauseId
@@ -174,10 +199,10 @@ export function ViewerRulesProvider({ children }: PropsWithChildren) {
         });
       },
       replaceConfig(nextConfig) {
-        writeStoredConfig(nextConfig);
+        persist(nextConfig);
       },
     }),
-    [config],
+    [config, persist],
   );
 
   return <ViewerRulesContext.Provider value={value}>{children}</ViewerRulesContext.Provider>;
