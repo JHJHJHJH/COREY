@@ -32,7 +32,7 @@ Copy the environment template, then start the backing services:
 
 ```bash
 cp .env.example .env
-docker compose -f docker/docker-compose.yml up -d postgres minio minio-init
+docker compose --env-file .env -f docker/docker-compose.yml up -d postgres minio minio-init
 pnpm db:deploy
 pnpm dev
 ```

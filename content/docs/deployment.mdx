@@ -39,7 +39,7 @@ docker run --rm -p 4000:4000 \
 For the app plus local Postgres and MinIO:
 
 ```bash
-docker compose -f docker/docker-compose.yml up --build
+docker compose --env-file .env -f docker/docker-compose.yml up --build
 ```
 
 The app healthcheck calls `/api/health`.
@@ -48,7 +48,7 @@ The app healthcheck calls `/api/health`.
 
 ```bash
 pnpm verify
-docker compose -f docker/docker-compose.yml build app
+docker compose --env-file .env -f docker/docker-compose.yml build app
 ```
 
 Version tags publish GHCR images through the release workflow.

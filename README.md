@@ -36,7 +36,7 @@ run in Docker while editing source files on the host:
 
 ```bash
 cp .env.example .env
-docker compose -f docker/docker-compose.dev.yml up --build
+docker compose --env-file .env -f docker/docker-compose.dev.yml up --build
 ```
 
 Open `http://localhost:4000`.
@@ -51,7 +51,7 @@ If you change the Compose file or the dev server command, recreate the app
 service:
 
 ```bash
-docker compose -f docker/docker-compose.dev.yml up -d --force-recreate app
+docker compose --env-file .env -f docker/docker-compose.dev.yml up -d --force-recreate app
 ```
 
 ## Documentation
@@ -73,7 +73,7 @@ migrations:
 
 ```bash
 cp .env.example .env
-docker compose -f docker/docker-compose.yml up --build
+docker compose --env-file .env -f docker/docker-compose.yml up --build
 ```
 
 Open `http://localhost:4000`.
@@ -88,7 +88,7 @@ Use the no-MinIO Compose file when you only need the local-first viewer plus
 Postgres-backed routes, or when object storage is provided separately:
 
 ```bash
-docker compose -f docker/docker-compose.no-minio.yml up --build
+docker compose --env-file .env -f docker/docker-compose.no-minio.yml up --build
 ```
 
 This stack starts the app, Postgres, and migrations only. It sets placeholder S3
@@ -97,7 +97,7 @@ upload/download still requires real S3-compatible storage. To avoid a local port
 conflict, set `APP_PORT` for the host binding:
 
 ```bash
-APP_PORT=4010 docker compose -f docker/docker-compose.no-minio.yml up --build
+APP_PORT=4010 docker compose --env-file .env -f docker/docker-compose.no-minio.yml up --build
 ```
 
 ## Container Images
@@ -111,7 +111,7 @@ docker pull ghcr.io/jhjhjhjh/bca-ifc:latest
 For source builds, continue to use:
 
 ```bash
-docker compose -f docker/docker-compose.yml up --build
+docker compose --env-file .env -f docker/docker-compose.yml up --build
 ```
 
 ## Configuration
