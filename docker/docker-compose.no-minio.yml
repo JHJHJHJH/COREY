@@ -11,7 +11,7 @@ services:
       # Placeholder S3 settings keep health checks green for local-first runs.
       # Server-backed model upload/download still needs real S3-compatible storage.
       S3_ENDPOINT: ${DOCKER_S3_ENDPOINT:-http://s3-disabled.invalid}
-      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_REGION: ${S3_REGION:-ap-southeast-1}
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-disabled}
       S3_SECRET_KEY: ${S3_SECRET_KEY:-disabled}
       S3_BUCKET: ${S3_BUCKET:-disabled}

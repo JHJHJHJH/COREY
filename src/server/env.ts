@@ -53,7 +53,7 @@ export function getDatabaseUrl() {
 export function getS3Env(): S3Env {
   return {
     s3Endpoint: readRequiredEnv("S3_ENDPOINT"),
-    s3Region: process.env.S3_REGION || "us-east-1",
+    s3Region: process.env.S3_REGION || "ap-southeast-1",
     s3AccessKey: readRequiredEnv("S3_ACCESS_KEY"),
     s3SecretKey: readRequiredEnv("S3_SECRET_KEY"),
     s3Bucket: readRequiredEnv("S3_BUCKET"),

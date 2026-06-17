@@ -161,4 +161,4 @@ pnpm audit --prod
 
 ## License
 
-MIT. See `LICENSE` and `THIRD_PARTY_NOTICES.md`.
+MIT. See `LICENSE` and `docs/third-party-notices.md`.
