@@ -55,16 +55,16 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/mdx": "2.0.14",
-    "@types/node": "^20",
+    "@types/node": "^25",
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/three": "^0.183.1",
-    "eslint": "^9",
+    "eslint": "^10",
     "eslint-config-next": "16.2.9",
     "prisma": "^7.8.0",
     "tailwindcss": "^4",
-    "typescript": "^5",
+    "typescript": "^6",
     "vite": "8.0.16"
   }
 }
