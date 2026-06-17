@@ -1,0 +1,118 @@
+---
+title: Clauses & Checks
+description: How COREY's rule-based model checking works, in plain language.
+---
+
+Checking a model means asking questions like "do all beams carry their required
+`SGPset_Beam` data?" or "are all door widths within the allowed range?". COREY lets
+you write those questions down as **clauses** and **rules**, then runs them across
+the whole model and tells you what passed, what to watch, and what failed.
+
+This is how COREY encodes **IFC-SG** requirements. The IFC-SG
+[industry Excel mapping file](https://info.corenet.gov.sg/ifc-sg/templates--apps-and-more/ifc-sg-excel-mapping-file)
+lists, per building component, the IFC entity, property set, and properties a model
+must carry for CORENET X submission. Each of those requirements becomes a **rule**;
+related rules are grouped into a **clause**. COREY ships a starter
+**BCA – Column + Beam** template built from that mapping, and you can extend it or
+import your own.
+
+## The building blocks
+
+<Cards>
+  <Card title="Rule" description="One specific check — e.g. 'a wall's fire rating must be filled in'." />
+  <Card title="Clause" description="A named group of related rules — e.g. 'Fire safety requirements'." />
+  <Card title="Check result" description="What COREY reports per element: OK, Warning, or Error." />
+</Cards>
+
+A **clause** is just a titled folder of **rules**. Grouping rules into clauses
+keeps your checks organised and makes reports easier to read ("3 elements failed
+the *Fire safety* clause").
+
+## Anatomy of a rule
+
+Every rule answers four questions:
+
+| Part | Question it answers | Example |
+|---|---|---|
+| **IFC Type** | Which kind of element does this apply to? | `IFCWALL` (walls) |
+| **Target** | Which piece of information should we look at? | The property `Pset_WallCommon › Reference` |
+| **Check** | What must that information satisfy? | Must be one of `WALL-A`, `WALL-B`, `WALL-C` |
+| **Severity** | How serious is a failure? | `Error` or `Warning` |
+
+### Target: where to look
+
+A target is either:
+
+- an **Attribute** — a built-in field on the element, identified by name (such as
+  `Name` or `GlobalId`); or
+- a **Property** — a value inside a property set, identified by the **property set**
+  it lives in and its **label** (such as `Pset_WallCommon` › `Reference`).
+
+### Check: what to require
+
+COREY offers three kinds of check:
+
+| Check | Passes when… | Use it for… |
+|---|---|---|
+| **Required value** | the field is filled in (not blank/missing) | making sure information isn't left empty |
+| **Allowed values (enum)** | the value is one of a list you provide | codes, classifications, fixed vocabularies |
+| **Number range** | the number is within a minimum and/or maximum | dimensions, ratings, counts |
+
+<Callout type="info">
+Any check automatically fails if the value is missing or empty — so "Allowed
+values" and "Number range" also guarantee the field is present.
+</Callout>
+
+### Severity: how loud to be
+
+Each rule fails as either:
+
+- **Error** — a real problem that should be fixed.
+- **Warning** — worth a look, but not necessarily wrong.
+
+When an element breaks several rules, its overall result is the most serious one
+(Error beats Warning beats OK).
+
+## A worked example
+
+> **Clause: "Wall basics"**
+>
+> - **Rule 1** — On every `IFCWALL`, the attribute `Name` is **required**.
+>   Failing this is an **Error**.
+> - **Rule 2** — On every `IFCWALL`, the property `Pset_WallCommon › Reference`
+>   must be one of `WALL-A`, `WALL-B`, `WALL-C`. Failing this is a **Warning**.
+
+Run this against a model and COREY checks every wall. A wall with no name shows an
+**Error**; a wall named correctly but with a `Reference` of `WALL-Z` shows a
+**Warning**; a wall that satisfies both is **OK**.
+
+## Reading the results
+
+After you run validation, COREY:
+
+- **Highlights** elements in the 3D viewport — one colour for warnings, another for
+  errors — so problems are easy to spot.
+- Lists the **failed clauses**, how many elements each one affected, and the
+  specific rules that tripped.
+- Lets you click a result to **focus the matching element** in the view.
+
+## Saving and reusing clauses
+
+You can **export** your clauses to a file (`corey-clauses.json`) and **import**
+them later or on another project — so a team can agree on one standard set of
+checks and apply it everywhere. With the optional backend, clause sets can also be
+saved as shared templates.
+
+<Callout title="For developers">
+Clauses are stored as a small JSON document (a `version` plus a `clauses` array,
+each clause holding `rules`). The repository includes a starter file,
+`sample-rules.json`, and the format is validated on import. The exact schema and
+evaluation logic live in `src/features/rules`.
+</Callout>
+
+## Where to go next
+
+<Cards>
+  <Card title="Workflow" href="./workflow" description="See where clause-checking fits in a full review." />
+  <Card title="Features" href="./features" description="The rest of COREY's review tools." />
+</Cards>

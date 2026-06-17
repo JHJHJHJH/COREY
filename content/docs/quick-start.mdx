@@ -1,0 +1,93 @@
+---
+title: Quick Start
+description: Get COREY running and open your first model in a few minutes.
+---
+
+import { Steps, Step } from "fumadocs-ui/components/steps";
+
+The fastest way to run COREY is with **Docker** — one command, nothing else to
+install. If you're a developer who'd rather run it from source with Node and pnpm,
+see [Getting Started](./getting-started) instead.
+
+## Before you start
+
+- Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and
+  make sure it's running.
+- Have an `.ifc` file ready to open (any model exported from your BIM software).
+
+## Run COREY
+
+<Steps>
+
+<Step>
+
+### Get the project
+
+Download or clone the project, then open a terminal in the project folder.
+
+</Step>
+
+<Step>
+
+### Create your settings file
+
+```bash
+cp .env.example .env
+```
+
+</Step>
+
+<Step>
+
+### Start everything
+
+This starts the app, its database, and file storage together:
+
+```bash
+docker compose --env-file .env -f docker/docker-compose.yml up --build
+```
+
+The first run downloads and builds the images, so it takes a few minutes. Later
+runs start quickly.
+
+</Step>
+
+<Step>
+
+### Open it in your browser
+
+Go to [http://localhost:4000](http://localhost:4000). 🎉
+
+</Step>
+
+<Step>
+
+### Open your first model
+
+Choose an `.ifc` file from your computer. The building loads into the 3D viewport
+and you're ready to review.
+
+</Step>
+
+</Steps>
+
+<Callout title="Prefer a prebuilt image?">
+You can pull a ready-made image instead of building from source:
+
+```bash
+docker pull ghcr.io/jhjhjhjh/corey:latest
+```
+</Callout>
+
+## What next?
+
+<Cards>
+  <Card title="Workflow" href="./workflow" description="Walk through a complete model review, step by step." />
+  <Card title="Features" href="./features" description="See everything COREY can do." />
+  <Card title="Clauses & Checks" href="./clauses" description="Set up the rules your model must satisfy." />
+</Cards>
+
+<Callout type="info">
+Running from source, or setting up the optional shared backend? See
+[Getting Started](./getting-started).
+</Callout>

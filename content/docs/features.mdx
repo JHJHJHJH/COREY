@@ -1,0 +1,79 @@
+---
+title: Features
+description: A plain-language tour of what you can do with COREY.
+---
+
+COREY helps you open a building model (an IFC file) and check that it is complete,
+correct, and consistent — all in your web browser. You don't need to install
+modelling software, and by default your files stay on your own computer.
+
+This page describes each feature in everyday terms. If you'd rather follow a
+start-to-finish example, see the [Workflow](./workflow) page.
+
+## Open and view models
+
+<Cards>
+  <Card title="Open from your computer" description="Pick an .ifc file from disk. It loads straight into the browser — nothing is uploaded." />
+  <Card title="3D viewport" description="Pan, orbit, and zoom around the building, just like a 3D model viewer." />
+  <Card title="Building tree" description="Browse the model by its structure — site, building, storeys, and the elements inside each space." />
+</Cards>
+
+## Inspect elements
+
+Click any element — a wall, door, beam, and so on — to see its details:
+
+- **Properties**: every attribute and property the modeller stored on that element
+  (name, dimensions, materials, classification codes, and so on).
+- **Location in the tree**: which storey or space the element belongs to.
+
+This is the quickest way to answer "what is this, and what information does it carry?"
+
+## Focus on what matters
+
+When a model is busy, these tools help you concentrate on a subset of it:
+
+| Tool | What it does |
+|---|---|
+| **Hide** | Hides the selected elements so you can see past them. |
+| **Isolate** | Hides everything *except* what you selected. |
+| **Show all** | Brings everything back into view. |
+| **Focus** | Zooms the camera to frame your current selection. |
+| **Section** | Slices through the model with a cutting plane to look inside. |
+| **Measure** | Measures the distance/length between points. |
+
+## Review data in a table
+
+Instead of clicking elements one at a time, open the **data table** to see many
+elements and their values side by side, like a spreadsheet.
+
+- Filter rows to find what you're looking for.
+- **Import and export Excel** to review data outside the app or share it with
+  colleagues who don't use COREY.
+
+## Check the model against rules
+
+This is COREY's core review capability, and how it encodes **IFC-SG** requirements
+for CORENET X submissions. You define **clauses** — named groups of checks such as
+"every beam carries its required `SGPset_Beam` data" — and run them against the
+model. COREY highlights the elements that pass, warn, or fail, and produces a
+report you can act on. A starter **BCA – Column + Beam** clause template, derived
+from the IFC-SG industry mapping, is included.
+
+<Callout title="Clauses get their own page">
+Because rule-checking is the heart of the tool, it's explained in full on the
+[Clauses & Checks](./clauses) page.
+</Callout>
+
+## Save and share (optional)
+
+By default COREY runs entirely on your machine. If your team sets up the optional
+backend, you can additionally:
+
+- Store models on a shared server so colleagues can open the same model.
+- Save review drafts and reports so work isn't lost between sessions.
+- Reuse clause templates across projects.
+
+<Callout type="info">
+The optional backend is something an administrator sets up once. As a reviewer,
+you simply open COREY in your browser and use it — see [Getting Started](./getting-started).
+</Callout>

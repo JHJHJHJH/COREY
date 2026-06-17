@@ -1,0 +1,95 @@
+---
+title: Workflow
+description: A typical start-to-finish model review, step by step.
+---
+
+import { Steps, Step } from "fumadocs-ui/components/steps";
+
+This page walks through a normal review session — from opening a model to
+producing a report — without assuming any technical background. Each step links
+to the feature it uses.
+
+<Steps>
+
+<Step>
+
+### Open your model
+
+Launch COREY in your browser (your team will have a link, or run it locally — see
+[Getting Started](./getting-started)). Choose an `.ifc` file from your computer.
+The building appears in the 3D viewport.
+
+> Your file is read in the browser. It is not uploaded anywhere unless you are
+> using the optional shared backend.
+
+</Step>
+
+<Step>
+
+### Look around and get oriented
+
+Pan, orbit, and zoom to get a feel for the model. Use the **building tree** on the
+side to expand storeys and spaces and understand how the model is organised.
+
+</Step>
+
+<Step>
+
+### Inspect individual elements
+
+Click an element to open its **properties**. Check that the information you care
+about is actually there — names, dimensions, materials, classification codes, and
+so on. Use **Isolate** or **Hide** to clear away clutter while you focus.
+
+</Step>
+
+<Step>
+
+### Review data in bulk
+
+Open the **data table** to compare many elements at once. Filter to the elements
+you're reviewing (for example, all walls), and scan for blanks or wrong values.
+If you prefer, **export to Excel** to review or annotate outside the app.
+
+</Step>
+
+<Step>
+
+### Set up your checks (clauses)
+
+Open the clause editor and define the rules your model must satisfy — for example
+"every wall has a fire rating" or "door widths are between 850 and 1200 mm".
+You can build these from scratch, or **import a saved set of clauses** that your
+team uses on every project. Full details are on [Clauses & Checks](./clauses).
+
+</Step>
+
+<Step>
+
+### Run the checks
+
+Run validation. COREY evaluates every relevant element against your clauses and
+marks each as **OK**, **Warning**, or **Error**. Failing elements are highlighted
+in the 3D view, so you can see *where* the problems are, not just that they exist.
+
+</Step>
+
+<Step>
+
+### Diagnose and report
+
+Open the validation results to see which clauses failed and which elements caused
+them. Click through to highlight a problem element in the viewport. When you're
+done, **export the report** (and your clause set) to share findings with the model
+author or keep a record of the review.
+
+</Step>
+
+</Steps>
+
+## What to do next
+
+<Cards>
+  <Card title="Clauses & Checks" href="./clauses" description="Learn how to build the rules that drive the review." />
+  <Card title="Features" href="./features" description="A reference for every tool mentioned above." />
+</Cards>

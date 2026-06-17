@@ -1,7 +1,15 @@
 {
   "pages": [
     "index",
+    "---Getting Started---",
+    "introduction",
+    "quick-start",
     "getting-started",
+    "---User Guides---",
+    "features",
+    "workflow",
+    "clauses",
+    "---Developer---",
     "architecture",
     "runtime-assets",
     "backend-api",
