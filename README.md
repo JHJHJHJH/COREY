@@ -1,38 +1,96 @@
+<div align="center">
+
+<img src="public/corey-robot-builder.png" alt="COREY logo" width="140" />
+
 # COREY
 
-COREY is a browser-based IFC review app. It can run local-first with user-selected
-IFC files, and it also ships a supported self-hosted backend for model storage,
-rule templates, validation reports, data-table drafts, Excel import/export, and
-server-backed IFC writeback.
+### Review your building models (IFC) right in the browser — no installs, no cloud account.
 
-The app is built with Next.js 16, React 19, Tailwind CSS 4, That Open, Three.js,
-web-ifc, Prisma, Postgres, and S3-compatible object storage.
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
+[![Runs in Docker](https://img.shields.io/badge/Runs%20in-Docker-blue?logo=docker&logoColor=white)](#-easy-setup-recommended)
 
-## Features
+</div>
 
-- Local IFC upload and review in the browser
-- That Open-powered 3D viewport
-- Selection, properties, and spatial tree inspection
-- Hide, isolate, show-all, section plane, and measurement tools
-- Data-table review with Excel import/export
-- Rule-based validation and diagnosis reports
-- Optional self-hosted backend with Postgres and S3-compatible storage
+---
 
-## Quick Start
+## 🤔 What is COREY?
 
-Install dependencies and start the local app:
+COREY is a tool for **opening, exploring, and checking IFC building models** — the
+standard file format produced by BIM software like Revit, ArchiCAD, and Tekla.
+
+You drag in an `.ifc` file and immediately get a **3D view** of the building, can
+click parts to read their properties, run **automatic rule checks** for compliance
+or quality, and export findings to **Excel**.
+
+> 💡 **No account, no upload required.** By default everything runs locally on your
+> machine — your model files never leave your computer.
+
+## ✨ What can it do?
+
+| | Feature |
+|---|---|
+| 📂 | Open IFC files straight from your computer |
+| 🧱 | Explore the building in an interactive **3D viewport** |
+| 🔍 | Click any element to inspect its **properties** and place in the building tree |
+| 👁️ | **Hide, isolate, slice (section), and measure** parts of the model |
+| 📊 | Review model data in tables, with **Excel import/export** |
+| ✅ | Run **rule-based checks** and get validation & diagnosis reports |
+| 🗄️ | *(Optional)* Save models to your own server with a database & file storage |
+
+---
+
+## 🚀 Easy Setup (Recommended)
+
+The simplest way to run COREY is with **Docker** — one command, nothing else to install.
+
+**Before you start:** install [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+and make sure it's running.
+
+**1.** Download or clone this project, then open a terminal inside the project folder.
+
+**2.** Create your settings file from the example:
+
+```bash
+cp .env.example .env
+```
+
+**3.** Start everything (the app, database, and file storage):
+
+```bash
+docker compose --env-file .env -f docker/docker-compose.yml up --build
+```
+
+**4.** Open your browser to **[http://localhost:4000](http://localhost:4000)** 🎉
+
+That's it. The first run takes a few minutes to download and build; later runs are fast.
+
+> 📦 Prefer not to build from source? Pull a ready-made image:
+> ```bash
+> docker pull ghcr.io/jhjhjhjh/bca-ifc:latest
+> ```
+
+---
+
+## 🧑‍💻 For Developers
+
+<details>
+<summary><strong>Run locally with Node + pnpm</strong></summary>
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:4000` and choose an IFC file from disk.
+Then open `http://localhost:4000` and choose an IFC file from disk.
 
-## Docker Development
+</details>
 
-Use the development Compose file when you want the app, Postgres, and MinIO to
-run in Docker while editing source files on the host:
+<details>
+<summary><strong>Develop inside Docker (live reload)</strong></summary>
+
+Use the development Compose file to run the app, Postgres, and MinIO in Docker
+while editing source on the host:
 
 ```bash
 cp .env.example .env
@@ -43,46 +101,20 @@ Open `http://localhost:4000`.
 
 The dev container bind-mounts the repository and keeps `node_modules`, `.next`,
 generated Prisma files, and the pnpm store in Docker volumes. It intentionally
-runs `next dev --webpack` with polling enabled because Next.js 16 uses
-Turbopack by default, and Turbopack can miss hot reload invalidation on
-Docker-mounted filesystems.
+runs `next dev --webpack` with polling enabled because Next.js 16 uses Turbopack
+by default, and Turbopack can miss hot reload invalidation on Docker-mounted
+filesystems.
 
-If you change the Compose file or the dev server command, recreate the app
-service:
+If you change the Compose file or the dev server command, recreate the app service:
 
 ```bash
 docker compose --env-file .env -f docker/docker-compose.dev.yml up -d --force-recreate app
 ```
 
-## Documentation
+</details>
 
-The repo docs are built with Fumadocs and served from the app at
-`http://localhost:4000/docs`.
-
-Public docs content lives in `content/docs`. After editing docs, run:
-
-```bash
-pnpm docs:generate
-pnpm build
-```
-
-## Self-Hosted Backend
-
-The Docker Compose stack starts the app, Postgres, MinIO, and one-shot database
-migrations:
-
-```bash
-cp .env.example .env
-docker compose --env-file .env -f docker/docker-compose.yml up --build
-```
-
-Open `http://localhost:4000`.
-
-The backend is intended for single-tenant/self-hosted deployments. Put a reverse
-proxy in front of it for public networks, and configure payload limits, TLS,
-authentication, and rate limits there.
-
-### Run Without MinIO
+<details>
+<summary><strong>Run without MinIO (Postgres only)</strong></summary>
 
 Use the no-MinIO Compose file when you only need the local-first viewer plus
 Postgres-backed routes, or when object storage is provided separately:
@@ -100,21 +132,10 @@ conflict, set `APP_PORT` for the host binding:
 APP_PORT=4010 docker compose --env-file .env -f docker/docker-compose.no-minio.yml up --build
 ```
 
-## Container Images
+</details>
 
-Release images are published to GitHub Container Registry:
-
-```bash
-docker pull ghcr.io/jhjhjhjh/bca-ifc:latest
-```
-
-For source builds, continue to use:
-
-```bash
-docker compose --env-file .env -f docker/docker-compose.yml up --build
-```
-
-## Configuration
+<details>
+<summary><strong>Configuration (environment variables)</strong></summary>
 
 Copy `.env.example` to `.env` for local development. Required backend variables:
 
@@ -126,28 +147,37 @@ Copy `.env.example` to `.env` for local development. Required backend variables:
 - `S3_BUCKET`
 - `COREY_MAX_MODEL_BYTES`
 
-## Runtime Assets
+The backend is intended for single-tenant / self-hosted deployments. Put a reverse
+proxy in front of it on public networks, and configure payload limits, TLS,
+authentication, and rate limits there.
 
-The viewer serves these copied runtime assets from `public/`:
+</details>
+
+<details>
+<summary><strong>Documentation, assets & verification</strong></summary>
+
+**Docs** are built with Fumadocs and served at `http://localhost:4000/docs`.
+Content lives in `content/docs`. After editing:
+
+```bash
+pnpm docs:generate
+pnpm build
+```
+
+**Runtime assets** served from `public/`:
 
 - `public/workers/thatopen-fragments-worker.mjs`
 - `public/wasm/web-ifc.wasm`
 - `public/wasm/web-ifc-mt.wasm`
 
 If `@thatopen/fragments` or `web-ifc` changes, refresh the copied files from
-`node_modules` and run:
+`node_modules` and run `pnpm check:assets`.
 
-```bash
-pnpm check:assets
-```
-
-## Sample Assets
-
-COREY does not ship a public sample IFC by default. Commit IFC samples only when
-their redistribution rights are explicit and documented in
+**Sample assets:** COREY does not ship a public sample IFC by default. Commit IFC
+samples only when their redistribution rights are explicit and documented in
 `public/resources/README.md`.
 
-## Verification
+**Verification:**
 
 ```bash
 pnpm lint
@@ -156,9 +186,17 @@ pnpm build
 pnpm audit --prod
 ```
 
-`pnpm build` generates Fumadocs sources, then intentionally uses
-`next build --webpack`.
+`pnpm build` generates Fumadocs sources, then intentionally uses `next build --webpack`.
 
-## License
+</details>
 
-MIT. See `LICENSE` and `docs/third-party-notices.md`.
+---
+
+## 🛠️ Built With
+
+Next.js 16 · React 19 · Tailwind CSS 4 · [That Open](https://thatopen.com) · Three.js ·
+web-ifc · Prisma · Postgres · S3-compatible object storage
+
+## 📄 License
+
+MIT — see [`LICENSE`](LICENSE) and [`docs/third-party-notices.md`](docs/third-party-notices.md).
