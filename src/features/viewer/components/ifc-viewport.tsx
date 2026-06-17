@@ -8,6 +8,7 @@ import {
   useRef,
 } from "react";
 import { Upload } from "lucide-react";
+import Image from "next/image";
 import * as OBC from "@thatopen/components";
 import * as OBF from "@thatopen/components-front";
 import * as FRAGS from "@thatopen/fragments";
@@ -1095,6 +1096,17 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       {status.phase !== "loaded" ? (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-[color:var(--viewport-overlay)]">
           <div className="max-w-md rounded-[1.75rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/95 px-6 py-5 text-center shadow-[var(--viewer-shadow)] backdrop-blur">
+            <div className="corey-canvas-mascot mb-3" aria-hidden="true">
+              <Image
+                src="/corey-robot-builder.svg"
+                alt=""
+                width={80}
+                height={80}
+                aria-hidden="true"
+                unoptimized
+                className="relative z-10 h-20 w-20"
+              />
+            </div>
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
               COREY
             </div>

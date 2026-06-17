@@ -269,6 +269,69 @@ canvas {
   background: rgba(10, 92, 255, 0.18);
 }
 
+.corey-canvas-mascot {
+  position: relative;
+  display: inline-flex;
+  height: 5rem;
+  width: 5rem;
+  align-items: center;
+  justify-content: center;
+  transform-origin: 50% 70%;
+  animation: corey-canvas-mascot-float 4.8s ease-in-out infinite;
+  will-change: transform;
+}
+
+.corey-canvas-mascot::after {
+  position: absolute;
+  right: 18%;
+  bottom: -0.35rem;
+  left: 18%;
+  height: 0.48rem;
+  border-radius: 999px;
+  background: rgba(10, 92, 255, 0.24);
+  content: "";
+  filter: blur(7px);
+  opacity: 0.36;
+  transform-origin: center;
+  animation: corey-canvas-mascot-shadow 4.8s ease-in-out infinite;
+}
+
+[data-viewer-theme="dark"] .corey-canvas-mascot::after {
+  background: rgba(109, 164, 255, 0.3);
+  opacity: 0.32;
+}
+
+@keyframes corey-canvas-mascot-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-1deg);
+  }
+
+  50% {
+    transform: translate3d(0, -0.45rem, 0) rotate(1.4deg);
+  }
+}
+
+@keyframes corey-canvas-mascot-shadow {
+  0%,
+  100% {
+    opacity: 0.36;
+    transform: scaleX(1);
+  }
+
+  50% {
+    opacity: 0.22;
+    transform: scaleX(0.78);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .corey-canvas-mascot,
+  .corey-canvas-mascot::after {
+    animation: none;
+  }
+}
+
 /* A faint engineering grid for surfaces that want technical depth. */
 .corey-blueprint {
   background-color: var(--panel-bg);
