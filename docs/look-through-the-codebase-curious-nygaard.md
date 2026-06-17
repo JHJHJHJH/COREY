@@ -36,7 +36,7 @@ Ordered by recommended sequence. Each names the current client seam to replace.
 | # | Feature | Driver | Current state / seam | Target |
 |---|---------|--------|----------------------|--------|
 | 1 | **Model storage + remote loading** | Remote sources | `LocalFileModelSource` only (`lib/model-source.ts`); `ModelSource.kind: "local-file"` (`types.ts:179`); ephemeral `sourceId = name:size:lastModified` | Upload/list/fetch IFC via `/api/models`; `RemoteModelSource`; stable server `modelId` as `sourceId` |
-| 2 | **Validation rules config** | Persistence/multi-user | `localStorage["bca-ifc.validation-rules.v1"]` via `rules-provider.tsx` (read/write isolated in `readStoredConfig`/`writeStoredConfig`) | Server-backed rule sets; localStorage becomes offline cache |
+| 2 | **Validation rules config** | Persistence/multi-user | `localStorage["corey.validation-rules.v1"]` via `rules-provider.tsx` (read/write isolated in `readStoredConfig`/`writeStoredConfig`) | Server-backed rule sets; localStorage becomes offline cache |
 | 3 | **Data-table edits (drafts)** | Persistence/multi-user | `localStorage["corey:data-table-draft:…"]` via `lib/data-table-draft.ts` (`read/write/clearPersistedViewerDataTableDraft`), keyed by `sourceId` | Server-backed drafts keyed by `modelId`; localStorage cache |
 | 4 | **Validation reports** | Persistence | Ephemeral React state (`validationResult` in `viewer-shell.tsx`); export only to Excel | Persist `ViewerValidationDiagnosisReport` per model run; list/restore |
 | 5 | **Rule templates** | Shared catalogs | Static `public/resources/*.json`, fetched in `rules-screen.tsx` (`STARTER_TEMPLATES`) | Server-managed `/api/rule-templates` library |

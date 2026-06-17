@@ -67,7 +67,7 @@ That's it. The first run takes a few minutes to download and build; later runs a
 
 > 📦 Prefer not to build from source? Pull a ready-made image:
 > ```bash
-> docker pull ghcr.io/jhjhjhjh/bca-ifc:latest
+> docker pull ghcr.io/jhjhjhjh/corey:latest
 > ```
 
 ---

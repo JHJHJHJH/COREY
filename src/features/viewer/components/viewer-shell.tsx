@@ -2649,7 +2649,7 @@ export function ViewerShell() {
                 className="hidden"
               />
               <Link
-                href="/rules"
+                href="/clause"
                 className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-4 text-sm font-semibold text-[color:var(--foreground)] no-underline shadow-sm transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)]"
               >
                 <ClipboardCheck className="h-4 w-4 shrink-0" />

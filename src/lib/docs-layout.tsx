@@ -21,7 +21,7 @@ export function baseOptions(): BaseLayoutProps {
       ),
       url: "/docs",
     },
-    githubUrl: "https://github.com/JHJHJHJH/bca-ifc",
+    githubUrl: "https://github.com/JHJHJHJH/Corey",
     themeSwitch: {
       enabled: false,
     },
@@ -32,7 +32,7 @@ export function baseOptions(): BaseLayoutProps {
       },
       {
         text: "Clauses",
-        url: "/rules",
+        url: "/clause",
       },
     ],
   };

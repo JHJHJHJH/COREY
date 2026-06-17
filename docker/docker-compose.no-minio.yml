@@ -1,4 +1,4 @@
-name: bca-ifc-no-minio
+name: corey-no-minio
 
 services:
   app:

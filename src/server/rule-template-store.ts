@@ -59,6 +59,15 @@ const BUILT_IN_RULE_TEMPLATES = [
     sourceFileName: null,
     sortOrder: 20,
   },
+  {
+    id: "industry-mapping-bca-column-beam",
+    name: "BCA - Column + Beam",
+    description: "BCA industry mapping checks for column and beam SGPset requirements.",
+    sourceKind: "industry-mapping",
+    configFileName: "industry-mapping-bca-column-beam.json",
+    sourceFileName: null,
+    sortOrder: 30,
+  },
 ] satisfies BuiltInRuleTemplate[];
 
 let seedPromise: Promise<void> | null = null;

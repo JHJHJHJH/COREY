@@ -29,7 +29,7 @@ export const VIEWER_VALIDATION_CONFIG_VERSION = 2 as const;
 
 const LEGACY_VIEWER_VALIDATION_CONFIG_VERSION = 1 as const;
 
-export const VIEWER_VALIDATION_STORAGE_KEY = "bca-ifc.validation-rules.v1";
+export const VIEWER_VALIDATION_STORAGE_KEY = "corey.validation-rules.v1";
 
 const DEFAULT_VALIDATION_CHUNK_SIZE = 250;
 const LEGACY_MIGRATION_CLAUSE_TITLE = "Migrated clause";

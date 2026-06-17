@@ -13,6 +13,15 @@ const watchOptions =
 /** @type {import("next").NextConfig} */
 const nextConfig = {
   output: "standalone",
+  async redirects() {
+    return [
+      {
+        source: "/rules",
+        destination: "/clause",
+        permanent: true,
+      },
+    ];
+  },
   turbopack: {
     // Keep Turbopack scoped to this app instead of the parent home directory.
     root: resolve(appRoot),

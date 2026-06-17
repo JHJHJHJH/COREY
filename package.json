@@ -6,12 +6,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/JHJHJHJH/bca-ifc.git"
+    "url": "git+https://github.com/JHJHJHJH/Corey.git"
   },
   "bugs": {
-    "url": "https://github.com/JHJHJHJH/bca-ifc/issues"
+    "url": "https://github.com/JHJHJHJH/Corey/issues"
   },
-  "homepage": "https://github.com/JHJHJHJH/bca-ifc#readme",
+  "homepage": "https://github.com/JHJHJHJH/Corey#readme",
   "pnpm": {
     "overrides": {
       "@babel/core": "7.29.7",
