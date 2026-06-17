@@ -1,0 +1,92 @@
+{
+  "version": 2,
+  "clauses": [
+    {
+      "id": "starter-structural-identity",
+      "title": "Structural element identity",
+      "rules": [
+        {
+          "id": "beam-globalid-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "attribute",
+            "name": "GlobalId"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "column-globalid-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "attribute",
+            "name": "GlobalId"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "slab-globalid-required",
+          "ifcType": "IfcSlab",
+          "target": {
+            "kind": "attribute",
+            "name": "GlobalId"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "starter-structural-common-properties",
+      "title": "Structural common properties",
+      "rules": [
+        {
+          "id": "beam-load-bearing-required",
+          "ifcType": "IfcBeam",
+          "target": {
+            "kind": "property",
+            "group": "Pset_BeamCommon",
+            "label": "LoadBearing"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "warn"
+        },
+        {
+          "id": "column-load-bearing-required",
+          "ifcType": "IfcColumn",
+          "target": {
+            "kind": "property",
+            "group": "Pset_ColumnCommon",
+            "label": "LoadBearing"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "warn"
+        },
+        {
+          "id": "slab-load-bearing-required",
+          "ifcType": "IfcSlab",
+          "target": {
+            "kind": "property",
+            "group": "Pset_SlabCommon",
+            "label": "LoadBearing"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "warn"
+        }
+      ]
+    }
+  ]
+}

@@ -31,8 +31,8 @@ type ValidationDiagnosisReportProps = {
 
 function severityTone(result: "warn" | "error") {
   return result === "error"
-    ? "border-[#d3a08e] bg-[#fff0ea] text-[#8a3e1f]"
-    : "border-[#d8af80] bg-[#fff7ed] text-[#915217]";
+    ? "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]"
+    : "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
 }
 
 function formatSavedReportDate(value: string) {
@@ -80,7 +80,7 @@ function SavedReportPicker({
             className={`shrink-0 rounded-xl border px-3 py-2 text-left text-xs transition ${
               activeSavedReportId
                 ? "border-[color:var(--viewer-border)] bg-white/70 text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
-                : "border-[#88b59d] bg-[#edf7f1] text-[#1e6b45]"
+                : "border-[color:var(--success-border)] bg-[color:var(--success-bg)] text-[color:var(--success-fg)]"
             }`}
           >
             <div className="font-semibold">Current Run</div>
@@ -96,7 +96,7 @@ function SavedReportPicker({
             onClick={() => onRestoreReport(savedReport.reportId)}
             className={`shrink-0 rounded-xl border px-3 py-2 text-left text-xs transition ${
               activeSavedReportId === savedReport.reportId
-                ? "border-[#88b59d] bg-[#edf7f1] text-[#1e6b45]"
+                ? "border-[color:var(--success-border)] bg-[color:var(--success-bg)] text-[color:var(--success-fg)]"
                 : "border-[color:var(--viewer-border)] bg-white/70 text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
             }`}
           >
@@ -355,12 +355,12 @@ export function ValidationDiagnosisReport({
   );
 
   return (
-    <div className="flex h-screen min-h-0 flex-col bg-[linear-gradient(180deg,#f5efe6_0%,#edf4ff_100%)] text-[color:var(--foreground)]">
+    <div className="flex h-screen min-h-0 flex-col bg-[color:var(--background)] text-[color:var(--foreground)]">
       <header className="border-b border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/95 px-5 py-4 backdrop-blur">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <CircleAlert className="h-5 w-5 text-[#8a3e1f]" />
+              <CircleAlert className="h-5 w-5 text-[color:var(--danger-fg)]" />
               <h1 className="text-xl font-semibold tracking-tight">Clause Diagnosis Report</h1>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted-ink)]">
@@ -435,7 +435,7 @@ export function ValidationDiagnosisReport({
               {summaryCard({
                 label: "Failed Clauses",
                 value: String(report.failedClauseCount),
-                tone: "border-[#d3a08e] bg-[#fff0ea] text-[#8a3e1f]",
+                tone: "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]",
               })}
               {summaryCard({
                 label: "Flagged Elements",
@@ -444,12 +444,12 @@ export function ValidationDiagnosisReport({
               {summaryCard({
                 label: "Error Elements",
                 value: String(report.errorElementCount),
-                tone: "border-[#d3a08e] bg-[#fff0ea] text-[#8a3e1f]",
+                tone: "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]",
               })}
               {summaryCard({
                 label: "Warn Elements",
                 value: String(report.warnElementCount),
-                tone: "border-[#d8af80] bg-[#fff7ed] text-[#915217]",
+                tone: "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]",
               })}
             </div>
 

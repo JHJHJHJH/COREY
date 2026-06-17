@@ -42,33 +42,22 @@ const RESOURCE_DIR = join(process.cwd(), "public", "resources");
 
 const BUILT_IN_RULE_TEMPLATES = [
   {
-    id: "testmodel-simple",
-    name: "Testmodel Simple",
-    description: "2 slab checks grouped into one clause to force demo highlights.",
+    id: "starter-essential-elements",
+    name: "Starter Essential Elements",
+    description: "Basic required-field checks for common IFC element categories.",
     sourceKind: "starter",
-    configFileName: "testmodel-rules-simple.json",
+    configFileName: "starter-essential-elements.json",
     sourceFileName: null,
     sortOrder: 10,
   },
   {
-    id: "testmodel-comprehensive",
-    name: "Testmodel Comprehensive",
-    description:
-      "67 grouped rules for IfcSlab, IfcColumn, and IfcBeam with broad expected highlights.",
+    id: "starter-structural-elements",
+    name: "Starter Structural Elements",
+    description: "Synthetic beam, column, and slab property checks for validation setup.",
     sourceKind: "starter",
-    configFileName: "testmodel-rules-comprehensive.json",
+    configFileName: "starter-structural-elements.json",
     sourceFileName: null,
     sortOrder: 20,
-  },
-  {
-    id: "industry-mapping-bca-column-beam",
-    name: "BCA - Column + Beam",
-    description:
-      "55 generated checks grouped by Agency + Identified Component from the industry mapping CSV.",
-    sourceKind: "industry-mapping",
-    configFileName: "industry-mapping-bca-column-beam.json",
-    sourceFileName: "industry-mapping-4-dec-csv.csv",
-    sortOrder: 30,
   },
 ] satisfies BuiltInRuleTemplate[];
 

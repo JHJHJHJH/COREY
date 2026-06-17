@@ -1,0 +1,34 @@
+---
+title: Contributing
+description: Development conventions for repo contributors.
+---
+
+## Development Flow
+
+1. Read `AGENTS.md` before changing architecture or Next.js behavior.
+2. Keep viewer runtime code client-only.
+3. Extend typed interfaces in `src/features/viewer/types.ts` before adding ad hoc props.
+4. Keep changes scoped to the viewer, runtime, server, or docs boundary they affect.
+5. Run verification before opening a pull request.
+
+## Useful Commands
+
+```bash
+pnpm dev
+pnpm docs:generate
+pnpm lint
+pnpm build
+pnpm verify
+```
+
+## Documentation
+
+Public docs live in `content/docs` and render through Fumadocs at `/docs`.
+Maintenance and planning notes can stay in the repository `docs` folder when they
+are not part of the public documentation set.
+
+## Support And Security
+
+- Use `SUPPORT.md` for support expectations.
+- Use `SECURITY.md` for responsible vulnerability reporting.
+- Follow `CODE_OF_CONDUCT.md` for community standards.

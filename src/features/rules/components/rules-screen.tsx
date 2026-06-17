@@ -39,6 +39,14 @@ function compactButtonClassName() {
   return "inline-flex h-8 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 text-xs font-medium text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]";
 }
 
+function canDownloadTemplateSource(template: ViewerRuleTemplateSummary) {
+  return (
+    Boolean(template.sourceFileName) &&
+    template.templateId !== "industry-mapping-bca-column-beam" &&
+    template.name !== "BCA - Column + Beam"
+  );
+}
+
 function enumText(check: ViewerValidationCheck) {
   return check.kind === "enum" ? check.allowedValues.join(", ") : "";
 }
@@ -633,7 +641,7 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
                           >
                             JSON
                           </a>
-                          {template.sourceFileName ? (
+                          {canDownloadTemplateSource(template) ? (
                             <a
                               href={ruleTemplateSourceEndpoint(template.templateId)}
                               download

@@ -1,0 +1,37 @@
+---
+title: Architecture
+description: Main boundaries in the viewer, runtime, and optional backend.
+---
+
+COREY has two supported operating modes.
+
+## Local-First Mode
+
+Users choose an IFC file from disk. The browser reads the file, creates the That
+Open runtime inside `IfcViewport`, and keeps review state in React and browser
+storage. Model bytes do not leave the browser in this mode.
+
+## Self-Hosted Backend Mode
+
+The backend stores model metadata in Postgres and model bytes in S3-compatible
+object storage. Server-backed models use stable model ids for drafts, validation
+reports, rule templates, Excel compute, and IFC writeback.
+
+## Main Boundaries
+
+- `src/app/page.tsx`: app entry for the viewer
+- `src/features/viewer/components/viewer-shell.tsx`: top-level React state and workflow orchestration
+- `src/features/viewer/components/ifc-viewport.tsx`: That Open, WebGL, worker, WASM, and tool lifecycle boundary
+- `src/features/viewer/lib/model-source.ts`: local and remote model-loading abstraction
+- `src/features/viewer/lib/ifc-data.ts`: tree, selection, category, table, and formatting helpers
+- `src/features/rules/*`: validation clause UI, provider, worker, and shared evaluator
+- `src/server/*`: Prisma, S3, model, draft, report, and rule-template stores
+- `src/app/api/*`: supported self-hosted API routes
+
+## Design Rules
+
+- Keep That Open and WebGL code client-only.
+- Keep `IfcViewport` as the imperative runtime boundary.
+- Keep ordinary React state in `ViewerShell`.
+- Preserve the `ModelSource` abstraction for local and remote model sources.
+- Preserve the single-model assumption unless multi-model workflows are explicitly designed.

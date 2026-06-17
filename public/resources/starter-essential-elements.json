@@ -1,0 +1,54 @@
+{
+  "version": 2,
+  "clauses": [
+    {
+      "id": "starter-element-identity",
+      "title": "Element identity",
+      "rules": [
+        {
+          "id": "wall-globalid-required",
+          "ifcType": "IfcWall",
+          "target": {
+            "kind": "attribute",
+            "name": "GlobalId"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "door-name-required",
+          "ifcType": "IfcDoor",
+          "target": {
+            "kind": "attribute",
+            "name": "Name"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "warn"
+        }
+      ]
+    },
+    {
+      "id": "starter-fire-rating",
+      "title": "Fire rating metadata",
+      "rules": [
+        {
+          "id": "wall-fire-rating-required",
+          "ifcType": "IfcWall",
+          "target": {
+            "kind": "property",
+            "group": "Pset_WallCommon",
+            "label": "FireRating"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "warn"
+        }
+      ]
+    }
+  ]
+}

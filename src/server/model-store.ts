@@ -6,7 +6,7 @@ import {
 } from "@aws-sdk/client-s3";
 import type { ServerModelSummary } from "@/features/viewer/types";
 import { prisma } from "@/server/db";
-import { S3_BUCKET, getS3Client, modelObjectKey } from "@/server/s3";
+import { getS3Bucket, getS3Client, modelObjectKey } from "@/server/s3";
 
 /**
  * Server-side persistence boundary for uploaded IFC models.
@@ -19,6 +19,7 @@ export interface ModelStore {
   list(): Promise<ServerModelSummary[]>;
   getMetadata(modelId: string): Promise<ServerModelSummary | null>;
   getBytes(modelId: string): Promise<Uint8Array | null>;
+  delete(modelId: string): Promise<boolean>;
 }
 
 type ModelRecordRow = {
@@ -44,7 +45,7 @@ class MinioPostgresModelStore implements ModelStore {
     // Write bytes first; only record metadata once the object is durable.
     await getS3Client().send(
       new PutObjectCommand({
-        Bucket: S3_BUCKET,
+        Bucket: getS3Bucket(),
         Key: modelObjectKey(modelId),
         Body: bytes,
         ContentType: "application/octet-stream",
@@ -59,7 +60,7 @@ class MinioPostgresModelStore implements ModelStore {
     } catch (error) {
       // Roll back the orphaned object so storage stays consistent with the DB.
       await getS3Client()
-        .send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: modelObjectKey(modelId) }))
+        .send(new DeleteObjectCommand({ Bucket: getS3Bucket(), Key: modelObjectKey(modelId) }))
         .catch(() => undefined);
       throw error;
     }
@@ -80,7 +81,7 @@ class MinioPostgresModelStore implements ModelStore {
   async getBytes(modelId: string): Promise<Uint8Array | null> {
     try {
       const response = await getS3Client().send(
-        new GetObjectCommand({ Bucket: S3_BUCKET, Key: modelObjectKey(modelId) }),
+        new GetObjectCommand({ Bucket: getS3Bucket(), Key: modelObjectKey(modelId) }),
       );
       if (!response.Body) {
         return null;
@@ -89,6 +90,24 @@ class MinioPostgresModelStore implements ModelStore {
     } catch {
       return null;
     }
+  }
+
+  async delete(modelId: string): Promise<boolean> {
+    // Remove metadata first — it's the source of truth for the catalog, and the
+    // cascade clears the model's drafts and validation reports. A failed object
+    // delete then only leaks bytes (invisible to callers), never the reverse.
+    try {
+      await prisma.modelRecord.delete({ where: { id: modelId } });
+    } catch {
+      // Record already gone (or never existed) — nothing to delete.
+      return false;
+    }
+
+    await getS3Client()
+      .send(new DeleteObjectCommand({ Bucket: getS3Bucket(), Key: modelObjectKey(modelId) }))
+      .catch(() => undefined);
+
+    return true;
   }
 }
 

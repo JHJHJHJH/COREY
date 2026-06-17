@@ -1,0 +1,113 @@
+name: bca-ifc-dev
+
+services:
+  app:
+    build:
+      context: ..
+      target: deps
+    init: true
+    environment:
+      DATABASE_URL: ${DOCKER_DATABASE_URL:-postgresql://corey:corey@postgres:5432/corey?schema=public}
+      S3_ENDPOINT: ${DOCKER_S3_ENDPOINT:-http://minio:9000}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-corey}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-corey-secret}
+      S3_BUCKET: ${S3_BUCKET:-corey-models}
+      COREY_MAX_MODEL_BYTES: ${COREY_MAX_MODEL_BYTES:-262144000}
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_WATCH_POLL_INTERVAL_MS: ${NEXT_WATCH_POLL_INTERVAL_MS:-1000}
+      WATCHPACK_POLLING: ${WATCHPACK_POLLING:-true}
+      CHOKIDAR_USEPOLLING: ${CHOKIDAR_USEPOLLING:-true}
+    ports:
+      - "${PORT:-4000}:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    volumes:
+      - ..:/app
+      - dev-node-modules:/app/node_modules
+      - dev-next-cache:/app/.next
+      - dev-fumadocs-source:/app/.source
+      - dev-pnpm-store:/pnpm/store
+      - dev-prisma-generated:/app/src/generated/prisma
+    command: >
+      sh -c "pnpm config set store-dir /pnpm/store &&
+      CI=true pnpm install --frozen-lockfile &&
+      pnpm prisma generate &&
+      pnpm docs:generate &&
+      pnpm db:deploy &&
+      pnpm dev --webpack"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4000/api/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-corey}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-corey}
+      POSTGRES_DB: ${POSTGRES_DB:-corey}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - dev-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-corey}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-corey-secret}
+    ports:
+      - "${MINIO_API_PORT:-9002}:9000"
+      - "${MINIO_CONSOLE_PORT:-9003}:9001"
+    volumes:
+      - dev-minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio-init:
+    image: minio/mc:latest
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-corey}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-corey-secret}
+      S3_BUCKET: ${S3_BUCKET:-corey-models}
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 \"$${S3_ACCESS_KEY}\" \"$${S3_SECRET_KEY}\" &&
+      mc mb --ignore-existing \"local/$${S3_BUCKET}\" &&
+      echo \"MinIO bucket $${S3_BUCKET} ready\";
+      "
+
+volumes:
+  dev-node-modules:
+  dev-next-cache:
+  dev-fumadocs-source:
+  dev-pnpm-store:
+  dev-prisma-generated:
+  dev-postgres-data:
+  dev-minio-data:

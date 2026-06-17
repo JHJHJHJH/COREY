@@ -13,8 +13,8 @@ deployment, but which today live in the browser:
   identity.
 - **Remote sources:** models can only be loaded from local disk; the `ModelSource` interface
   is hardcoded to `kind: "local-file"`.
-- **Shared catalogs:** rule templates and the industry-mapping file are static assets under
-  `public/resources`, not a server-managed library.
+- **Shared catalogs:** rule templates are static assets under `public/resources`,
+  not a server-managed library.
 - **Compute:** IFC→Fragments conversion, data-table indexing, validation, and IFC writeback
   all run client-side.
 
@@ -39,7 +39,7 @@ Ordered by recommended sequence. Each names the current client seam to replace.
 | 2 | **Validation rules config** | Persistence/multi-user | `localStorage["bca-ifc.validation-rules.v1"]` via `rules-provider.tsx` (read/write isolated in `readStoredConfig`/`writeStoredConfig`) | Server-backed rule sets; localStorage becomes offline cache |
 | 3 | **Data-table edits (drafts)** | Persistence/multi-user | `localStorage["corey:data-table-draft:…"]` via `lib/data-table-draft.ts` (`read/write/clearPersistedViewerDataTableDraft`), keyed by `sourceId` | Server-backed drafts keyed by `modelId`; localStorage cache |
 | 4 | **Validation reports** | Persistence | Ephemeral React state (`validationResult` in `viewer-shell.tsx`); export only to Excel | Persist `ViewerValidationDiagnosisReport` per model run; list/restore |
-| 5 | **Rule templates + industry mapping** | Shared catalogs | Static `public/resources/*.json` + CSV, fetched in `rules-screen.tsx` (`STARTER_TEMPLATES`) | Server-managed `/api/rule-templates` library |
+| 5 | **Rule templates** | Shared catalogs | Static `public/resources/*.json`, fetched in `rules-screen.tsx` (`STARTER_TEMPLATES`) | Server-managed `/api/rule-templates` library |
 | 6 | **Validation evaluation** | Compute offload | Already isomorphic; API route exists as worker *fallback* | (Largely done) make API path first-class for large models |
 | 7 | **IFC→Fragments conversion, data-table indexing, writeback, Excel** | Compute offload | All client-side (`ifc-viewport.tsx` import pipeline, `ifc-data.ts` `buildViewerDataTable`, `ifc-writeback.ts`, `data-table-excel.ts`) | Optional server jobs; **last** — tightly coupled to That Open client runtime |
 
@@ -111,7 +111,7 @@ That Open client coupling.
 - `pnpm lint` and `pnpm build` (`next build --webpack`) — must stay green.
 - Manual end-to-end (use the `run` skill or `pnpm dev`):
   1. Local upload still loads and renders a model (no regression).
-  2. `POST /api/models` with `public/resources/testmodel.ifc`; confirm it appears in
+  2. `POST /api/models` with a local redistributable IFC fixture; confirm it appears in
      `GET /api/models`.
   3. Load that model via the new "server models" entry; confirm tree, properties, data table,
      and validation all work identically to local load, and that `metadata.sourceId` equals

@@ -71,10 +71,10 @@ function ActionButton({
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className={`group flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl transition disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`group flex h-9 w-9 cursor-pointer items-center justify-center rounded-[var(--r-control)] transition disabled:cursor-not-allowed disabled:opacity-40 ${
         active
-          ? "bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
-          : "bg-[color:var(--surface-strong)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-hover)]"
+          ? "bg-[color:var(--accent)] text-[color:var(--accent-ink)] shadow-[inset_0_0_0_1px_var(--accent-strong)]"
+          : "text-[color:var(--foreground)] hover:bg-[color:var(--accent-wash)]"
       } ${className ?? ""}`}
     >
       {children}
@@ -99,7 +99,7 @@ export function ViewerToolbar({
   return (
     <>
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-wrap items-start justify-between gap-2 p-2 sm:p-3">
-        <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/95 px-2 py-2 shadow-[var(--viewer-shadow)] backdrop-blur">
+        <div className="pointer-events-auto flex flex-wrap items-center gap-1 rounded-[var(--r-panel)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] p-1 shadow-[var(--viewer-shadow)] backdrop-blur">
           {Object.entries(toolLabels).map(([tool, label]) => {
             const selected = session.activeTool === tool;
             const Icon = toolIcons[tool as ViewerTool];
@@ -112,10 +112,10 @@ export function ViewerToolbar({
                 title={label}
                 disabled={disabled}
                 onClick={() => onToolChange(tool as ViewerTool)}
-                className={`group flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl transition ${
+                className={`group flex h-9 w-9 cursor-pointer items-center justify-center rounded-[var(--r-control)] transition ${
                   selected
-                    ? "bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
-                    : "bg-transparent text-[color:var(--muted-ink)] hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
+                    ? "bg-[color:var(--accent)] text-[color:var(--accent-ink)] shadow-[inset_0_0_0_1px_var(--accent-strong)]"
+                    : "bg-transparent text-[color:var(--muted-ink)] hover:bg-[color:var(--accent-wash)] hover:text-[color:var(--foreground)]"
                 } disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 <Icon className={`h-4 w-4 ${iconClassName(selected)}`} />
@@ -124,7 +124,7 @@ export function ViewerToolbar({
           })}
         </div>
 
-        <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/95 px-2 py-2 shadow-[var(--viewer-shadow)] backdrop-blur">
+        <div className="pointer-events-auto flex flex-wrap items-center gap-1 rounded-[var(--r-panel)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] p-1 shadow-[var(--viewer-shadow)] backdrop-blur">
           <ActionButton
             label="Focus selection"
             disabled={disabled || !session.selected}
@@ -149,6 +149,7 @@ export function ViewerToolbar({
           <ActionButton label="Show all" disabled={disabled} onClick={onShowAll}>
             <LayoutGrid className="h-4 w-4" />
           </ActionButton>
+          <span aria-hidden="true" className="mx-0.5 h-6 w-px bg-[color:var(--hairline)]" />
           <ActionButton
             label="Clear sections"
             disabled={disabled || session.sectionCount === 0}
@@ -165,21 +166,24 @@ export function ViewerToolbar({
           </ActionButton>
         </div>
 
-        <div className="pointer-events-auto min-w-0 rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/95 px-3 py-2 shadow-[var(--viewer-shadow)] backdrop-blur">
+        <div className="pointer-events-auto min-w-0 rounded-[var(--r-panel)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-3 py-2 shadow-[var(--viewer-shadow)] backdrop-blur">
           <div className="max-w-[min(28rem,60vw)] truncate text-sm font-medium text-[color:var(--foreground)]">
             {status.message}
           </div>
-          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[color:var(--muted-ink)]">
-            <span>{session.selected ? `Selected: ${session.selected.label}` : "No selection"}</span>
-            <span>{session.sectionCount} sections</span>
-            <span>{session.measurementCount} measures</span>
-            <span>{session.hiddenItemCount} hidden</span>
+          <div className="corey-mono-label mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] uppercase tracking-[0.06em] text-[color:var(--muted-ink)]">
+            <span className="truncate text-[color:var(--foreground)]">
+              {session.selected ? session.selected.label : "No selection"}
+            </span>
+            <span className="h-3 w-px bg-[color:var(--hairline)]" />
+            <span>{session.sectionCount} sec</span>
+            <span>{session.measurementCount} msr</span>
+            <span>{session.hiddenItemCount} hid</span>
           </div>
         </div>
       </div>
 
       <div className="pointer-events-none absolute bottom-0 right-3 z-20 sm:right-4">
-        <div className="pointer-events-auto flex overflow-hidden rounded-t-2xl border border-b-0 border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/95 shadow-[var(--viewer-shadow)] backdrop-blur">
+        <div className="pointer-events-auto flex overflow-hidden rounded-t-[var(--r-panel)] border border-b-0 border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] shadow-[var(--viewer-shadow)] backdrop-blur">
           <ActionButton
             label={dataTableOpen ? "Hide data table" : "Open data table"}
             active={dataTableOpen}

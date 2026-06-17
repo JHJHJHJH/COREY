@@ -1,7 +1,7 @@
 // Prisma schema for COREY's server-side persistence (Postgres).
 // Model bytes live in MinIO (S3); this database holds model metadata and the
 // validation rules configuration, data-table drafts, and validation reports. See
-// docker-compose.yml for local services.
+// docker/docker-compose.yml for local services.
 
 generator client {
   provider = "prisma-client"

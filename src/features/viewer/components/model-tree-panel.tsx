@@ -116,10 +116,10 @@ function TreeNodeRow({
   const rowClassName = selected
     ? "border-[color:var(--accent)]/40 bg-[color:var(--surface-strong)] text-[color:var(--foreground)]"
     : isCategoryRow
-      ? "border-[color:var(--accent)]/18 bg-[linear-gradient(135deg,rgba(10,92,255,0.08),rgba(255,255,255,0.88))] text-[color:var(--foreground)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.35)] hover:border-[color:var(--accent)]/30 hover:bg-[linear-gradient(135deg,rgba(10,92,255,0.12),rgba(255,255,255,0.96))]"
+      ? "border-[color:var(--accent)]/18 bg-[color:var(--accent-wash)] text-[color:var(--foreground)] shadow-[inset_0_0_0_1px_var(--hairline)] hover:border-[color:var(--accent)]/30 hover:bg-[color:var(--surface-strong)]"
       : "border-transparent text-[color:var(--muted-ink)] hover:border-[color:var(--viewer-border)] hover:bg-[color:var(--surface-soft)] hover:text-[color:var(--foreground)]";
   const badgeClassName = isCategoryRow
-    ? "hidden rounded-full border border-[color:var(--accent)]/20 bg-white/80 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] text-[color:var(--accent)] md:inline-flex"
+    ? "hidden rounded-full border border-[color:var(--accent)]/20 bg-[color:var(--surface-strong)] px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] text-[color:var(--accent)] md:inline-flex"
     : "hidden rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] text-[color:var(--muted-ink)] md:inline-flex";
   const rowIndentStyle = indentLevel > 0 ? { paddingLeft: `${indentLevel * 0.875}rem` } : undefined;
 

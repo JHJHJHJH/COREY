@@ -25,7 +25,8 @@ CMD ["npx", "prisma", "migrate", "deploy"]
 
 FROM base AS deps
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml prisma.config.ts ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml prisma.config.ts source.config.ts tsconfig.json ./
+COPY content ./content
 COPY prisma ./prisma
 
 RUN mkdir -p src && pnpm install --frozen-lockfile
@@ -60,5 +61,8 @@ COPY --chown=node:node --from=builder /app/public ./public
 USER node
 
 EXPOSE 4000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 4000) + '/api/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
 CMD ["node", "server.js"]

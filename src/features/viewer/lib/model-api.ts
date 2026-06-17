@@ -7,6 +7,25 @@ import type { ServerModelSummary } from "@/features/viewer/types";
  * catalog-level operations (list + upload) used by the viewer shell.
  */
 
+/**
+ * Reports whether server-side model storage (MinIO + Postgres) is configured.
+ *
+ * `/api/health` builds the backend env, which throws (→ 503) when the S3 or
+ * database settings are missing. A clean `ok` means uploads will persist.
+ */
+export async function isServerStorageAvailable(): Promise<boolean> {
+  try {
+    const response = await fetch("/api/health", { cache: "no-store" });
+    if (!response.ok) {
+      return false;
+    }
+    const body = (await response.json().catch(() => null)) as { status?: string } | null;
+    return body?.status === "ok";
+  } catch {
+    return false;
+  }
+}
+
 export async function listServerModels(): Promise<ServerModelSummary[]> {
   const response = await fetch("/api/models", { cache: "no-store" });
   if (!response.ok) {
@@ -15,6 +34,14 @@ export async function listServerModels(): Promise<ServerModelSummary[]> {
 
   const body = (await response.json()) as { models: ServerModelSummary[] };
   return body.models;
+}
+
+export async function deleteServerModel(modelId: string): Promise<void> {
+  const response = await fetch(`/api/models/${modelId}`, { method: "DELETE" });
+  if (!response.ok && response.status !== 404) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `Model could not be deleted (${response.status}).`);
+  }
 }
 
 export async function uploadModelToServer(

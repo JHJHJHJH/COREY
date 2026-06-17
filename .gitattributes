@@ -1,0 +1,2 @@
+public/workers/thatopen-fragments-worker.mjs -whitespace
+public/wasm/*.wasm binary

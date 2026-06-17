@@ -2,6 +2,7 @@ import {
   coerceViewerDataTableInputValue,
   createViewerDataTableDraft,
 } from "@/features/viewer/lib/data-table-draft";
+import type { CellValue, Workbook, Worksheet } from "exceljs";
 import type {
   ViewerDataTableColumn,
   ViewerDataTableData,
@@ -25,32 +26,6 @@ const TECHNICAL_COLUMNS = ["__rowKey", "__modelId", "__localId"] as const;
 const IMPORTED_COLUMN_FALLBACK_GROUP = "Excel Import";
 const WORKBOOK_GROUP_DELIMITER = "|||";
 
-type SheetJsModule = {
-  read: (data: ArrayBuffer | Uint8Array, options: Record<string, unknown>) => Workbook;
-  write: (workbook: Workbook, options: Record<string, unknown>) => ArrayBuffer;
-  utils: {
-    aoa_to_sheet: (data: unknown[][]) => Worksheet;
-    book_new: () => Workbook;
-    book_append_sheet: (workbook: Workbook, worksheet: Worksheet, name: string) => void;
-    sheet_to_json: (sheet: Worksheet, options: Record<string, unknown>) => unknown[][];
-  };
-};
-
-type Workbook = {
-  SheetNames: string[];
-  Sheets: Record<string, Worksheet>;
-  Workbook?: {
-    Sheets?: Array<{
-      Hidden?: number;
-      name?: string;
-    }>;
-  };
-};
-
-type Worksheet = {
-  ["!cols"]?: Array<{ hidden?: boolean }>;
-};
-
 type ColumnMetaRow = {
   header: string;
   columnKey: string;
@@ -67,8 +42,78 @@ type ColumnMetaRow = {
   importHeader: string;
 };
 
-async function loadSheetJs(): Promise<SheetJsModule> {
-  return (await import("xlsx")) as unknown as SheetJsModule;
+async function createWorkbook(): Promise<Workbook> {
+  const ExcelJS = await import("exceljs");
+  return new ExcelJS.Workbook();
+}
+
+function appendRows(worksheet: Worksheet, rows: unknown[][]) {
+  for (const row of rows) {
+    worksheet.addRow(row);
+  }
+}
+
+function toArrayBuffer(bytes: Uint8Array) {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
+function toUint8Array(bytes: ArrayBuffer) {
+  return new Uint8Array(bytes);
+}
+
+function normalizeCellValue(value: CellValue): unknown {
+  if (value === null || typeof value === "undefined") {
+    return "";
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (typeof value !== "object") {
+    return value;
+  }
+
+  if ("result" in value) {
+    return normalizeCellValue(value.result as CellValue);
+  }
+
+  if ("text" in value && typeof value.text === "string") {
+    return value.text;
+  }
+
+  if ("richText" in value && Array.isArray(value.richText)) {
+    return value.richText.map((part) => part.text ?? "").join("");
+  }
+
+  return String(value);
+}
+
+function worksheetRows(worksheet: Worksheet) {
+  const rows: unknown[][] = [];
+  const columnCount = worksheet.columnCount;
+
+  worksheet.eachRow((row) => {
+    const values: unknown[] = [];
+    for (let index = 1; index <= columnCount; index++) {
+      values.push(normalizeCellValue(row.getCell(index).value));
+    }
+    rows.push(values);
+  });
+
+  return rows;
+}
+
+function getSheetNames(workbook: Workbook) {
+  return workbook.worksheets.map((worksheet) => worksheet.name);
+}
+
+async function loadWorkbook(bytes: Uint8Array) {
+  const workbook = await createWorkbook();
+  await workbook.xlsx.load(toArrayBuffer(bytes));
+  return workbook;
 }
 
 function formatByteSignature(bytes: Uint8Array, length = 8) {
@@ -381,8 +426,8 @@ function buildDiagnosisElementRows(report: ViewerValidationDiagnosisReport) {
 
 function verifyWorkbook(workbook: Workbook, requiredSheets: string[], context: string) {
   for (const sheetName of requiredSheets) {
-    if (!workbook.Sheets[sheetName]) {
-      const sheetNames = workbook.SheetNames.join(", ");
+    if (!workbook.getWorksheet(sheetName)) {
+      const sheetNames = getSheetNames(workbook).join(", ");
       throw new Error(
         `${context} verification failed. Found sheets: ${sheetNames || "none"}.`,
       );
@@ -394,8 +439,7 @@ export async function buildViewerDataTableExcelBytes(input: {
   data: ViewerDataTableData;
   sourceId: string;
 }) {
-  const XLSX = await loadSheetJs();
-  const workbook = XLSX.utils.book_new();
+  const workbook = await createWorkbook();
   const visibleColumns = input.data.columns;
   const headerRow = [
     ...TECHNICAL_COLUMNS,
@@ -407,27 +451,13 @@ export async function buildViewerDataTableExcelBytes(input: {
     row.localId,
     ...visibleColumns.map((column) => toWorkbookCellValue(row, column)),
   ]);
-  const dataSheet = XLSX.utils.aoa_to_sheet([headerRow, ...dataRows]);
-  const metaSheet = XLSX.utils.aoa_to_sheet(buildMetaRows(input.sourceId, visibleColumns));
+  const dataSheet = workbook.addWorksheet(DATA_SHEET_NAME);
+  const metaSheet = workbook.addWorksheet(META_SHEET_NAME, { state: "hidden" });
+  appendRows(dataSheet, [headerRow, ...dataRows]);
+  appendRows(metaSheet, buildMetaRows(input.sourceId, visibleColumns));
 
-  XLSX.utils.book_append_sheet(workbook, dataSheet, DATA_SHEET_NAME);
-  XLSX.utils.book_append_sheet(workbook, metaSheet, META_SHEET_NAME);
-  workbook.Workbook = {
-    Sheets: [
-      { name: DATA_SHEET_NAME, Hidden: 0 },
-      { name: META_SHEET_NAME, Hidden: 1 },
-    ],
-  };
-
-  const bytes = XLSX.write(workbook, {
-    bookType: "xlsx",
-    type: "array",
-    compression: true,
-  });
-  const verificationWorkbook = XLSX.read(bytes, {
-    type: "array",
-    raw: true,
-  });
+  const bytes = toUint8Array(await workbook.xlsx.writeBuffer({ useSharedStrings: true }));
+  const verificationWorkbook = await loadWorkbook(bytes);
   verifyWorkbook(verificationWorkbook, [DATA_SHEET_NAME, META_SHEET_NAME], "Exported workbook");
 
   return bytes;
@@ -436,23 +466,14 @@ export async function buildViewerDataTableExcelBytes(input: {
 export async function buildViewerValidationDiagnosisExcelBytes(input: {
   report: ViewerValidationDiagnosisReport;
 }) {
-  const XLSX = await loadSheetJs();
-  const workbook = XLSX.utils.book_new();
-  const clauseSheet = XLSX.utils.aoa_to_sheet(buildDiagnosisClauseRows(input.report));
-  const elementSheet = XLSX.utils.aoa_to_sheet(buildDiagnosisElementRows(input.report));
+  const workbook = await createWorkbook();
+  const clauseSheet = workbook.addWorksheet(DIAGNOSIS_CLAUSES_SHEET_NAME);
+  const elementSheet = workbook.addWorksheet(DIAGNOSIS_ELEMENTS_SHEET_NAME);
+  appendRows(clauseSheet, buildDiagnosisClauseRows(input.report));
+  appendRows(elementSheet, buildDiagnosisElementRows(input.report));
 
-  XLSX.utils.book_append_sheet(workbook, clauseSheet, DIAGNOSIS_CLAUSES_SHEET_NAME);
-  XLSX.utils.book_append_sheet(workbook, elementSheet, DIAGNOSIS_ELEMENTS_SHEET_NAME);
-
-  const bytes = XLSX.write(workbook, {
-    bookType: "xlsx",
-    type: "array",
-    compression: true,
-  });
-  const verificationWorkbook = XLSX.read(bytes, {
-    type: "array",
-    raw: true,
-  });
+  const bytes = toUint8Array(await workbook.xlsx.writeBuffer({ useSharedStrings: true }));
+  const verificationWorkbook = await loadWorkbook(bytes);
   verifyWorkbook(
     verificationWorkbook,
     [DIAGNOSIS_CLAUSES_SHEET_NAME, DIAGNOSIS_ELEMENTS_SHEET_NAME],
@@ -469,27 +490,19 @@ export async function parseViewerDataTableExcelBytes(input: {
   baseData: ViewerDataTableData;
   currentData: ViewerDataTableData;
 }) {
-  const XLSX = await loadSheetJs();
-  const workbook = XLSX.read(input.bytes, {
-    type: "array",
-    raw: true,
-  });
-  const dataSheet = workbook.Sheets[DATA_SHEET_NAME];
-  const metaSheet = workbook.Sheets[META_SHEET_NAME];
+  const workbook = await loadWorkbook(input.bytes);
+  const dataSheet = workbook.getWorksheet(DATA_SHEET_NAME);
+  const metaSheet = workbook.getWorksheet(META_SHEET_NAME);
 
   if (!dataSheet || !metaSheet) {
-    const sheetNames = workbook.SheetNames.length > 0 ? workbook.SheetNames.join(", ") : "none";
+    const sheetNames = getSheetNames(workbook);
     const signature = formatByteSignature(input.bytes);
     throw new Error(
-      `Workbook is missing the required Data Table or _corey_meta sheet. Found sheets: ${sheetNames}. Signature: ${signature || "none"}. Size: ${input.bytes.byteLength} bytes.`,
+      `Workbook is missing the required Data Table or _corey_meta sheet. Found sheets: ${sheetNames.length > 0 ? sheetNames.join(", ") : "none"}. Signature: ${signature || "none"}. Size: ${input.bytes.byteLength} bytes.`,
     );
   }
 
-  const metaRows = XLSX.utils.sheet_to_json(metaSheet, {
-    header: 1,
-    raw: true,
-    blankrows: false,
-  });
+  const metaRows = worksheetRows(metaSheet);
   const { settings, columns: metaColumns } = parseMetaRows(metaRows);
   const version = Number(settings.get("version") ?? Number.NaN);
   const workbookSourceId = settings.get("sourceId") ?? "";
@@ -502,12 +515,7 @@ export async function parseViewerDataTableExcelBytes(input: {
     throw new Error("Workbook source does not match the currently loaded model.");
   }
 
-  const rows = XLSX.utils.sheet_to_json(dataSheet, {
-    header: 1,
-    raw: true,
-    defval: "",
-    blankrows: false,
-  });
+  const rows = worksheetRows(dataSheet);
   const headerRow = rows[0] ?? [];
   const headerIndex = new Map<string, number>();
   const duplicateHeaders = new Set<string>();

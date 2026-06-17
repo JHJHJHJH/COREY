@@ -16,6 +16,7 @@
 # next.js
 /.next/
 /out/
+/.source/
 
 # production
 /build
@@ -40,9 +41,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local IFC fixtures
+# local IFC fixtures. Public sample models must have explicit provenance before
+# being committed; see public/resources/README.md.
 /public/resources/*.ifc
-!/public/resources/testmodel.ifc
 
 #videos
 /playwright-artifacts/*
@@ -53,3 +54,4 @@ next-env.d.ts
 
 # local env (use .env.example as the template)
 /.env
+.pnpm-store/

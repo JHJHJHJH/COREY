@@ -1,13 +1,35 @@
 {
   "name": "corey",
+  "description": "Local-first IFC review app with an optional self-hosted backend.",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JHJHJHJH/bca-ifc.git"
+  },
+  "bugs": {
+    "url": "https://github.com/JHJHJHJH/bca-ifc/issues"
+  },
+  "homepage": "https://github.com/JHJHJHJH/bca-ifc#readme",
+  "pnpm": {
+    "overrides": {
+      "@babel/core": "7.29.7",
+      "@hono/node-server": "1.19.13",
+      "postcss": "8.5.10",
+      "uuid": "11.1.1"
+    }
+  },
   "scripts": {
     "dev": "next dev -p 4000",
-    "build": "next build --webpack",
+    "build": "fumadocs-mdx && next build --webpack",
     "start": "next start -p 4000",
     "lint": "eslint",
-    "postinstall": "prisma generate",
+    "docs:generate": "fumadocs-mdx",
+    "check:assets": "node scripts/check-runtime-assets.mjs",
+    "audit:prod": "pnpm audit --prod",
+    "verify": "pnpm docs:generate && pnpm lint && pnpm check:assets && pnpm build && pnpm audit:prod",
+    "postinstall": "prisma generate && fumadocs-mdx",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy"
   },
@@ -15,29 +37,34 @@
     "@aws-sdk/client-s3": "^3.1068.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
-    "@thatopen/components": "^3.3.3",
-    "@thatopen/components-front": "^3.3.3",
-    "@thatopen/fragments": "^3.3.7",
+    "@thatopen/components": "^3.4.6",
+    "@thatopen/components-front": "^3.4.3",
+    "@thatopen/fragments": "^3.4.5",
+    "exceljs": "4.4.0",
+    "fumadocs-core": "16.10.3",
+    "fumadocs-mdx": "15.0.12",
+    "fumadocs-ui": "16.10.3",
     "lucide-react": "^1.7.0",
-    "next": "16.2.2",
+    "next": "16.2.9",
     "pg": "^8.21.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "three": "^0.183.2",
-    "web-ifc": "^0.0.77",
-    "xlsx": "^0.18.5"
+    "web-ifc": "^0.0.77"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/mdx": "2.0.14",
     "@types/node": "^20",
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/three": "^0.183.1",
     "eslint": "^9",
-    "eslint-config-next": "16.2.2",
+    "eslint-config-next": "16.2.9",
     "prisma": "^7.8.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite": "8.0.16"
   }
 }

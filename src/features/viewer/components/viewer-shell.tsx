@@ -1,9 +1,9 @@
 "use client";
 
 import {
+  BookOpenText,
   ClipboardCheck,
   CircleAlert,
-  CloudUpload,
   FileOutput,
   FileSpreadsheet,
   Import,
@@ -13,6 +13,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   startTransition,
@@ -73,7 +74,7 @@ import {
   sanitizeViewerDebugValue,
 } from "@/features/viewer/lib/ifc-data";
 import { LocalFileModelSource, RemoteModelSource } from "@/features/viewer/lib/model-source";
-import { uploadModelToServer } from "@/features/viewer/lib/model-api";
+import { isServerStorageAvailable, uploadModelToServer } from "@/features/viewer/lib/model-api";
 import { ServerModelsMenu } from "@/features/viewer/components/server-models-menu";
 import { buildViewerValidationDiagnosisReport } from "@/features/viewer/lib/validation-report";
 import {
@@ -140,6 +141,7 @@ const MAX_DATA_TABLE_DIALOG_WIDTH = Number.POSITIVE_INFINITY;
 const MAX_DATA_TABLE_DIALOG_HEIGHT = Number.POSITIVE_INFINITY;
 const DATA_TABLE_DIALOG_MARGIN = 12;
 const VALIDATION_API_ROW_THRESHOLD = 1000;
+const VIEWER_THEME_STORAGE_KEY = "corey.viewer.theme";
 
 const validationWorkerUrl = new URL("../../rules/workers/validation-worker.ts", import.meta.url);
 const source = new LocalFileModelSource();
@@ -194,6 +196,7 @@ const initialValidationState: ViewerValidationState = {
 };
 
 type DrawerSide = "left" | "right";
+type ViewerTheme = "light" | "dark";
 
 type DrawerDragState = {
   side: DrawerSide;
@@ -221,6 +224,11 @@ type DataTableDialogResizeState = {
   startLayout: DataTableDialogLayout;
 };
 
+type WorkspaceDrawerWidths = {
+  treeDrawerWidth: number;
+  propertiesDrawerWidth: number;
+};
+
 type ViewerValidationWorkerMessage =
   | {
       type: "progress";
@@ -243,29 +251,157 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
+function clampDrawerWidthToWorkspace(
+  nextWidth: number,
+  otherDrawerWidth: number,
+  workspaceWidth: number,
+) {
+  if (workspaceWidth === 0) {
+    return clamp(nextWidth, MIN_DRAWER_WIDTH, MAX_DRAWER_WIDTH);
+  }
+
+  const handleCount = 2;
+  const availableWidth =
+    workspaceWidth - otherDrawerWidth - handleCount * DRAWER_HANDLE_WIDTH - MIN_VIEWPORT_WIDTH;
+  const maxWidth = Math.min(
+    MAX_DRAWER_WIDTH,
+    Math.max(MIN_CONSTRAINED_DRAWER_WIDTH, availableWidth),
+  );
+  const minWidth = Math.min(MIN_DRAWER_WIDTH, maxWidth);
+
+  return clamp(nextWidth, minWidth, maxWidth);
+}
+
+function clampWorkspaceDrawerWidths({
+  treeDrawerWidth,
+  propertiesDrawerWidth,
+  showTree,
+  showProperties,
+  workspaceWidth,
+}: WorkspaceDrawerWidths & {
+  showTree: boolean;
+  showProperties: boolean;
+  workspaceWidth: number;
+}) {
+  if (workspaceWidth === 0) {
+    return {
+      treeDrawerWidth: showTree
+        ? clamp(treeDrawerWidth, MIN_DRAWER_WIDTH, MAX_DRAWER_WIDTH)
+        : treeDrawerWidth,
+      propertiesDrawerWidth: showProperties
+        ? clamp(propertiesDrawerWidth, MIN_DRAWER_WIDTH, MAX_DRAWER_WIDTH)
+        : propertiesDrawerWidth,
+    } satisfies WorkspaceDrawerWidths;
+  }
+
+  if (showTree && !showProperties) {
+    return {
+      treeDrawerWidth: clampDrawerWidthToWorkspace(
+        treeDrawerWidth,
+        COLLAPSED_DRAWER_WIDTH,
+        workspaceWidth,
+      ),
+      propertiesDrawerWidth,
+    } satisfies WorkspaceDrawerWidths;
+  }
+
+  if (!showTree && showProperties) {
+    return {
+      treeDrawerWidth,
+      propertiesDrawerWidth: clampDrawerWidthToWorkspace(
+        propertiesDrawerWidth,
+        COLLAPSED_DRAWER_WIDTH,
+        workspaceWidth,
+      ),
+    } satisfies WorkspaceDrawerWidths;
+  }
+
+  if (!showTree || !showProperties) {
+    return { treeDrawerWidth, propertiesDrawerWidth } satisfies WorkspaceDrawerWidths;
+  }
+
+  const handleCount = 2;
+  const availableDrawerWidth =
+    workspaceWidth - handleCount * DRAWER_HANDLE_WIDTH - MIN_VIEWPORT_WIDTH;
+  const minimumDrawerWidth =
+    availableDrawerWidth >= MIN_DRAWER_WIDTH * 2
+      ? MIN_DRAWER_WIDTH
+      : MIN_CONSTRAINED_DRAWER_WIDTH;
+  const maximumTotalDrawerWidth = Math.max(minimumDrawerWidth * 2, availableDrawerWidth);
+  let nextTreeDrawerWidth = clamp(treeDrawerWidth, minimumDrawerWidth, MAX_DRAWER_WIDTH);
+  let nextPropertiesDrawerWidth = clamp(
+    propertiesDrawerWidth,
+    minimumDrawerWidth,
+    MAX_DRAWER_WIDTH,
+  );
+  let excessWidth =
+    nextTreeDrawerWidth + nextPropertiesDrawerWidth - maximumTotalDrawerWidth;
+
+  if (excessWidth <= 0) {
+    return {
+      treeDrawerWidth: nextTreeDrawerWidth,
+      propertiesDrawerWidth: nextPropertiesDrawerWidth,
+    } satisfies WorkspaceDrawerWidths;
+  }
+
+  const treeShrinkRoom = Math.max(0, nextTreeDrawerWidth - minimumDrawerWidth);
+  const propertiesShrinkRoom = Math.max(0, nextPropertiesDrawerWidth - minimumDrawerWidth);
+  const totalShrinkRoom = treeShrinkRoom + propertiesShrinkRoom;
+
+  if (totalShrinkRoom === 0) {
+    return {
+      treeDrawerWidth: nextTreeDrawerWidth,
+      propertiesDrawerWidth: nextPropertiesDrawerWidth,
+    } satisfies WorkspaceDrawerWidths;
+  }
+
+  const treeReduction = Math.min(
+    treeShrinkRoom,
+    excessWidth * (treeShrinkRoom / totalShrinkRoom),
+  );
+  nextTreeDrawerWidth -= treeReduction;
+  excessWidth -= treeReduction;
+
+  const propertiesReduction = Math.min(propertiesShrinkRoom, excessWidth);
+  nextPropertiesDrawerWidth -= propertiesReduction;
+  excessWidth -= propertiesReduction;
+
+  if (excessWidth > 0) {
+    nextTreeDrawerWidth -= Math.min(
+      Math.max(0, nextTreeDrawerWidth - minimumDrawerWidth),
+      excessWidth,
+    );
+  }
+
+  return {
+    treeDrawerWidth: nextTreeDrawerWidth,
+    propertiesDrawerWidth: nextPropertiesDrawerWidth,
+  } satisfies WorkspaceDrawerWidths;
+}
+
 function dataTablePhaseTone(phase: ViewerDataTableState["phase"]) {
   switch (phase) {
     case "loading":
-      return "border-[#d8af80] bg-[#fff1df] text-[#915217]";
+      return "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
     case "error":
-      return "border-[#c78972] bg-[#fff0ea] text-[#8a3e1f]";
+      return "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]";
     case "loaded":
-      return "border-[color:var(--viewer-border)] bg-white/70 text-[color:var(--muted-ink)]";
+      return "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)]";
     default:
-      return "border-[color:var(--viewer-border)] bg-white/60 text-[color:var(--muted-ink)]";
+      return "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)]";
   }
 }
 
 function validationPhaseTone(phase: ViewerValidationState["phase"]) {
   switch (phase) {
     case "running":
-      return "border-[#d8af80] bg-[#fff1df] text-[#915217]";
+      return "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
     case "error":
-      return "border-[#c78972] bg-[#fff0ea] text-[#8a3e1f]";
+      return "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]";
     case "ready":
-      return "border-[color:var(--viewer-border)] bg-white/70 text-[color:var(--muted-ink)]";
+      return "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)]";
     default:
-      return "border-[color:var(--viewer-border)] bg-white/60 text-[color:var(--muted-ink)]";
+      return "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)]";
   }
 }
 
@@ -322,10 +458,10 @@ function HeaderActionButton({
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border transition ${
+      className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-[var(--r-control)] border transition ${
         active
-          ? "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
-          : "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
+          ? "border-[color:var(--accent-strong)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
+          : "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-strong)]"
       } disabled:cursor-not-allowed disabled:opacity-50`}
     >
       {children}
@@ -341,7 +477,7 @@ function HeaderActionFileButton({
   children,
 }: HeaderActionFileButtonProps) {
   const className =
-    "flex h-10 w-10 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]";
+    "flex h-10 w-10 items-center justify-center rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-strong)]";
 
   if (disabled) {
     return (
@@ -632,11 +768,17 @@ export function ViewerShell() {
   const dataTableDraftPersistenceVersionRef = useRef(0);
   const dataTableDraftWriteThroughRef = useRef(false);
   const persistedValidationResultRef = useRef<ViewerValidationRunResult | null>(null);
-  const [savingToServer, setSavingToServer] = useState(false);
+  const [serverNotice, setServerNotice] = useState<{
+    tone: "info" | "success" | "error";
+    message: string;
+    sticky?: boolean;
+  } | null>(null);
   const validationWorkerRef = useRef<Worker | null>(null);
   const validationAbortControllerRef = useRef<AbortController | null>(null);
   const validationRunIdRef = useRef(0);
   const drawerDragStateRef = useRef<DrawerDragState | null>(null);
+  const treeDrawerWidthRef = useRef(DEFAULT_TREE_DRAWER_WIDTH);
+  const propertiesDrawerWidthRef = useRef(DEFAULT_PROPERTIES_DRAWER_WIDTH);
   const pendingDrawerWidthRef = useRef<{ side: DrawerSide; width: number } | null>(null);
   const drawerAnimationFrameRef = useRef<number | null>(null);
   const dataTableDialogLayoutRef = useRef<DataTableDialogLayout>({
@@ -688,6 +830,8 @@ export function ViewerShell() {
     useState<ViewerValidationDiagnosisReport | null>(null);
   const [activeSavedValidationReportId, setActiveSavedValidationReportId] = useState<string | null>(null);
   const [selectedValidationClauseId, setSelectedValidationClauseId] = useState("");
+  const [viewerTheme, setViewerTheme] = useState<ViewerTheme>("dark");
+  const [viewerThemeLoaded, setViewerThemeLoaded] = useState(false);
   const [showTree, setShowTree] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
   const [showDataTable, setShowDataTable] = useState(false);
@@ -713,6 +857,9 @@ export function ViewerShell() {
   const hasModel = Boolean(metadata && status.phase === "loaded");
   const isDataTableDetached = showDataTable && showDataTableInWindow;
   const activeDrawerResizeSide = drawerDragState?.side ?? null;
+  const toggleViewerTheme = useCallback(() => {
+    setViewerTheme((current) => (current === "dark" ? "light" : "dark"));
+  }, []);
   const deferredClauses = useDeferredValue(config.clauses);
   const compiledValidationRules = useMemo(
     () => compileViewerValidationRules(deferredClauses),
@@ -851,6 +998,21 @@ export function ViewerShell() {
       rows: buildViewerValidationRows(effectiveDataTableData, deferredClauses),
     };
   }, [deferredClauses, effectiveDataTableData, metadata, runnableRuleCount, status.phase]);
+
+  useEffect(() => {
+    const persistedTheme = window.localStorage.getItem(VIEWER_THEME_STORAGE_KEY);
+    if (persistedTheme === "light" || persistedTheme === "dark") {
+      setViewerTheme(persistedTheme);
+    }
+    setViewerThemeLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!viewerThemeLoaded) {
+      return;
+    }
+    window.localStorage.setItem(VIEWER_THEME_STORAGE_KEY, viewerTheme);
+  }, [viewerTheme, viewerThemeLoaded]);
 
   useEffect(() => {
     const sourceId = metadata?.sourceId;
@@ -1157,29 +1319,17 @@ export function ViewerShell() {
 
   const clampDrawerWidth = useCallback((side: DrawerSide, nextWidth: number) => {
     const workspaceWidth = workspaceRef.current?.clientWidth ?? 0;
-    if (workspaceWidth === 0) {
-      return clamp(nextWidth, MIN_DRAWER_WIDTH, MAX_DRAWER_WIDTH);
-    }
-
     const otherDrawerWidth =
       side === "left"
         ? showProperties
-          ? propertiesDrawerWidth
+          ? propertiesDrawerWidthRef.current
           : COLLAPSED_DRAWER_WIDTH
         : showTree
-          ? treeDrawerWidth
+          ? treeDrawerWidthRef.current
           : COLLAPSED_DRAWER_WIDTH;
-    const handleCount = 2;
-    const availableWidth =
-      workspaceWidth - otherDrawerWidth - handleCount * DRAWER_HANDLE_WIDTH - MIN_VIEWPORT_WIDTH;
-    const maxWidth = Math.min(
-      MAX_DRAWER_WIDTH,
-      Math.max(MIN_CONSTRAINED_DRAWER_WIDTH, availableWidth),
-    );
-    const minWidth = Math.min(MIN_DRAWER_WIDTH, maxWidth);
 
-    return clamp(nextWidth, minWidth, maxWidth);
-  }, [propertiesDrawerWidth, showProperties, showTree, treeDrawerWidth]);
+    return clampDrawerWidthToWorkspace(nextWidth, otherDrawerWidth, workspaceWidth);
+  }, [showProperties, showTree]);
 
   const clampDataTableDialogLayout = useCallback((nextLayout: DataTableDialogLayout) => {
     const workspace = workspaceRef.current;
@@ -1195,14 +1345,33 @@ export function ViewerShell() {
   }, []);
 
   const syncWorkspaceLayout = useCallback(() => {
-    if (showTree) {
-      setTreeDrawerWidth((current) => clampDrawerWidth("left", current));
+    const nextWidths = clampWorkspaceDrawerWidths({
+      treeDrawerWidth: treeDrawerWidthRef.current,
+      propertiesDrawerWidth: propertiesDrawerWidthRef.current,
+      showTree,
+      showProperties,
+      workspaceWidth: workspaceRef.current?.clientWidth ?? 0,
+    });
+
+    if (showTree && nextWidths.treeDrawerWidth !== treeDrawerWidthRef.current) {
+      treeDrawerWidthRef.current = nextWidths.treeDrawerWidth;
+      setTreeDrawerWidth((current) =>
+        current === nextWidths.treeDrawerWidth ? current : nextWidths.treeDrawerWidth,
+      );
     }
 
-    if (showProperties) {
-      setPropertiesDrawerWidth((current) => clampDrawerWidth("right", current));
+    if (
+      showProperties &&
+      nextWidths.propertiesDrawerWidth !== propertiesDrawerWidthRef.current
+    ) {
+      propertiesDrawerWidthRef.current = nextWidths.propertiesDrawerWidth;
+      setPropertiesDrawerWidth((current) =>
+        current === nextWidths.propertiesDrawerWidth
+          ? current
+          : nextWidths.propertiesDrawerWidth,
+      );
     }
-  }, [clampDrawerWidth, showProperties, showTree]);
+  }, [showProperties, showTree]);
 
   const stopDrawerResize = useCallback(() => {
     stopPendingDrawerPreview();
@@ -1214,8 +1383,10 @@ export function ViewerShell() {
     if (pendingWidth) {
       applyDrawerWidth(pendingWidth.side, pendingWidth.width);
       if (pendingWidth.side === "left") {
+        treeDrawerWidthRef.current = pendingWidth.width;
         setTreeDrawerWidth(pendingWidth.width);
       } else {
+        propertiesDrawerWidthRef.current = pendingWidth.width;
         setPropertiesDrawerWidth(pendingWidth.width);
       }
     }
@@ -1350,10 +1521,12 @@ export function ViewerShell() {
   }, [drawerDragState, stopDrawerResize, updateDraggedDrawerWidth]);
 
   useEffect(() => {
+    treeDrawerWidthRef.current = treeDrawerWidth;
     applyDrawerWidth("left", treeDrawerWidth);
   }, [applyDrawerWidth, treeDrawerWidth]);
 
   useEffect(() => {
+    propertiesDrawerWidthRef.current = propertiesDrawerWidth;
     applyDrawerWidth("right", propertiesDrawerWidth);
   }, [applyDrawerWidth, propertiesDrawerWidth]);
 
@@ -1810,14 +1983,28 @@ export function ViewerShell() {
     [loadModelFromSource],
   );
 
-  const handleSaveToServer = useCallback(async () => {
+  const autoSaveToServer = useCallback(async () => {
     const activeSource = activeSourceRef.current;
     if (!activeSource) {
       return;
     }
 
+    // Already a server-backed model (e.g. loaded from the catalog) — nothing to do.
+    if (activeSource.metadata.serverModelId) {
+      return;
+    }
+
+    if (!(await isServerStorageAvailable())) {
+      setServerNotice({
+        tone: "info",
+        message:
+          "Server storage isn’t configured — this model is available for the current session only.",
+      });
+      return;
+    }
+
     const previousSourceId = activeSource.metadata.sourceId;
-    setSavingToServer(true);
+    setServerNotice({ tone: "info", message: "Saving model to server…", sticky: true });
     try {
       const summary = await uploadModelToServer(
         activeSource.metadata.name,
@@ -1847,50 +2034,20 @@ export function ViewerShell() {
           ? { ...current, sourceId: summary.modelId, serverModelId: summary.modelId }
           : current,
       );
-      startTransition(() => {
-        setStatus({ phase: "loaded", message: `Saved “${summary.name}” to server.` });
-      });
+      setServerNotice({ tone: "success", message: `Saved “${summary.name}” to server.` });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      startTransition(() => {
-        setStatus({ phase: "error", message: `Failed to save to server: ${message}` });
-      });
-    } finally {
-      setSavingToServer(false);
+      setServerNotice({ tone: "error", message: `Failed to save to server: ${message}` });
     }
   }, [commitDataTableDraft, dataTableDraft]);
 
-  const handleLoadBundledModel = async () => {
-    startTransition(() => {
-      setStatus({
-        phase: "loading",
-        message: "Fetching bundled test model...",
-      });
-    });
-
-    try {
-      const response = await fetch("/resources/testmodel.ifc");
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const blob = await response.blob();
-      const file = new File([blob], "testmodel.ifc", {
-        type: "application/octet-stream",
-      });
-
-      await loadModelFromFile(file);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown fetch error";
-
-      startTransition(() => {
-        setStatus({
-          phase: "error",
-          message: `Failed to fetch bundled test model: ${message}`,
-        });
-      });
+  useEffect(() => {
+    if (!serverNotice || serverNotice.sticky) {
+      return;
     }
-  };
+    const timer = window.setTimeout(() => setServerNotice(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [serverNotice]);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -1900,6 +2057,7 @@ export function ViewerShell() {
 
     await loadModelFromFile(file);
     event.target.value = "";
+    void autoSaveToServer();
   };
 
   const handleDataTableImport = async (file: File) => {
@@ -2328,24 +2486,24 @@ export function ViewerShell() {
             Data table
           </div>
           <span
-            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${dataTablePhaseTone(dataTableState.phase)}`}
+            className={`corey-mono-label inline-flex items-center rounded-[var(--r-chip)] border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] ${dataTablePhaseTone(dataTableState.phase)}`}
           >
             {dataTableState.phase}
           </span>
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[color:var(--muted-ink)]">
           {metadata ? (
-            <span className="inline-flex items-center rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-2.5 py-1">
+            <span className="corey-mono-label inline-flex items-center rounded-[var(--r-chip)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1">
               {metadata.name}
             </span>
           ) : null}
           {metadata ? (
-            <span className="inline-flex items-center rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-2.5 py-1">
+            <span className="corey-mono-label inline-flex items-center rounded-[var(--r-chip)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1">
               {formatBytes(metadata.size)}
             </span>
           ) : null}
           {draftEditCount > 0 ? (
-            <span className="inline-flex items-center rounded-full border border-[color:var(--viewer-border)] bg-[#edf7f1] px-2.5 py-1 text-[#1e6b45]">
+            <span className="corey-mono-label inline-flex items-center rounded-[var(--r-chip)] border border-[color:var(--success-border)] bg-[color:var(--success-bg)] px-2.5 py-1 text-[color:var(--success-fg)]">
               {draftEditCount} imported edits
             </span>
           ) : null}
@@ -2356,7 +2514,7 @@ export function ViewerShell() {
           </div>
         ) : null}
         {dataTableImportReport?.issues.length ? (
-          <div className="mt-1 max-w-3xl text-xs text-[#8a3e1f]">
+          <div className="mt-1 max-w-3xl text-xs text-[color:var(--danger-fg)]">
             {dataTableImportReport.issues[0]?.message}
             {dataTableImportReport.issues.length > 1
               ? ` (+${dataTableImportReport.issues.length - 1} more)`
@@ -2440,16 +2598,44 @@ export function ViewerShell() {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[color:var(--background)] text-[color:var(--foreground)]">
-      <header className="w-full border-b border-[color:var(--viewer-border)] bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(234,242,255,0.94))] shadow-[var(--viewer-shadow)]">
+    <div
+      data-viewer-theme={viewerTheme}
+      className="flex h-full min-h-0 flex-col bg-[color:var(--background)] text-[color:var(--foreground)]"
+    >
+      <header className="w-full border-b border-[color:var(--viewer-border)] [background:var(--viewer-header-bg)] shadow-[var(--viewer-shadow)]">
         <div className="flex w-full flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-3">
-                <div className="min-w-0">
-                  <h1 className="mt-1 text-lg font-extrabold tracking-tight text-[#4f7dc8] text-shadow-sm sm:text-xl">
+                <Image
+                  src="/corey-robot-builder.png"
+                  alt=""
+                  width={44}
+                  height={44}
+                  priority
+                  aria-hidden="true"
+                  className="h-11 w-11 shrink-0"
+                />
+                <div className="mr-9 min-w-0">
+                  <h1 className="mt-1 text-lg font-extrabold tracking-tight text-[color:var(--viewer-brand)] text-shadow-sm sm:text-xl">
                     COREY
                   </h1>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={openFilePicker}
+                    className="inline-flex h-10 items-center gap-2 rounded-[var(--r-control)] bg-[color:var(--accent)] px-4 text-sm font-semibold text-[color:var(--accent-ink)] shadow-sm transition hover:bg-[color:var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)] focus-visible:ring-offset-2"
+                  >
+                    <Upload className="h-4 w-4" />
+                    <span>Upload</span>
+                  </button>
+                  <ServerModelsMenu
+                    theme={viewerTheme}
+                    onLoadModel={(modelId) => {
+                      void loadModelById(modelId);
+                    }}
+                  />
                 </div>
               </div>
             </div>
@@ -2462,33 +2648,9 @@ export function ViewerShell() {
                 onChange={handleFileChange}
                 className="hidden"
               />
-              <button
-                type="button"
-                onClick={openFilePicker}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[color:var(--accent)] px-4 text-sm font-semibold text-[color:var(--accent-ink)] transition hover:brightness-95"
-              >
-                <Upload className="h-4 w-4" />
-                <span>Open IFC</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  void handleSaveToServer();
-                }}
-                disabled={!metadata || savingToServer}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-4 text-sm font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <CloudUpload className="h-4 w-4" />
-                <span>{savingToServer ? "Saving…" : "Save to server"}</span>
-              </button>
-              <ServerModelsMenu
-                onLoadModel={(modelId) => {
-                  void loadModelById(modelId);
-                }}
-              />
               <Link
                 href="/rules"
-                className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-4 text-sm text-[color:var(--foreground)] no-underline transition hover:bg-[color:var(--surface-strong)]"
+                className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-4 text-sm font-semibold text-[color:var(--foreground)] no-underline shadow-sm transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)]"
               >
                 <ClipboardCheck className="h-4 w-4 shrink-0" />
                 <span>Clauses</span>
@@ -2496,16 +2658,23 @@ export function ViewerShell() {
               <button
                 type="button"
                 onClick={() => setShowValidationReport(true)}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-4 text-sm font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]"
+                className="inline-flex h-10 items-center gap-2 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-4 text-sm font-semibold text-[color:var(--foreground)] shadow-sm transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)]"
               >
                 <CircleAlert className="h-4 w-4" />
                 <span>Report</span>
               </button>
+              <Link
+                href="/docs"
+                className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-4 text-sm font-semibold text-[color:var(--foreground)] no-underline shadow-sm transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)]"
+              >
+                <BookOpenText className="h-4 w-4 shrink-0" />
+                <span>Docs</span>
+              </Link>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <div className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/72 px-3 py-1.5 text-[color:var(--muted-ink)]">
+            <div className="corey-mono-label rounded-[var(--r-chip)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1 text-[10px] uppercase tracking-[0.05em] text-[color:var(--muted-ink)]">
               <span className="inline-flex items-center gap-2">
                 <StatusDot phase={metadata ? "loaded" : "idle"} />
               </span>{" "}
@@ -2514,28 +2683,28 @@ export function ViewerShell() {
                 {metadata?.name ?? "No file loaded"}
               </span>
             </div>
-            <div className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/72 px-3 py-1.5 text-[color:var(--muted-ink)]">
+            <div className="corey-mono-label rounded-[var(--r-chip)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1 text-[10px] uppercase tracking-[0.05em] text-[color:var(--muted-ink)]">
               <span className="font-semibold text-[color:var(--foreground)]">Size:</span>{" "}
               {metadata ? formatBytes(metadata.size) : "—"}
             </div>
-            <div className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/72 px-3 py-1.5 text-[color:var(--muted-ink)]">
+            <div className="corey-mono-label rounded-[var(--r-chip)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1 text-[10px] uppercase tracking-[0.05em] text-[color:var(--muted-ink)]">
               <span className="font-semibold capitalize text-[color:var(--foreground)]">
                 {session.activeTool}
               </span>{" "}
               active
             </div>
-            <div className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/72 px-3 py-1.5 text-[color:var(--muted-ink)]">
+            <div className="corey-mono-label rounded-[var(--r-chip)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1 text-[10px] uppercase tracking-[0.05em] text-[color:var(--muted-ink)]">
               <span className="font-semibold capitalize text-[color:var(--foreground)]">
                 {status.phase}
               </span>{" "}
               status
             </div>
-            <div className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/72 px-3 py-1.5 text-[color:var(--muted-ink)]">
+            <div className="corey-mono-label rounded-[var(--r-chip)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1 text-[10px] uppercase tracking-[0.05em] text-[color:var(--muted-ink)]">
               <span className="font-semibold text-[color:var(--foreground)]">Clauses:</span>{" "}
               {config.clauses.length}
             </div>
             <div
-              className={`rounded-full border px-3 py-1.5 ${validationPhaseTone(validationState.phase)}`}
+              className={`corey-mono-label rounded-[var(--r-chip)] border px-2.5 py-1 text-[10px] uppercase tracking-[0.05em] ${validationPhaseTone(validationState.phase)}`}
             >
               <span className="font-semibold">
                 {validationState.phase === "running"
@@ -2550,7 +2719,7 @@ export function ViewerShell() {
               </span>
               {validationState.mode ? ` · ${validationState.mode}` : ""}
             </div>
-            <div className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/72 px-3 py-1.5 text-[color:var(--muted-ink)]">
+            <div className="corey-mono-label rounded-[var(--r-chip)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1 text-[10px] uppercase tracking-[0.05em] text-[color:var(--muted-ink)]">
               <span className="max-w-[min(30rem,70vw)] truncate align-bottom inline-block">
                 {validationState.message}
               </span>
@@ -2563,7 +2732,7 @@ export function ViewerShell() {
         <main className="flex min-h-0 flex-1">
           <div
             ref={workspaceRef}
-            className="relative -mt-px flex min-h-0 flex-1 flex-col overflow-hidden rounded-b-[2rem] border border-t-0 border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/60 shadow-[var(--viewer-shadow)]"
+            className="corey-blueprint relative -mt-px flex min-h-0 flex-1 flex-col overflow-hidden rounded-b-[var(--r-panel)] border border-t-0 border-[color:var(--viewer-border)] shadow-[var(--viewer-shadow)]"
           >
             <div className="relative min-h-0 flex flex-1 overflow-hidden">
               <ViewerDrawer
@@ -2605,9 +2774,20 @@ export function ViewerShell() {
                 <IfcViewport
                   ref={viewportRef}
                   embedded
+                  theme={viewerTheme}
                   status={status}
                   activeTool={session.activeTool}
                   validationHighlights={validationHighlights}
+                  onOpenFile={openFilePicker}
+                  filesButton={
+                    <ServerModelsMenu
+                      variant="empty-state"
+                      theme={viewerTheme}
+                      onLoadModel={(modelId) => {
+                        void loadModelById(modelId);
+                      }}
+                    />
+                  }
                   onStatusChange={(nextStatus) => {
                     startTransition(() => {
                       setStatus(nextStatus);
@@ -2716,14 +2896,13 @@ export function ViewerShell() {
 
             <DebugPanel
               metadata={metadata}
+              viewerTheme={viewerTheme}
               rawItemSample={activeRawDebugItem}
               rawItemLabel={activeRawDebugLabel}
               selectionSample={debugSelectionSample}
               rowSample={debugRowSample}
               treeSample={debugTreeSample}
-              onLoadBundledModel={() => {
-                void handleLoadBundledModel();
-              }}
+              onToggleTheme={toggleViewerTheme}
             />
 
             {showDataTable && !isDataTableDetached ? (
@@ -2744,7 +2923,10 @@ export function ViewerShell() {
                 onClose={hideDataTable}
                 onOpenBlocked={showDataTableDialog}
               >
-                <div className="flex h-screen min-h-0 flex-col bg-[color:var(--panel-bg)] text-[color:var(--foreground)]">
+                <div
+                  data-viewer-theme={viewerTheme}
+                  className="flex h-screen min-h-0 flex-col bg-[color:var(--panel-bg)] text-[color:var(--foreground)]"
+                >
                   {dataTableSurface}
                 </div>
               </DetachedWindow>
@@ -2759,34 +2941,59 @@ export function ViewerShell() {
                 onClose={() => setShowValidationReport(false)}
                 onOpenBlocked={() => setShowValidationReport(false)}
               >
-                <ValidationDiagnosisReport
-                  metadata={metadata}
-                  report={activeValidationDiagnosisReport}
-                  currentReport={validationDiagnosisReport}
-                  savedReports={savedValidationReports}
-                  activeSavedReportId={activeSavedValidationReportId}
-                  validationPhase={validationState.phase}
-                  validationMessage={validationState.message}
-                  statusMessage={validationReportStatus.message}
-                  activeSelection={session.selected}
-                  onExport={() => {
-                    void handleExportValidationDiagnosis();
-                  }}
-                  onShowClauseInTable={handleShowClauseInDataTable}
-                  onUseCurrentReport={handleUseCurrentValidationReport}
-                  onRestoreReport={(reportId) => {
-                    void handleRestoreValidationReport(reportId);
-                  }}
-                  onSelectElement={(element) => {
-                    void handleValidationDiagnosisElementSelect(element);
-                  }}
-                  onClose={() => setShowValidationReport(false)}
-                />
+                <div data-viewer-theme={viewerTheme}>
+                  <ValidationDiagnosisReport
+                    metadata={metadata}
+                    report={activeValidationDiagnosisReport}
+                    currentReport={validationDiagnosisReport}
+                    savedReports={savedValidationReports}
+                    activeSavedReportId={activeSavedValidationReportId}
+                    validationPhase={validationState.phase}
+                    validationMessage={validationState.message}
+                    statusMessage={validationReportStatus.message}
+                    activeSelection={session.selected}
+                    onExport={() => {
+                      void handleExportValidationDiagnosis();
+                    }}
+                    onShowClauseInTable={handleShowClauseInDataTable}
+                    onUseCurrentReport={handleUseCurrentValidationReport}
+                    onRestoreReport={(reportId) => {
+                      void handleRestoreValidationReport(reportId);
+                    }}
+                    onSelectElement={(element) => {
+                      void handleValidationDiagnosisElementSelect(element);
+                    }}
+                    onClose={() => setShowValidationReport(false)}
+                  />
+                </div>
               </DetachedWindow>
             ) : null}
           </div>
         </main>
       </div>
+      {serverNotice ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`fixed bottom-5 right-5 z-50 flex max-w-sm items-start gap-3 rounded-[var(--r-control)] border px-4 py-3 text-sm font-medium shadow-[var(--viewer-shadow-lift)] ${
+            serverNotice.tone === "error"
+              ? "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]"
+              : serverNotice.tone === "success"
+                ? "border-[color:var(--accent)] bg-[color:var(--surface-strong)] text-[color:var(--foreground)]"
+                : "border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] text-[color:var(--foreground)]"
+          }`}
+        >
+          <span className="min-w-0 flex-1">{serverNotice.message}</span>
+          <button
+            type="button"
+            onClick={() => setServerNotice(null)}
+            aria-label="Dismiss notification"
+            className="-mr-1 -mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-hover)]"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

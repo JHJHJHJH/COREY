@@ -1,0 +1,36 @@
+---
+title: Overview
+description: Repo documentation for COREY, a local-first browser IFC review app.
+---
+
+COREY is a browser-based IFC review app built with Next.js, React, That Open,
+Three.js, and web-ifc. The default workflow is local-first: users open IFC files
+from disk and review them in the browser.
+
+The repository is backend-ready for self-hosted deployments. The optional backend
+stores model bytes in S3-compatible storage, metadata and persisted review data in
+Postgres, and exposes API routes from the same Next.js app.
+
+<Cards>
+  <Card title="Get Started" href="./getting-started" description="Install dependencies, run the app, and verify the repo." />
+  <Card title="Architecture" href="./architecture" description="Understand the main client, viewport, and backend boundaries." />
+  <Card title="Backend API" href="./backend-api" description="Review the self-hosted API surface." />
+  <Card title="Deployment" href="./deployment" description="Build and run COREY with Docker or Next.js." />
+</Cards>
+
+## Current Scope
+
+- Local IFC upload
+- 3D model rendering with That Open
+- Selection and property inspection
+- Spatial and model tree browsing
+- Hide, isolate, and show-all visibility flows
+- Section plane and length measurement tools
+- Validation clauses, reports, and data-table workflows
+- Optional self-hosted storage and compute routes
+
+## Project Links
+
+- Viewer: [/](../)
+- Clause editor: [/rules](../rules)
+- Source repository: [GitHub](https://github.com/JHJHJHJH/bca-ifc)

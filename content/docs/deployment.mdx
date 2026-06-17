@@ -1,0 +1,54 @@
+---
+title: Deployment
+description: Build and run COREY for local or self-hosted distribution.
+---
+
+## Production Build
+
+```bash
+pnpm build
+pnpm start
+```
+
+The build uses `next build --webpack` and generates Fumadocs source files before
+building.
+
+## Docker
+
+Build the runner image:
+
+```bash
+docker build --target runner -t corey:local .
+```
+
+Run the image with backend environment variables:
+
+```bash
+docker run --rm -p 4000:4000 \
+  -e DATABASE_URL="postgresql://corey:corey@host.docker.internal:5432/corey?schema=public" \
+  -e S3_ENDPOINT="http://host.docker.internal:9000" \
+  -e S3_REGION="us-east-1" \
+  -e S3_ACCESS_KEY="corey" \
+  -e S3_SECRET_KEY="corey-secret" \
+  -e S3_BUCKET="corey-models" \
+  corey:local
+```
+
+## Docker Compose
+
+For the app plus local Postgres and MinIO:
+
+```bash
+docker compose -f docker/docker-compose.yml up --build
+```
+
+The app healthcheck calls `/api/health`.
+
+## Release Checklist
+
+```bash
+pnpm verify
+docker compose -f docker/docker-compose.yml build app
+```
+
+Version tags publish GHCR images through the release workflow.

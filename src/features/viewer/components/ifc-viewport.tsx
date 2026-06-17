@@ -7,6 +7,7 @@ import {
   useImperativeHandle,
   useRef,
 } from "react";
+import { Upload } from "lucide-react";
 import * as OBC from "@thatopen/components";
 import * as OBF from "@thatopen/components-front";
 import * as FRAGS from "@thatopen/fragments";
@@ -38,6 +39,7 @@ import type {
 
 type IfcViewportProps = {
   embedded?: boolean;
+  theme: "light" | "dark";
   status: ViewerStatus;
   activeTool: ViewerTool;
   validationHighlights: ViewerValidationHighlights;
@@ -51,6 +53,8 @@ type IfcViewportProps = {
   onDataTableChange: (state: ViewerDataTableState) => void;
   onSelectionDetailsChange: (details: ViewerSelectionDetails) => void;
   onDebugDataChange: (data: ViewerDebugData) => void;
+  onOpenFile?: () => void;
+  filesButton?: React.ReactNode;
 };
 
 type ViewerRuntime = {
@@ -81,6 +85,18 @@ const validationErrorMaterial = {
   transparent: false,
   renderedFaces: 0,
 } satisfies Omit<FRAGS.MaterialDefinition, "customId">;
+const viewportSceneThemes = {
+  light: {
+    background: "#ffffff",
+    ambientLight: "#edf4ff",
+    measurement: "#27445d",
+  },
+  dark: {
+    background: "#080a0d",
+    ambientLight: "#dbe8ff",
+    measurement: "#9fc0ff",
+  },
+} as const;
 
 function toBox(boxes: THREE.Box3[]) {
   const aggregate = new THREE.Box3();
@@ -122,6 +138,7 @@ const selectionDetailsDataConfig = {
 export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(function IfcViewport(
   {
     embedded = false,
+    theme,
     status,
     activeTool,
     validationHighlights,
@@ -131,12 +148,15 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
     onSessionChange,
     onStatusChange,
     onDebugDataChange,
+    onOpenFile,
+    filesButton,
   },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const runtimeRef = useRef<ViewerRuntime | null>(null);
   const activeToolRef = useRef<ViewerTool>(activeTool);
+  const themeRef = useRef(theme);
   const loadSequenceRef = useRef(0);
   const selectionLoadSequenceRef = useRef(0);
   const selectionLoadTimerRef = useRef<number | null>(null);
@@ -327,6 +347,20 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
     runtime.clipper.enabled = activeTool === "section";
     syncSession(runtime.model ? getPrimarySelection(runtime.highlighter.selection.select, runtime.labels, runtime.categories) : null);
   }, [activeTool]);
+
+  useEffect(() => {
+    themeRef.current = theme;
+
+    const runtime = runtimeRef.current;
+    if (!runtime) {
+      return;
+    }
+
+    const sceneTheme = viewportSceneThemes[theme];
+    (runtime.world.scene.three as THREE.Scene).background = new THREE.Color(sceneTheme.background);
+    runtime.measurer.color = new THREE.Color(sceneTheme.measurement);
+    runtime.world.update(0);
+  }, [theme]);
 
   useEffect(() => {
     const runtime = runtimeRef.current;
@@ -847,6 +881,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
         OBF.PostproductionRenderer
       >();
       world.scene = new OBC.SimpleScene(components);
+      const sceneTheme = viewportSceneThemes[themeRef.current];
       world.scene.setup({
         directionalLight: {
           color: new THREE.Color("#ffffff"),
@@ -855,10 +890,10 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
         },
         ambientLight: {
           intensity: 0.8,
-          color: new THREE.Color("#edf4ff"),
+          color: new THREE.Color(sceneTheme.ambientLight),
         },
       });
-      world.scene.three.background = new THREE.Color("#ffffff");
+      world.scene.three.background = new THREE.Color(sceneTheme.background);
       world.renderer = new OBF.PostproductionRenderer(components, container);
       world.camera = new OBC.OrthoPerspectiveCamera(components);
       await world.camera.controls?.setLookAt(18, 16, 18, 0, 0, 0);
@@ -952,7 +987,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
 
       const measurer = components.get(OBF.LengthMeasurement);
       measurer.world = world;
-      measurer.color = new THREE.Color("#27445d");
+      measurer.color = new THREE.Color(sceneTheme.measurement);
       measurer.enabled = false;
       measurer.snappings = [FRAGS.SnappingClass.POINT];
 
@@ -1042,7 +1077,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
 
   return (
     <div
-      className={`relative h-full min-h-0 overflow-hidden bg-[radial-gradient(circle_at_top,rgba(10,92,255,0.16),transparent_42%),linear-gradient(180deg,#f7faff_0%,#dfeaff_100%)] ${
+      className={`relative h-full min-h-0 overflow-hidden [background:var(--viewport-bg)] ${
         embedded
           ? ""
           : "rounded-[2rem] border border-[color:var(--viewer-border)] shadow-[var(--viewer-shadow)]"
@@ -1065,8 +1100,23 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
             </div>
             <div className="mt-3 text-lg font-semibold text-[color:var(--foreground)]">{status.message}</div>
             <div className="mt-2 text-sm text-[color:var(--muted-ink)]">
-              Upload an IFC file to render it with That Open components and inspect the BIM data in-browser.
+              Open IFC -&gt; Configure Clauses -&gt; Validate Model
             </div>
+            {onOpenFile || filesButton ? (
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                {onOpenFile ? (
+                  <button
+                    type="button"
+                    onClick={onOpenFile}
+                    className="pointer-events-auto inline-flex h-10 items-center gap-2 rounded-[var(--r-control)] bg-[color:var(--accent)] px-4 text-sm font-semibold text-[color:var(--accent-ink)] shadow-sm transition hover:bg-[color:var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)] focus-visible:ring-offset-2"
+                  >
+                    <Upload className="h-4 w-4" />
+                    <span>Upload</span>
+                  </button>
+                ) : null}
+                {filesButton}
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}

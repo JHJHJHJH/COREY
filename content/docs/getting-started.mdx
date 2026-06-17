@@ -1,0 +1,58 @@
+---
+title: Getting Started
+description: Install dependencies and run COREY locally.
+---
+
+## Requirements
+
+- Node.js 22
+- pnpm 10
+- Docker, if you want the optional Postgres and S3-compatible backend
+
+## Install
+
+```bash
+pnpm install
+```
+
+The postinstall script generates the Prisma client and Fumadocs source files.
+
+## Run The Viewer
+
+```bash
+pnpm dev
+```
+
+Open [http://localhost:4000](http://localhost:4000), then choose an IFC file from
+disk. Local files are processed in the browser.
+
+## Optional Backend
+
+Copy the environment template, then start the backing services:
+
+```bash
+cp .env.example .env
+docker compose -f docker/docker-compose.yml up -d postgres minio minio-init
+pnpm db:deploy
+pnpm dev
+```
+
+The backend mode enables server model uploads, persisted drafts, persisted reports,
+rule templates, Excel compute routes, and server-model IFC writeback.
+
+## Verification
+
+Run the standard checks before opening a pull request:
+
+```bash
+pnpm verify
+```
+
+For narrower checks:
+
+```bash
+pnpm lint
+pnpm check:assets
+pnpm build
+pnpm audit:prod
+```

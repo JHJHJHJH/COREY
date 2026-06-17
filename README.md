@@ -1,67 +1,164 @@
 # COREY
 
-Browser-based IFC viewer built with `Next.js`, `@thatopen/components`, and `@thatopen/components-front`.
+COREY is a browser-based IFC review app. It can run local-first with user-selected
+IFC files, and it also ships a supported self-hosted backend for model storage,
+rule templates, validation reports, data-table drafts, Excel import/export, and
+server-backed IFC writeback.
+
+The app is built with Next.js 16, React 19, Tailwind CSS 4, That Open, Three.js,
+web-ifc, Prisma, Postgres, and S3-compatible object storage.
 
 ## Features
 
-- Local IFC upload with no backend dependency
+- Local IFC upload and review in the browser
 - That Open-powered 3D viewport
-- Selection and property inspection
-- Spatial tree navigation
-- Hide, isolate, and show-all visibility controls
-- Section plane placement
-- Length measurement placement
-- In-viewport IFC debug panel for inspecting parsed sample data
+- Selection, properties, and spatial tree inspection
+- Hide, isolate, show-all, section plane, and measurement tools
+- Data-table review with Excel import/export
+- Rule-based validation and diagnosis reports
+- Optional self-hosted backend with Postgres and S3-compatible storage
 
-## IFC Debug Panel
+## Quick Start
 
-The viewer includes a small debug panel in the viewport with four sample payloads:
-
-- `Raw IFC`: sanitized output from `model.getItemsData(...)` for either the selected element or the first indexed sample element. This is the closest view to the parsed IFC item shape used by the app.
-- `Selection`: the normalized `ViewerSelectionDetails` payload used by the properties panel. It is built from the raw item through `buildSelectionInspection(...)`.
-- `Row`: the normalized `ViewerDataTableRow` payload from the indexed element table built by `buildViewerDataTable(...)`.
-- `Tree`: a trimmed sample of the `ViewerTreeNode[]` structure produced by `buildViewerTree(...)` from the model spatial structure.
-
-All debug payloads are passed through a sanitizer before display so circular references, deep nesting, and very large arrays remain readable in the UI.
-
-## Development
-
-Install dependencies and start the app:
+Install dependencies and start the local app:
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:4000`.
+Open `http://localhost:4000` and choose an IFC file from disk.
 
-## Docker
+## Docker Development
 
-Build and run the app with Postgres and MinIO:
+Use the development Compose file when you want the app, Postgres, and MinIO to
+run in Docker while editing source files on the host:
 
 ```bash
-docker compose up --build
+cp .env.example .env
+docker compose -f docker/docker-compose.dev.yml up --build
 ```
 
 Open `http://localhost:4000`.
 
-The compose stack runs database migrations before starting the app. Container
-environment values are wired to the internal compose services, while
-`.env.example` remains the template for local non-Docker development.
+The dev container bind-mounts the repository and keeps `node_modules`, `.next`,
+generated Prisma files, and the pnpm store in Docker volumes. It intentionally
+runs `next dev --webpack` with polling enabled because Next.js 16 uses
+Turbopack by default, and Turbopack can miss hot reload invalidation on
+Docker-mounted filesystems.
 
-## Verification
+If you change the Compose file or the dev server command, recreate the app
+service:
 
 ```bash
-pnpm lint
+docker compose -f docker/docker-compose.dev.yml up -d --force-recreate app
+```
+
+## Documentation
+
+The repo docs are built with Fumadocs and served from the app at
+`http://localhost:4000/docs`.
+
+Public docs content lives in `content/docs`. After editing docs, run:
+
+```bash
+pnpm docs:generate
 pnpm build
 ```
 
+## Self-Hosted Backend
+
+The Docker Compose stack starts the app, Postgres, MinIO, and one-shot database
+migrations:
+
+```bash
+cp .env.example .env
+docker compose -f docker/docker-compose.yml up --build
+```
+
+Open `http://localhost:4000`.
+
+The backend is intended for single-tenant/self-hosted deployments. Put a reverse
+proxy in front of it for public networks, and configure payload limits, TLS,
+authentication, and rate limits there.
+
+### Run Without MinIO
+
+Use the no-MinIO Compose file when you only need the local-first viewer plus
+Postgres-backed routes, or when object storage is provided separately:
+
+```bash
+docker compose -f docker/docker-compose.no-minio.yml up --build
+```
+
+This stack starts the app, Postgres, and migrations only. It sets placeholder S3
+values so the app and health check can start, but server-backed model
+upload/download still requires real S3-compatible storage. To avoid a local port
+conflict, set `APP_PORT` for the host binding:
+
+```bash
+APP_PORT=4010 docker compose -f docker/docker-compose.no-minio.yml up --build
+```
+
+## Container Images
+
+Release images are published to GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/jhjhjhjh/bca-ifc:latest
+```
+
+For source builds, continue to use:
+
+```bash
+docker compose -f docker/docker-compose.yml up --build
+```
+
+## Configuration
+
+Copy `.env.example` to `.env` for local development. Required backend variables:
+
+- `DATABASE_URL`
+- `S3_ENDPOINT`
+- `S3_REGION`
+- `S3_ACCESS_KEY`
+- `S3_SECRET_KEY`
+- `S3_BUCKET`
+- `COREY_MAX_MODEL_BYTES`
+
 ## Runtime Assets
 
-The viewer serves These bundled assets from `public/`:
+The viewer serves these copied runtime assets from `public/`:
 
 - `public/workers/thatopen-fragments-worker.mjs`
 - `public/wasm/web-ifc.wasm`
 - `public/wasm/web-ifc-mt.wasm`
 
-If the That Open or `web-ifc` packages are upgraded, refresh those copied files from `node_modules` so the runtime stays in sync with the installed dependency versions.
+If `@thatopen/fragments` or `web-ifc` changes, refresh the copied files from
+`node_modules` and run:
+
+```bash
+pnpm check:assets
+```
+
+## Sample Assets
+
+COREY does not ship a public sample IFC by default. Commit IFC samples only when
+their redistribution rights are explicit and documented in
+`public/resources/README.md`.
+
+## Verification
+
+```bash
+pnpm lint
+pnpm check:assets
+pnpm build
+pnpm audit --prod
+```
+
+`pnpm build` generates Fumadocs sources, then intentionally uses
+`next build --webpack`.
+
+## License
+
+MIT. See `LICENSE` and `THIRD_PARTY_NOTICES.md`.

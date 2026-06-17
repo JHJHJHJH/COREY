@@ -57,20 +57,20 @@ type DataTableUiState = {
 function statusTone(phase: ViewerDataTableState["phase"]) {
   switch (phase) {
     case "loading":
-      return "border-[#d8af80] bg-[#fff1df] text-[#915217]";
+      return "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
     case "error":
-      return "border-[#c78972] bg-[#fff0ea] text-[#8a3e1f]";
+      return "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]";
     case "loaded":
-      return "border-[color:var(--viewer-border)] bg-white/70 text-[color:var(--muted-ink)]";
+      return "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)]";
     default:
-      return "border-[color:var(--viewer-border)] bg-white/60 text-[color:var(--muted-ink)]";
+      return "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)]";
   }
 }
 
 function validationClauseTone(result: ViewerValidationClauseTableView["result"]) {
   return result === "error"
-    ? "border-[#d3a08e] bg-[#fff0ea] text-[#8a3e1f]"
-    : "border-[#d8af80] bg-[#fff7ed] text-[#915217]";
+    ? "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]"
+    : "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
 }
 
 function compactButtonTone(active: boolean) {
@@ -81,7 +81,7 @@ function compactButtonTone(active: boolean) {
 
 function cellTone(column: ViewerDataTableColumn, state: "present" | "missing" | "empty" | "null" | "undefined") {
   if (state !== "present") {
-    return "text-[#915217]";
+    return "text-[color:var(--warning-fg)]";
   }
 
   if (column.kind === "base") {
@@ -177,31 +177,31 @@ const DataTableContent = memo(function DataTableContent({
     <div className="min-h-0 flex-1 overflow-hidden">
       {!data && tablePhase === "loading" ? (
         <div className="flex h-full items-center justify-center px-5 py-6">
-          <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[#d8af80] bg-[#fff7ed] px-6 py-6 text-center">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#915217]">
+          <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] px-6 py-6 text-center">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--warning-fg)]">
               Loading Table
             </div>
             <div className="mt-3 text-lg font-semibold text-[color:var(--foreground)]">
               Building the IFC data table
             </div>
-            <p className="mt-2 text-sm leading-6 text-[#915217]">{tableMessage}</p>
+            <p className="mt-2 text-sm leading-6 text-[color:var(--warning-fg)]">{tableMessage}</p>
           </div>
         </div>
       ) : !data && tablePhase === "error" ? (
         <div className="flex h-full items-center justify-center px-5 py-6">
-          <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[#c78972] bg-[#fff0ea] px-6 py-6 text-center">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8a3e1f]">
+          <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] px-6 py-6 text-center">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--danger-fg)]">
               Table Unavailable
             </div>
             <div className="mt-3 text-lg font-semibold text-[color:var(--foreground)]">
               The data table could not be indexed
             </div>
-            <p className="mt-2 text-sm leading-6 text-[#8a3e1f]">{tableMessage}</p>
+            <p className="mt-2 text-sm leading-6 text-[color:var(--danger-fg)]">{tableMessage}</p>
           </div>
         </div>
       ) : !data ? (
         <div className="flex h-full items-center justify-center px-5 py-6">
-          <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[color:var(--viewer-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.54),rgba(245,239,230,0.76))] px-6 py-6 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
+          <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-6 py-6 text-center shadow-[inset_0_1px_0_var(--hairline)]">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
               No Table Data
             </div>
@@ -330,7 +330,7 @@ const DataTableContent = memo(function DataTableContent({
                           key={column.key}
                           className={`border-b border-[color:var(--viewer-border)] px-3 py-3 align-top text-sm ${
                             draftCell
-                              ? "bg-[#edf7f1] text-[#1e6b45]"
+                              ? "bg-[color:var(--success-bg)] text-[color:var(--success-fg)]"
                               : cell
                                 ? cellTone(column, cell.state)
                                 : "text-[color:var(--muted-ink)]"
@@ -340,7 +340,7 @@ const DataTableContent = memo(function DataTableContent({
                             {cell?.text ?? "MISSING"}
                           </div>
                           {draftCell ? (
-                            <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1e6b45]">
+                            <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--success-fg)]">
                               Imported
                             </div>
                           ) : null}
@@ -768,7 +768,7 @@ const DataTablePanelComponent = function DataTablePanel({
         id="table-filters"
         className="relative z-20 border-b border-[color:var(--viewer-border)] px-4 py-3"
       >
-        <div className="rounded-[1.4rem] border border-[color:var(--viewer-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.82),rgba(245,249,255,0.92))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
+        <div className="rounded-[1.4rem] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] p-3 shadow-[inset_0_1px_0_var(--hairline)]">
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-3">
               <div className="shrink-0">

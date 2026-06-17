@@ -1,18 +1,123 @@
 @import "tailwindcss";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
 
 :root {
   --background: #ffffff;
-  --foreground: #10203f;
-  --muted-ink: #5d6f94;
-  --panel-bg: #f6f9ff;
-  --surface-soft: rgba(255, 255, 255, 0.72);
-  --surface-strong: rgba(255, 255, 255, 0.92);
-  --surface-hover: rgba(255, 255, 255, 0.96);
+  --foreground: #0d1b36;
+  --muted-ink: #56688d;
+  --panel-bg: #f4f8ff;
+  --surface-soft: rgba(255, 255, 255, 0.74);
+  --surface-strong: rgba(255, 255, 255, 0.94);
+  --surface-hover: #ffffff;
   --accent: #0a5cff;
+  --accent-strong: #0a45c8;
   --accent-ink: #ffffff;
-  --viewer-border: rgba(10, 92, 255, 0.14);
-  --viewer-shadow: 0 22px 60px rgba(10, 48, 128, 0.12);
-  --viewport-overlay: rgba(246, 249, 255, 0.78);
+  --accent-wash: rgba(10, 92, 255, 0.08);
+
+  /* Sharper, higher-definition hairlines instead of a soft blue haze. */
+  --viewer-border: rgba(13, 27, 54, 0.12);
+  --viewer-border-strong: rgba(13, 27, 54, 0.2);
+  --hairline: rgba(13, 27, 54, 0.1);
+
+  /* Tightened radius scale — precise, not blobby. */
+  --r-chip: 5px;
+  --r-control: 7px;
+  --r-panel: 11px;
+
+  /* Layered, contained elevation: a crisp top light, a hairline ring, a short cast. */
+  --viewer-shadow:
+    0 0 0 1px rgba(13, 27, 54, 0.04),
+    0 1px 1px rgba(13, 27, 54, 0.05),
+    0 10px 24px -14px rgba(10, 48, 128, 0.42);
+  --viewer-shadow-lift:
+    0 0 0 1px rgba(13, 27, 54, 0.05),
+    0 2px 4px rgba(13, 27, 54, 0.06),
+    0 22px 48px -22px rgba(10, 48, 128, 0.5);
+  --viewport-overlay: rgba(244, 248, 255, 0.8);
+  --viewer-header-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(234, 242, 255, 0.94));
+  --viewport-bg:
+    radial-gradient(circle at top, rgba(10, 92, 255, 0.16), transparent 42%),
+    linear-gradient(180deg, #f7faff 0%, #dfeaff 100%);
+  --viewer-brand: #4f7dc8;
+  --debug-code-bg: #f6f0e6;
+  --debug-code-fg: #30261e;
+  --success-border: #8cc3a3;
+  --success-bg: #edf7f1;
+  --success-fg: #1e6b45;
+  --warning-border: #d8af80;
+  --warning-bg: #fff1df;
+  --warning-fg: #915217;
+  --danger-border: #c78972;
+  --danger-bg: #fff0ea;
+  --danger-fg: #8a3e1f;
+
+  /* Blueprint grid laid under the workspace for technical depth. */
+  --grid-line: rgba(13, 27, 54, 0.045);
+  --grid-line-strong: rgba(13, 27, 54, 0.07);
+}
+
+[data-viewer-theme="dark"] {
+  --background: #080a0d;
+  --foreground: #edf2f7;
+  --muted-ink: #9aa6b8;
+  --panel-bg: #11151c;
+  --surface-soft: rgba(31, 37, 48, 0.74);
+  --surface-strong: rgba(23, 28, 37, 0.94);
+  --surface-hover: #202735;
+  --accent: #6da4ff;
+  --accent-strong: #8bb8ff;
+  --accent-ink: #06111f;
+  --accent-wash: rgba(109, 164, 255, 0.16);
+  --viewer-border: rgba(226, 233, 244, 0.14);
+  --viewer-border-strong: rgba(226, 233, 244, 0.26);
+  --hairline: rgba(226, 233, 244, 0.12);
+  --viewer-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.035),
+    0 1px 1px rgba(0, 0, 0, 0.35),
+    0 18px 34px -18px rgba(0, 0, 0, 0.88);
+  --viewer-shadow-lift:
+    0 0 0 1px rgba(255, 255, 255, 0.045),
+    0 6px 18px rgba(0, 0, 0, 0.34),
+    0 26px 58px -24px rgba(0, 0, 0, 0.92);
+  --viewport-overlay: rgba(8, 10, 13, 0.74);
+  --viewer-header-bg: linear-gradient(135deg, rgba(19, 24, 33, 0.98), rgba(12, 16, 24, 0.94));
+  --viewport-bg:
+    radial-gradient(circle at top, rgba(109, 164, 255, 0.16), transparent 42%),
+    linear-gradient(180deg, #10141b 0%, #080a0d 100%);
+  --viewer-brand: #9bc0ff;
+  --debug-code-bg: #0c1017;
+  --debug-code-fg: #d9e3f2;
+  --success-border: rgba(83, 186, 132, 0.42);
+  --success-bg: rgba(35, 95, 65, 0.32);
+  --success-fg: #91d8ad;
+  --warning-border: rgba(219, 166, 83, 0.5);
+  --warning-bg: rgba(116, 76, 25, 0.32);
+  --warning-fg: #f1c586;
+  --danger-border: rgba(223, 117, 92, 0.5);
+  --danger-bg: rgba(119, 46, 36, 0.34);
+  --danger-fg: #efa08d;
+  --grid-line: rgba(226, 233, 244, 0.055);
+  --grid-line-strong: rgba(226, 233, 244, 0.09);
+}
+
+[data-viewer-theme="dark"] .bg-white,
+[data-viewer-theme="dark"] .bg-white\/30,
+[data-viewer-theme="dark"] .bg-white\/35,
+[data-viewer-theme="dark"] .bg-white\/55,
+[data-viewer-theme="dark"] .bg-white\/60,
+[data-viewer-theme="dark"] .bg-white\/65,
+[data-viewer-theme="dark"] .bg-white\/70,
+[data-viewer-theme="dark"] .bg-white\/75,
+[data-viewer-theme="dark"] .bg-white\/80,
+[data-viewer-theme="dark"] .bg-white\/90 {
+  background-color: var(--surface-soft) !important;
+}
+
+[data-viewer-theme="dark"] .hover\:bg-white:hover,
+[data-viewer-theme="dark"] .hover\:bg-white\/45:hover,
+[data-viewer-theme="dark"] .hover\:bg-white\/55:hover {
+  background-color: var(--surface-hover) !important;
 }
 
 @theme inline {
@@ -24,14 +129,115 @@
     "JetBrains Mono", "SFMono-Regular", "SF Mono", "Cascadia Mono", monospace;
 }
 
+/* ------------------------------------------------------------------ *
+ * fumadocs — retheme the generic neutral preset to the COREY palette  *
+ * ------------------------------------------------------------------ */
+:root {
+  --color-fd-background: #f7faff;
+  --color-fd-foreground: #0d1b36;
+  --color-fd-muted: #eef4ff;
+  --color-fd-muted-foreground: #56688d;
+  --color-fd-popover: #ffffff;
+  --color-fd-popover-foreground: #0d1b36;
+  --color-fd-card: #ffffff;
+  --color-fd-card-foreground: #0d1b36;
+  --color-fd-border: rgba(13, 27, 54, 0.1);
+  --color-fd-primary: #0a5cff;
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-secondary: #eaf1ff;
+  --color-fd-secondary-foreground: #0d1b36;
+  --color-fd-accent: #e4eeff;
+  --color-fd-accent-foreground: #0a45c8;
+  --color-fd-ring: #0a5cff;
+  --color-fd-overlay: rgba(13, 27, 54, 0.28);
+}
+
+.dark {
+  --color-fd-background: #101114;
+  --color-fd-foreground: #f2f4f8;
+  --color-fd-muted: #1a1d24;
+  --color-fd-muted-foreground: #a7afbc;
+  --color-fd-popover: #151820;
+  --color-fd-popover-foreground: #f2f4f8;
+  --color-fd-card: #15181f;
+  --color-fd-card-foreground: #f2f4f8;
+  --color-fd-border: rgba(232, 238, 247, 0.13);
+  --color-fd-primary: #82aaff;
+  --color-fd-primary-foreground: #08111f;
+  --color-fd-secondary: #191d25;
+  --color-fd-secondary-foreground: #eef2f7;
+  --color-fd-accent: #202632;
+  --color-fd-accent-foreground: #edf2fb;
+  --color-fd-ring: #82aaff;
+  --color-fd-overlay: rgba(5, 7, 11, 0.72);
+}
+
+.dark #nd-sidebar {
+  --color-fd-muted: #191c23;
+  --color-fd-secondary: #1b1f28;
+  --color-fd-muted-foreground: #a7afbc;
+}
+
+/* Sharpen the docs chrome: hairline rules, squared cards, tighter type. */
+#nd-docs-layout,
+#nd-page {
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.625rem;
+}
+
+#nd-docs-layout {
+  background: var(--color-fd-background);
+  color: var(--color-fd-foreground);
+}
+
+.dark #nd-docs-layout {
+  background: #101114;
+}
+
+.dark #nd-page {
+  color: var(--color-fd-foreground);
+}
+
+.dark #nd-page .prose {
+  --tw-prose-body: rgba(242, 244, 248, 0.84);
+  --tw-prose-links: #aac4ff;
+  --tw-prose-code: #f6f8fb;
+}
+
+.dark #nd-page [data-card] {
+  border-color: rgba(232, 238, 247, 0.13);
+  background: #15181f;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.dark #nd-page [data-card]:hover {
+  border-color: rgba(130, 170, 255, 0.36);
+  background: #1b2029;
+}
+
+.dark #nd-page .prose :where(code):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+  border-color: rgba(232, 238, 247, 0.16);
+  background: #1a1d24;
+}
+
+#nd-sidebar a[data-active="true"],
+#nd-toc a[data-active="true"] {
+  font-weight: 600;
+}
+
 * {
   box-sizing: border-box;
 }
 
 html {
   background:
-    radial-gradient(circle at top, rgba(10, 92, 255, 0.14), transparent 34%),
-    linear-gradient(180deg, #ffffff 0%, #edf4ff 100%);
+    radial-gradient(120% 80% at 50% -10%, rgba(10, 92, 255, 0.1), transparent 46%),
+    linear-gradient(180deg, #ffffff 0%, #e9f1ff 100%);
+}
+
+html > body[data-scroll-locked] {
+  margin-right: 0 !important;
+  --removed-body-scroll-bar-size: 0 !important;
 }
 
 body {
@@ -39,13 +245,20 @@ body {
   color: var(--foreground);
   font-family:
     "IBM Plex Sans", "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-button,
-input,
-textarea,
-select {
-  font: inherit;
+/* Keep this reset in the base layer: unlayered, it would beat every Tailwind
+ * utility (utilities are layered), forcing buttons back to the inherited
+ * 16px/400 and silently dropping text-sm / font-semibold on every <button>. */
+@layer base {
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
 }
 
 canvas {
@@ -54,4 +267,27 @@ canvas {
 
 ::selection {
   background: rgba(10, 92, 255, 0.18);
+}
+
+/* A faint engineering grid for surfaces that want technical depth. */
+.corey-blueprint {
+  background-color: var(--panel-bg);
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(var(--grid-line-strong) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line-strong) 1px, transparent 1px);
+  background-size:
+    24px 24px,
+    24px 24px,
+    120px 120px,
+    120px 120px;
+  background-position: -1px -1px;
+}
+
+/* Mono technical label — used for chips, codes, and measured values. */
+.corey-mono-label {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1, "zero" 1;
+  letter-spacing: 0.02em;
 }

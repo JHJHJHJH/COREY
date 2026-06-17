@@ -40,31 +40,31 @@ function validationLabel(validation: ViewerValidationMatch | null) {
 
 function rowClass(value: ViewerInspectionValue) {
   if (value.validation?.result === "ok") {
-    return "bg-[#edf7f1]";
+    return "bg-[color:var(--success-bg)]";
   }
 
   if (value.validation?.result === "warn") {
-    return "bg-[#fff7ed]";
+    return "bg-[color:var(--warning-bg)]";
   }
 
   if (value.validation?.result === "error") {
-    return "bg-[#fff0ea]";
+    return "bg-[color:var(--danger-bg)]";
   }
 
-  return "bg-white/30";
+  return "bg-[color:var(--surface-soft)]";
 }
 
 function valueClass(value: ViewerInspectionValue) {
   if (value.validation?.result === "ok") {
-    return "text-[#1e6b45]";
+    return "text-[color:var(--success-fg)]";
   }
 
   if (value.validation?.result === "warn") {
-    return "text-[#7d4414]";
+    return "text-[color:var(--warning-fg)]";
   }
 
   if (value.validation?.result === "error") {
-    return "text-[#8a3e1f]";
+    return "text-[color:var(--danger-fg)]";
   }
 
   return "text-[color:var(--foreground)]";
@@ -72,30 +72,30 @@ function valueClass(value: ViewerInspectionValue) {
 
 function badgeClass(value: ViewerInspectionValue) {
   if (value.validation?.result === "ok") {
-    return "border-[#8cc3a3] bg-[#edf7f1] text-[#1e6b45]";
+    return "border-[color:var(--success-border)] bg-[color:var(--success-bg)] text-[color:var(--success-fg)]";
   }
 
   if (value.validation?.result === "warn") {
-    return "border-[#d8af80] bg-[#fff1df] text-[#915217]";
+    return "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
   }
 
   if (value.validation?.result === "error") {
-    return "border-[#d3a08e] bg-[#fff0ea] text-[#8a3e1f]";
+    return "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]";
   }
 
-  return "border-[color:var(--viewer-border)] bg-white/70 text-[color:var(--muted-ink)]";
+  return "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)]";
 }
 
 function popupTone(result: ValidationPopupPayload["result"]) {
   if (result === "error") {
-    return "border-[#d3a08e] bg-[#fff0ea] text-[#8a3e1f]";
+    return "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]";
   }
 
   if (result === "warn") {
-    return "border-[#d8af80] bg-[#fff7ed] text-[#915217]";
+    return "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
   }
 
-  return "border-[color:var(--viewer-border)] bg-white text-[color:var(--foreground)]";
+  return "border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] text-[color:var(--foreground)]";
 }
 
 function ValidationDetailsButton({
@@ -109,7 +109,7 @@ function ValidationDetailsButton({
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[color:var(--viewer-border)] bg-white/75 text-[color:var(--muted-ink)] transition hover:bg-white hover:text-[color:var(--foreground)]"
+      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]"
       aria-label={title}
       title={title}
     >
@@ -313,7 +313,7 @@ function UnavailableState({ selection }: { selection: ViewerSelection }) {
         </div>
       </div>
 
-      <div className="rounded-xl border border-dashed border-[#d8af80] bg-[#fff7ed] px-3 py-3 text-sm text-[#915217]">
+      <div className="rounded-xl border border-dashed border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] px-3 py-3 text-sm text-[color:var(--warning-fg)]">
         The element is selected, but its IFC attributes or property relations could not be resolved.
       </div>
     </section>
@@ -333,10 +333,10 @@ function ValidationSummaryBanner({
 
   const tone =
     summary.result === "error"
-      ? "border-[#d3a08e] bg-[#fff0ea] text-[#8a3e1f]"
+      ? "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]"
       : summary.result === "warn"
-        ? "border-[#d8af80] bg-[#fff7ed] text-[#915217]"
-        : "border-[#8cc3a3] bg-[#edf7f1] text-[#1e6b45]";
+        ? "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]"
+        : "border-[color:var(--success-border)] bg-[color:var(--success-bg)] text-[color:var(--success-fg)]";
 
   return (
     <section className={`rounded-xl border px-3 py-3 ${tone}`}>

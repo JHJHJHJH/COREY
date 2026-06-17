@@ -3,10 +3,11 @@
 Status of moving COREY's local-first features behind a server API. The app was
 "backend ready but not connected"; this tracks the sequenced migration.
 
-Infrastructure (local dev): see `docker-compose.yml` — Postgres (Prisma) for
+Infrastructure (local dev): see `docker/docker-compose.yml` — Postgres (Prisma) for
 relational data and MinIO (S3) for model bytes. Copy `.env.example` → `.env`,
-run `docker compose up -d postgres minio minio-init`, then `pnpm db:deploy` and
-`pnpm dev`. For the full containerized app, run `docker compose up --build`.
+run `docker compose -f docker/docker-compose.yml up -d postgres minio minio-init`,
+then `pnpm db:deploy` and `pnpm dev`. For the full containerized app, run
+`docker compose -f docker/docker-compose.yml up --build`.
 
 ## Context
 
@@ -17,8 +18,7 @@ in a multi-user / persistent deployment:
   — not durable, not shareable, not keyed to a stable model identity.
 - **Remote sources:** models loaded only from local disk; `ModelSource` was hardcoded
   to `kind: "local-file"`.
-- **Shared catalogs:** rule templates / industry-mapping files are static assets under
-  `public/resources`.
+- **Shared catalogs:** rule templates are static assets under `public/resources`.
 - **Compute:** IFC→Fragments conversion, data-table indexing, validation, and IFC
   writeback run client-side.
 
@@ -108,8 +108,7 @@ shell entry points.
 
 - **Server:** `src/server/rule-template-store.ts` backs a shared template catalog
   with `RuleTemplateRecord` rows in Postgres. Built-in templates are seeded from
-  the existing resource JSON files, and the BCA industry-mapping CSV is stored as
-  the template source text.
+  synthetic starter JSON files under `public/resources`.
 - **Routes:** `GET /api/rule-templates` lists available templates;
   `GET /api/rule-templates/[id]` returns one template with its validated config;
   `GET /api/rule-templates/[id]?format=config` downloads the raw rules JSON; and
@@ -117,7 +116,7 @@ shell entry points.
   exists.
 - **Client:** the rules screen now loads starter templates through
   `src/features/rules/lib/rule-template-api.ts` instead of fetching
-  `public/resources/*.json` directly. The JSON and CSV actions also point at API
+  `public/resources/*.json` directly. Template download actions point at API
   routes.
 - **Types:** `ViewerRuleTemplateSummary` and `ViewerRuleTemplateRecord` define the
   catalog payloads shared by the route and client helper.
@@ -145,7 +144,7 @@ shell entry points.
   - `POST /api/validation-diagnosis/excel/export`
   - `POST /api/models/[id]/writeback`
 - **Shared compute cores:** `src/features/viewer/lib/data-table-excel-core.ts`
-  contains server-safe SheetJS workbook builders/parsers, and
+  contains server-safe ExcelJS workbook builders/parsers, and
   `src/features/viewer/lib/ifc-writeback-core.ts` contains server-safe `web-ifc`
   writeback logic. Existing browser utilities remain available for local-only
   files and fallback paths.
@@ -176,7 +175,7 @@ shell entry points.
 ## Verification (items 1–7)
 
 - `pnpm lint` and `pnpm build` (`next build --webpack`) green.
-- Model round-trip: `POST /api/models` with `public/resources/testmodel.ifc` →
+- Model round-trip: `POST /api/models` with a local redistributable IFC fixture →
   served bytes byte-identical, object in MinIO, row in `model_records`.
 - Rules round-trip: `GET → PUT → GET /api/rules/config` persists; `rule_configs`
   holds `id=default`.
@@ -187,10 +186,9 @@ shell entry points.
   `POST → GET list → GET detail /api/models/[id]/validation-reports` persists
   and restores a model-keyed diagnosis report.
 - Rule-template catalog:
-  `GET /api/rule-templates` seeds and lists the three built-ins;
-  `GET /api/rule-templates/testmodel-simple?format=config` returns raw rules JSON;
-  `GET /api/rule-templates/industry-mapping-bca-column-beam?format=source` returns
-  the source CSV.
+  `GET /api/rule-templates` seeds and lists the built-ins;
+  `GET /api/rule-templates/starter-essential-elements?format=config` returns raw
+  rules JSON.
 - Validation evaluation:
   `POST /api/rules/evaluate` returns a validated run result; server-backed and
   large validation payloads use the API path first, with worker fallback.

@@ -6,6 +6,7 @@
 .gitignore
 .next
 .pnpm-store
+.source
 .turbo
 .vercel
 Dockerfile*

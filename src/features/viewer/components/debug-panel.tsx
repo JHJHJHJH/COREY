@@ -1,19 +1,21 @@
 "use client";
 
-import { Bug, ChevronDown, ChevronUp, FlaskConical } from "lucide-react";
+import { Bug, ChevronDown, ChevronUp, Moon, Sun } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ModelMetadata, ViewerDebugValue } from "@/features/viewer/types";
 
 type DebugTabId = "raw" | "selection" | "row" | "tree";
+type ViewerTheme = "light" | "dark";
 
 type DebugPanelProps = {
   metadata: ModelMetadata | null;
+  viewerTheme: ViewerTheme;
   rawItemSample: ViewerDebugValue | null;
   rawItemLabel: string;
   selectionSample: ViewerDebugValue | null;
   rowSample: ViewerDebugValue | null;
   treeSample: ViewerDebugValue | null;
-  onLoadBundledModel: () => void;
+  onToggleTheme: () => void;
 };
 
 type DebugTab = {
@@ -25,12 +27,13 @@ type DebugTab = {
 
 export function DebugPanel({
   metadata,
+  viewerTheme,
   rawItemSample,
   rawItemLabel,
   selectionSample,
   rowSample,
   treeSample,
-  onLoadBundledModel,
+  onToggleTheme,
 }: DebugPanelProps) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<DebugTabId>("raw");
@@ -120,11 +123,11 @@ export function DebugPanel({
             </div>
 
             {formattedValue ? (
-              <pre className="max-h-[24rem] overflow-auto rounded-xl border border-[color:var(--viewer-border)] bg-[#f6f0e6] p-3 text-[11px] leading-5 whitespace-pre-wrap break-all text-[#30261e]">
+              <pre className="max-h-[24rem] overflow-auto rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--debug-code-bg)] p-3 text-[11px] leading-5 whitespace-pre-wrap break-all text-[color:var(--debug-code-fg)]">
                 {formattedValue}
               </pre>
             ) : (
-              <div className="rounded-xl border border-dashed border-[color:var(--viewer-border)] bg-white/35 px-3 py-4 text-sm text-[color:var(--muted-ink)]">
+              <div className="rounded-xl border border-dashed border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 py-4 text-sm text-[color:var(--muted-ink)]">
                 {active.emptyMessage}
               </div>
             )}
@@ -135,14 +138,13 @@ export function DebugPanel({
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={onLoadBundledModel}
-          aria-label="Load bundled test model"
-          title="Load bundled test model"
+          onClick={onToggleTheme}
+          aria-label={viewerTheme === "dark" ? "Use light theme" : "Use dark theme"}
+          title={viewerTheme === "dark" ? "Use light theme" : "Use dark theme"}
           className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/96 text-[color:var(--foreground)] shadow-[var(--viewer-shadow)] backdrop-blur transition hover:bg-[color:var(--surface-hover)]"
         >
-          <FlaskConical className="h-4 w-4" />
+          {viewerTheme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </button>
-
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}

@@ -1,0 +1,11 @@
+{
+  "pages": [
+    "index",
+    "getting-started",
+    "architecture",
+    "runtime-assets",
+    "backend-api",
+    "deployment",
+    "contributing"
+  ]
+}
