@@ -1,6 +1,6 @@
-# Backend API
+# API Reference
 
-The backend API is intended for self-hosted COREY deployments.
+The API reference is intended for self-hosted COREY deployments.
 
 ## Health
 
