@@ -19,21 +19,11 @@ export function baseOptions(): BaseLayoutProps {
           </span>
         </>
       ),
-      url: "/docs",
+      url: "/",
     },
     githubUrl: "https://github.com/JHJHJHJH/Corey",
     themeSwitch: {
       enabled: false,
     },
-    links: [
-      {
-        text: "Viewer",
-        url: "/",
-      },
-      {
-        text: "Clauses",
-        url: "/clause",
-      },
-    ],
   };
 }

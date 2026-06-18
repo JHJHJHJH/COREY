@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createRelativeLink } from "fumadocs-ui/mdx";
 import {
   DocsBody,
@@ -20,6 +20,11 @@ type DocsPageProps = {
 
 export default async function Page({ params }: DocsPageProps) {
   const { slug } = await params;
+
+  if (!slug?.length) {
+    redirect("/docs/introduction");
+  }
+
   const page = source.getPage(slug);
 
   if (!page) {
@@ -49,6 +54,11 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: DocsPageProps): Promise<Metadata> {
   const { slug } = await params;
+
+  if (!slug?.length) {
+    redirect("/docs/introduction");
+  }
+
   const page = source.getPage(slug);
 
   if (!page) {
