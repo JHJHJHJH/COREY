@@ -12,6 +12,8 @@ import {
   X,
 } from "lucide-react";
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { StatusBar, type StatusSegment, type StatusTone } from "@/components/status-bar/status-bar";
+import { InspectorDetailList } from "@/components/status-bar/status-inspector";
 import {
   filterViewerDataTableRows,
   formatBytes,
@@ -56,19 +58,6 @@ type DataTableUiState = {
   visibleColumnKeys: string[];
   selectedRowKeys: Set<string>;
 };
-
-function statusTone(phase: ViewerDataTableState["phase"]) {
-  switch (phase) {
-    case "loading":
-      return "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
-    case "error":
-      return "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]";
-    case "loaded":
-      return "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)]";
-    default:
-      return "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)]";
-  }
-}
 
 function validationClauseTone(result: ViewerValidationClauseTableView["result"]) {
   return result === "error"
@@ -578,6 +567,51 @@ const DataTablePanelComponent = function DataTablePanel({
     activeUiState.selectedRowKeys.has(row.key),
   );
 
+  const dataTableTone: StatusTone =
+    tableState.phase === "error"
+      ? "error"
+      : tableState.phase === "loading"
+        ? "warn"
+        : tableState.phase === "loaded"
+          ? "success"
+          : "muted";
+
+  const statusSegments = useMemo<StatusSegment[]>(() => {
+    const segments: StatusSegment[] = [];
+
+    if (showMetaHeader && metadata) {
+      segments.push({ id: "model", label: metadata.name, tone: "default" });
+    }
+
+    segments.push(
+      { id: "elements", label: `${data?.rows.length ?? 0} elements` },
+      { id: "columns", label: `${data?.columns.length ?? 0} columns` },
+      { id: "shown", label: `${visibleRows.length} shown` },
+      { id: "edited", label: `${editedRowCount} edited` },
+      { id: "selected", label: `${activeUiState.selectedRowKeys.size} selected` },
+    );
+
+    if (activeClauseView) {
+      segments.push({
+        id: "clause",
+        label: `Clause: ${activeClauseView.clauseTitle}`,
+        tone: "default",
+        title: activeClauseView.clauseTitle,
+      });
+    }
+
+    return segments;
+  }, [
+    activeClauseView,
+    activeUiState.selectedRowKeys.size,
+    data?.columns.length,
+    data?.rows.length,
+    editedRowCount,
+    metadata,
+    showMetaHeader,
+    visibleRows.length,
+  ]);
+
   useEffect(() => {
     if (selectAllRef.current) {
       selectAllRef.current.indeterminate = !allVisibleSelected && someVisibleSelected;
@@ -805,42 +839,6 @@ const DataTablePanelComponent = function DataTablePanel({
           : "rounded-[1.75rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] shadow-[var(--viewer-shadow)]"
       }`}
     >
-      <div id="dev-stats" className="border-b border-[color:var(--viewer-border)] px-4 py-3">
-        {showMetaHeader ? (
-          <div className="flex flex-wrap gap-2 text-[11px] font-medium tracking-[0.08em]">
-            <span
-              className={`inline-flex items-center rounded-full border px-3 py-1 uppercase ${statusTone(tableState.phase)}`}
-            >
-              {tableState.phase}
-            </span>
-            {metadata ? (
-              <span className="inline-flex items-center rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 py-1 text-[color:var(--muted-ink)]">
-                {metadata.name}
-              </span>
-            ) : null}
-            {metadata ? (
-              <span className="inline-flex items-center rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 py-1 text-[color:var(--muted-ink)]">
-                {formatBytes(metadata.size)}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-
-        <div
-          className={`flex flex-wrap gap-x-3 gap-y-1 text-xs text-[color:var(--muted-ink)] ${
-            showMetaHeader ? "mt-3" : ""
-          }`}
-        >
-          <span>{data?.rows.length ?? 0} elements</span>
-          <span>{data?.columns.length ?? 0} columns discovered</span>
-          <span>{visibleRows.length} visible rows</span>
-          <span>{editedRowCount} edited rows</span>
-          {activeClauseView ? <span>Clause view: {activeClauseView.clauseTitle}</span> : null}
-          <span>{activeUiState.selectedRowKeys.size} checked rows</span>
-          <span>{tableState.message}</span>
-        </div>
-      </div>
-
       <div
         id="table-filters"
         className="relative z-20 border-b border-[color:var(--viewer-border)] px-4 py-3"
@@ -1225,6 +1223,22 @@ const DataTablePanelComponent = function DataTablePanel({
         onToggleRow={toggleRow}
         onEditCell={onEditCell}
         onSelectRow={onSelectRow}
+      />
+
+      <StatusBar
+        statusTone={dataTableTone}
+        segments={statusSegments}
+        inspector={
+          <InspectorDetailList
+            items={[
+              { label: "Phase", value: tableState.phase },
+              { label: "Message", value: tableState.message || "—" },
+              { label: "Model", value: metadata?.name ?? "—" },
+              { label: "Size", value: metadata ? formatBytes(metadata.size) : "—" },
+              { label: "Clause view", value: activeClauseView?.clauseTitle ?? "None" },
+            ]}
+          />
+        }
       />
     </aside>
   );

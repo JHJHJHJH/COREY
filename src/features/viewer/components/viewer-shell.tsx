@@ -7,9 +7,11 @@ import {
   FileOutput,
   FileSpreadsheet,
   Import,
+  Moon,
   PanelLeftOpen,
   PanelRightOpen,
   RotateCcw,
+  Sun,
   Upload,
   X,
 } from "lucide-react";
@@ -34,8 +36,9 @@ import {
 } from "@/features/rules/lib/validation";
 import { evaluateViewerValidationViaApi } from "@/features/rules/lib/validation-api";
 import { useViewerRules } from "@/features/rules/rules-provider";
+import { StatusBar, type StatusSegment, type StatusTone } from "@/components/status-bar/status-bar";
+import { InspectorDetailList, JsonInspectorTabs } from "@/components/status-bar/status-inspector";
 import { DataTablePanel } from "@/features/viewer/components/data-table-panel";
-import { DebugPanel } from "@/features/viewer/components/debug-panel";
 import { DetachedWindow } from "@/features/viewer/components/detached-window";
 import { ModelTreePanel } from "@/features/viewer/components/model-tree-panel";
 import { IfcViewport } from "@/features/viewer/components/ifc-viewport";
@@ -395,19 +398,6 @@ function dataTablePhaseTone(phase: ViewerDataTableState["phase"]) {
   }
 }
 
-function validationPhaseTone(phase: ViewerValidationState["phase"]) {
-  switch (phase) {
-    case "running":
-      return "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
-    case "error":
-      return "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]";
-    case "ready":
-      return "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)]";
-    default:
-      return "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)]";
-  }
-}
-
 function summarizeIfcTypes(ifcTypes: string[], max = 6) {
   if (ifcTypes.length === 0) {
     return "none";
@@ -416,19 +406,6 @@ function summarizeIfcTypes(ifcTypes: string[], max = 6) {
   const visible = ifcTypes.slice(0, max);
   const suffix = ifcTypes.length > max ? ` (+${ifcTypes.length - max} more)` : "";
   return `${visible.join(", ")}${suffix}`;
-}
-
-function StatusDot({ phase }: { phase: ViewerStatus["phase"] }) {
-  const tone =
-    phase === "loaded"
-      ? "bg-emerald-500"
-      : phase === "loading"
-        ? "bg-amber-500"
-        : phase === "error"
-          ? "bg-rose-500"
-          : "bg-[color:var(--viewer-border)]";
-
-  return <span className={`h-2.5 w-2.5 rounded-full ${tone}`} aria-hidden="true" />;
 }
 
 type HeaderActionButtonProps = {
@@ -983,6 +960,102 @@ export function ViewerShell() {
       : debugData.sampleLocalId !== null
         ? `sample localId ${debugData.sampleLocalId}`
         : "no item sample";
+
+  const viewerStatusTone: StatusTone =
+    status.phase === "error"
+      ? "error"
+      : status.phase === "loading"
+        ? "warn"
+        : status.phase === "loaded"
+          ? "success"
+          : "muted";
+
+  const viewerValidationLabel =
+    validationState.phase === "running"
+      ? `Validation ${validationState.progress}%`
+      : validationState.phase === "ready"
+        ? validationState.issueCount === 0
+          ? "Validation clear"
+          : `${validationState.issueCount} flagged · ${validationState.failedClauseCount} clauses`
+        : validationState.phase === "error"
+          ? "Validation error"
+          : "Validation idle";
+
+  const viewerValidationTone: StatusTone =
+    validationState.phase === "error"
+      ? "error"
+      : validationState.phase === "ready"
+        ? validationState.issueCount === 0
+          ? "success"
+          : "warn"
+        : validationState.phase === "running"
+          ? "warn"
+          : "muted";
+
+  const viewerStatusSegments = useMemo<StatusSegment[]>(() => {
+    const segments: StatusSegment[] = [
+      metadata
+        ? { id: "model", label: metadata.name, tone: "default", title: metadata.name }
+        : { id: "model", label: "No file loaded" },
+    ];
+
+    if (metadata) {
+      segments.push({ id: "size", label: formatBytes(metadata.size) });
+    }
+
+    segments.push(
+      { id: "tool", label: `${session.activeTool} tool` },
+      { id: "phase", label: `${status.phase} status` },
+      { id: "clauses", label: `${config.clauses.length} clauses` },
+      {
+        id: "validation",
+        label: viewerValidationLabel,
+        tone: viewerValidationTone,
+        title: validationState.message,
+      },
+    );
+
+    return segments;
+  }, [
+    config.clauses.length,
+    metadata,
+    session.activeTool,
+    status.phase,
+    validationState.message,
+    viewerValidationLabel,
+    viewerValidationTone,
+  ]);
+
+  const viewerDebugTabs = useMemo(
+    () => [
+      {
+        id: "raw",
+        label: `Raw IFC · ${activeRawDebugLabel}`,
+        value: activeRawDebugItem,
+        emptyMessage: "Load a model to inspect the raw parsed IFC item payload.",
+      },
+      {
+        id: "selection",
+        label: "Selection",
+        value: debugSelectionSample,
+        emptyMessage: "Select an element to inspect the normalized selection payload.",
+      },
+      {
+        id: "row",
+        label: "Row",
+        value: debugRowSample,
+        emptyMessage: "Load a model to inspect an indexed data table row.",
+      },
+      {
+        id: "tree",
+        label: "Tree",
+        value: debugTreeSample,
+        emptyMessage: "Load a model to inspect a sample of the spatial tree.",
+      },
+    ],
+    [activeRawDebugItem, activeRawDebugLabel, debugRowSample, debugSelectionSample, debugTreeSample],
+  );
+
   const validationPayload = useMemo<ViewerValidationRunPayload | null>(() => {
     if (
       !metadata ||
@@ -2767,58 +2840,6 @@ export function ViewerShell() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <div className="corey-mono-label rounded-[var(--r-chip)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1 text-[10px] uppercase tracking-[0.05em] text-[color:var(--muted-ink)]">
-              <span className="inline-flex items-center gap-2">
-                <StatusDot phase={metadata ? "loaded" : "idle"} />
-              </span>{" "}
-              <span className="font-semibold text-[color:var(--foreground)]">File:</span>{" "}
-              <span className="max-w-[18rem] truncate align-bottom inline-block">
-                {metadata?.name ?? "No file loaded"}
-              </span>
-            </div>
-            <div className="corey-mono-label rounded-[var(--r-chip)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1 text-[10px] uppercase tracking-[0.05em] text-[color:var(--muted-ink)]">
-              <span className="font-semibold text-[color:var(--foreground)]">Size:</span>{" "}
-              {metadata ? formatBytes(metadata.size) : "—"}
-            </div>
-            <div className="corey-mono-label rounded-[var(--r-chip)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1 text-[10px] uppercase tracking-[0.05em] text-[color:var(--muted-ink)]">
-              <span className="font-semibold capitalize text-[color:var(--foreground)]">
-                {session.activeTool}
-              </span>{" "}
-              active
-            </div>
-            <div className="corey-mono-label rounded-[var(--r-chip)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1 text-[10px] uppercase tracking-[0.05em] text-[color:var(--muted-ink)]">
-              <span className="font-semibold capitalize text-[color:var(--foreground)]">
-                {status.phase}
-              </span>{" "}
-              status
-            </div>
-            <div className="corey-mono-label rounded-[var(--r-chip)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1 text-[10px] uppercase tracking-[0.05em] text-[color:var(--muted-ink)]">
-              <span className="font-semibold text-[color:var(--foreground)]">Clauses:</span>{" "}
-              {config.clauses.length}
-            </div>
-            <div
-              className={`corey-mono-label rounded-[var(--r-chip)] border px-2.5 py-1 text-[10px] uppercase tracking-[0.05em] ${validationPhaseTone(validationState.phase)}`}
-            >
-              <span className="font-semibold">
-                {validationState.phase === "running"
-                  ? `Validation ${validationState.progress}%`
-                  : validationState.phase === "ready"
-                    ? validationState.issueCount === 0
-                      ? "Validation clear"
-                      : `Validation ${validationState.issueCount} flagged · ${validationState.failedClauseCount} clauses`
-                    : validationState.phase === "error"
-                      ? "Validation error"
-                      : "Validation idle"}
-              </span>
-              {validationState.mode ? ` · ${validationState.mode}` : ""}
-            </div>
-            <div className="corey-mono-label rounded-[var(--r-chip)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1 text-[10px] uppercase tracking-[0.05em] text-[color:var(--muted-ink)]">
-              <span className="max-w-[min(30rem,70vw)] truncate align-bottom inline-block">
-                {validationState.message}
-              </span>
-            </div>
-          </div>
         </div>
       </header>
 
@@ -2864,111 +2885,146 @@ export function ViewerShell() {
                 )}
               />
 
-              <section className="relative min-w-0 flex-1">
-                <IfcViewport
-                  ref={viewportRef}
-                  embedded
-                  theme={viewerTheme}
-                  status={status}
-                  activeTool={session.activeTool}
-                  validationHighlights={validationHighlights}
-                  onOpenFile={openFilePicker}
-                  filesButton={
-                    <ServerModelsMenu
-                      variant="empty-state"
-                      theme={viewerTheme}
-                      onLoadModel={(modelId) => {
-                        void loadModelById(modelId);
-                      }}
-                    />
+              <section className="relative flex min-w-0 flex-1 flex-col">
+                <StatusBar
+                  placement="top"
+                  statusTone={viewerStatusTone}
+                  segments={viewerStatusSegments}
+                  inspectorLabel="IFC Debug"
+                  inspector={
+                    <div className="space-y-4">
+                      <InspectorDetailList
+                        items={[
+                          { label: "Active tool", value: session.activeTool },
+                          { label: "Validation", value: validationState.message },
+                          { label: "Mode", value: validationState.mode ?? "—" },
+                        ]}
+                      />
+                      <JsonInspectorTabs tabs={viewerDebugTabs} />
+                    </div>
                   }
-                  onStatusChange={(nextStatus) => {
-                    startTransition(() => {
-                      setStatus(nextStatus);
-                      if (nextStatus.phase !== "loaded") {
-                        setMetadata((current) =>
-                          current ? { ...current, loadStatus: nextStatus.phase } : current,
-                        );
-                      }
-                    });
-                  }}
-                  onSessionChange={(nextSession) => {
-                    startTransition(() => {
-                      setSession(nextSession);
-                    });
-                  }}
-                  onModelLoaded={({
-                    metadata: nextMetadata,
-                    tree: nextTree,
-                    categories: nextCategories,
-                  }) => {
-                    startTransition(() => {
-                      setMetadata(nextMetadata);
-                      setTree(nextTree);
-                      setCategories(nextCategories);
-                      setSelectionDetails({ selection: null, inspection: null, loading: false });
-                      setDebugData(initialDebugData);
-                    });
-                  }}
-                  onDataTableChange={(nextDataTableState) => {
-                    startTransition(() => {
-                      setDataTableState(nextDataTableState);
-                    });
-                  }}
-                  onSelectionDetailsChange={(details) => {
-                    startTransition(() => {
-                      setSelectionDetails(details);
-                    });
-                  }}
-                  onDebugDataChange={(nextDebugData) => {
-                    startTransition(() => {
-                      setDebugData(nextDebugData);
-                    });
-                  }}
+                  trailing={
+                    <button
+                      type="button"
+                      onClick={toggleViewerTheme}
+                      aria-label={viewerTheme === "dark" ? "Use light theme" : "Use dark theme"}
+                      title={viewerTheme === "dark" ? "Use light theme" : "Use dark theme"}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)] transition hover:text-[color:var(--foreground)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--accent)]"
+                    >
+                      {viewerTheme === "dark" ? (
+                        <Sun className="h-3.5 w-3.5" />
+                      ) : (
+                        <Moon className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  }
                 />
 
-                <ViewerToolbar
-                  disabled={!hasModel}
-                  dataTableOpen={showDataTable}
-                  session={session}
-                  status={status}
-                  onToggleDataTable={() => {
-                    if (showDataTable) {
-                      hideDataTable();
-                    } else {
-                      showDataTableWindow();
+                <div className="relative min-h-0 flex-1">
+                  <IfcViewport
+                    ref={viewportRef}
+                    embedded
+                    theme={viewerTheme}
+                    status={status}
+                    activeTool={session.activeTool}
+                    validationHighlights={validationHighlights}
+                    onOpenFile={openFilePicker}
+                    filesButton={
+                      <ServerModelsMenu
+                        variant="empty-state"
+                        theme={viewerTheme}
+                        onLoadModel={(modelId) => {
+                          void loadModelById(modelId);
+                        }}
+                      />
                     }
-                  }}
-                  onToolChange={(tool) => {
-                    setSession((current) => ({ ...current, activeTool: tool }));
-                    viewportRef.current?.setTool(tool);
-                  }}
-                  onFocusSelection={() => {
-                    void viewportRef.current?.focusSelection();
-                  }}
-                  onShowAll={() => {
-                    void runViewportVisibilityAction(async () => {
-                      await viewportRef.current?.showAll();
-                    });
-                  }}
-                  onHideSelection={() => {
-                    void runViewportVisibilityAction(async () => {
-                      await viewportRef.current?.hideSelection();
-                    });
-                  }}
-                  onIsolateSelection={() => {
-                    void runViewportVisibilityAction(async () => {
-                      await viewportRef.current?.isolateSelection();
-                    });
-                  }}
-                  onClearSections={() => {
-                    viewportRef.current?.clearSections();
-                  }}
-                  onClearMeasurements={() => {
-                    viewportRef.current?.clearMeasurements();
-                  }}
-                />
+                    onStatusChange={(nextStatus) => {
+                      startTransition(() => {
+                        setStatus(nextStatus);
+                        if (nextStatus.phase !== "loaded") {
+                          setMetadata((current) =>
+                            current ? { ...current, loadStatus: nextStatus.phase } : current,
+                          );
+                        }
+                      });
+                    }}
+                    onSessionChange={(nextSession) => {
+                      startTransition(() => {
+                        setSession(nextSession);
+                      });
+                    }}
+                    onModelLoaded={({
+                      metadata: nextMetadata,
+                      tree: nextTree,
+                      categories: nextCategories,
+                    }) => {
+                      startTransition(() => {
+                        setMetadata(nextMetadata);
+                        setTree(nextTree);
+                        setCategories(nextCategories);
+                        setSelectionDetails({ selection: null, inspection: null, loading: false });
+                        setDebugData(initialDebugData);
+                      });
+                    }}
+                    onDataTableChange={(nextDataTableState) => {
+                      startTransition(() => {
+                        setDataTableState(nextDataTableState);
+                      });
+                    }}
+                    onSelectionDetailsChange={(details) => {
+                      startTransition(() => {
+                        setSelectionDetails(details);
+                      });
+                    }}
+                    onDebugDataChange={(nextDebugData) => {
+                      startTransition(() => {
+                        setDebugData(nextDebugData);
+                      });
+                    }}
+                  />
 
+                  <ViewerToolbar
+                    disabled={!hasModel}
+                    dataTableOpen={showDataTable}
+                    session={session}
+                    status={status}
+                    onToggleDataTable={() => {
+                      if (showDataTable) {
+                        hideDataTable();
+                      } else {
+                        showDataTableWindow();
+                      }
+                    }}
+                    onToolChange={(tool) => {
+                      setSession((current) => ({ ...current, activeTool: tool }));
+                      viewportRef.current?.setTool(tool);
+                    }}
+                    onFocusSelection={() => {
+                      void viewportRef.current?.focusSelection();
+                    }}
+                    onShowAll={() => {
+                      void runViewportVisibilityAction(async () => {
+                        await viewportRef.current?.showAll();
+                      });
+                    }}
+                    onHideSelection={() => {
+                      void runViewportVisibilityAction(async () => {
+                        await viewportRef.current?.hideSelection();
+                      });
+                    }}
+                    onIsolateSelection={() => {
+                      void runViewportVisibilityAction(async () => {
+                        await viewportRef.current?.isolateSelection();
+                      });
+                    }}
+                    onClearSections={() => {
+                      viewportRef.current?.clearSections();
+                    }}
+                    onClearMeasurements={() => {
+                      viewportRef.current?.clearMeasurements();
+                    }}
+                  />
+                </div>
               </section>
 
               <ViewerDrawer
@@ -2987,17 +3043,6 @@ export function ViewerShell() {
                 )}
               />
             </div>
-
-            <DebugPanel
-              metadata={metadata}
-              viewerTheme={viewerTheme}
-              rawItemSample={activeRawDebugItem}
-              rawItemLabel={activeRawDebugLabel}
-              selectionSample={debugSelectionSample}
-              rowSample={debugRowSample}
-              treeSample={debugTreeSample}
-              onToggleTheme={toggleViewerTheme}
-            />
 
             {showDataTable && !isDataTableDetached ? (
               <div className="absolute inset-0 z-50 overflow-hidden border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] shadow-[var(--viewer-shadow)]">

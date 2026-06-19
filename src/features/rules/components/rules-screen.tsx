@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Trash2, X } from "lucide-react";
+import { Check, CircleAlert, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { StatusBar } from "@/components/status-bar/status-bar";
+import { InspectorDetailList } from "@/components/status-bar/status-inspector";
 import { useViewerRules } from "@/features/rules/rules-provider";
 import {
   createEmptyViewerValidationConfig,
@@ -555,17 +557,6 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
               </div>
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted-ink)]">
-              <span className="rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-3 py-1.5">
-                {config.clauses.length} clauses
-              </span>
-              <span className="rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-3 py-1.5">
-                {totalRuleCount} rules
-              </span>
-              <span className="rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-3 py-1.5">
-                Auto-saved locally
-              </span>
-            </div>
           </div>
 
           <aside className="w-full rounded-[1.2rem] border border-[color:var(--viewer-border)] bg-white/55 p-2.5 lg:justify-self-stretch">
@@ -728,6 +719,30 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
           </div>
         )}
       </div>
+
+      <StatusBar
+        statusTone={importError ? "error" : "success"}
+        segments={[
+          { id: "clauses", label: `${config.clauses.length} clauses` },
+          { id: "rules", label: `${totalRuleCount} rules` },
+          {
+            id: "saved",
+            label: importError ? "Not saved" : "Saved",
+            tone: importError ? "error" : "success",
+            icon: importError ? <CircleAlert /> : <Check />,
+          },
+        ]}
+        inspector={
+          <InspectorDetailList
+            items={[
+              { label: "Storage", value: "Auto-saved to this browser profile" },
+              { label: "Clauses", value: config.clauses.length },
+              { label: "Rules", value: totalRuleCount },
+              { label: "Last error", value: importError ?? "None" },
+            ]}
+          />
+        }
+      />
     </section>
   );
 }

@@ -2,6 +2,8 @@
 
 import { CircleAlert, FileSpreadsheet, History, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { StatusBar, type StatusTone } from "@/components/status-bar/status-bar";
+import { InspectorDetailList } from "@/components/status-bar/status-inspector";
 import type {
   ModelMetadata,
   ViewerSelection,
@@ -354,6 +356,21 @@ export function ValidationDiagnosisReport({
     [effectiveSelectedClauseId, report],
   );
 
+  let resultTone: StatusTone = "muted";
+  let resultLabel = `Validation ${validationPhase}`;
+  if (validationPhase === "error") {
+    resultTone = "error";
+    resultLabel = "Validation failed";
+  } else if (report) {
+    if (report.flaggedElementCount === 0) {
+      resultTone = "success";
+      resultLabel = "Passed";
+    } else {
+      resultTone = report.errorElementCount > 0 ? "error" : "warn";
+      resultLabel = `${report.flaggedElementCount} issues`;
+    }
+  }
+
   return (
     <div className="flex h-screen min-h-0 flex-col bg-[color:var(--background)] text-[color:var(--foreground)]">
       <header className="border-b border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/95 px-5 py-4 backdrop-blur">
@@ -363,20 +380,6 @@ export function ValidationDiagnosisReport({
               <CircleAlert className="h-5 w-5 text-[color:var(--danger-fg)]" />
               <h1 className="text-xl font-semibold tracking-tight">Clause Diagnosis Report</h1>
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted-ink)]">
-              <span className="rounded-full border border-[color:var(--viewer-border)] bg-white/75 px-3 py-1.5">
-                {metadata?.name ?? "No model loaded"}
-              </span>
-              <span className="rounded-full border border-[color:var(--viewer-border)] bg-white/75 px-3 py-1.5">
-                Validation {validationPhase}
-              </span>
-              <span className="rounded-full border border-[color:var(--viewer-border)] bg-white/75 px-3 py-1.5">
-                {validationMessage}
-              </span>
-            </div>
-            {statusMessage ? (
-              <div className="mt-2 text-xs text-[color:var(--muted-ink)]">{statusMessage}</div>
-            ) : null}
             <SavedReportPicker
               currentReport={currentReport}
               savedReports={savedReports}
@@ -491,6 +494,31 @@ export function ValidationDiagnosisReport({
           </div>
         )}
       </main>
+
+      <StatusBar
+        statusTone={resultTone}
+        segments={[
+          { id: "model", label: metadata?.name ?? "No model loaded", tone: "default" },
+          { id: "result", label: resultLabel, tone: resultTone },
+        ]}
+        inspector={
+          <InspectorDetailList
+            items={[
+              { label: "Validation phase", value: validationPhase },
+              { label: "Message", value: validationMessage || "—" },
+              { label: "Status", value: statusMessage || "—" },
+              {
+                label: "Flagged",
+                value: report ? String(report.flaggedElementCount) : "—",
+              },
+              {
+                label: "Failed clauses",
+                value: report ? String(report.failedClauseCount) : "—",
+              },
+            ]}
+          />
+        }
+      />
     </div>
   );
 }
