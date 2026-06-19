@@ -86,6 +86,18 @@ function badgeClass(value: ViewerInspectionValue) {
   return "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)]";
 }
 
+function summaryFlagClass(result: ViewerValidationMatch["result"]) {
+  if (result === "ok") {
+    return "border-[color:var(--success-border)] bg-[color:var(--success-bg)] text-[color:var(--success-fg)]";
+  }
+
+  if (result === "warn") {
+    return "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
+  }
+
+  return "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]";
+}
+
 function popupTone(result: ValidationPopupPayload["result"]) {
   if (result === "error") {
     return "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]";
@@ -115,6 +127,24 @@ function ValidationDetailsButton({
     >
       <CircleAlert className="h-3.5 w-3.5" />
     </button>
+  );
+}
+
+function ValidationSummaryFlag({
+  label,
+  result,
+  count,
+}: {
+  label: string;
+  result: ViewerValidationMatch["result"];
+  count: number;
+}) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${summaryFlagClass(result)}`}
+    >
+      {count} {label}
+    </span>
   );
 }
 
@@ -341,12 +371,10 @@ function ValidationSummaryBanner({
   return (
     <section className={`rounded-xl border px-3 py-3 ${tone}`}>
       <div className="text-xs font-semibold uppercase tracking-[0.18em]">Validation Summary</div>
-      <div className="mt-2 text-sm">
-        {summary.errorCount > 0 ? `${summary.errorCount} error` : "0 error"}
-        {" · "}
-        {summary.warnCount > 0 ? `${summary.warnCount} warn` : "0 warn"}
-        {" · "}
-        {summary.okCount > 0 ? `${summary.okCount} ok` : "0 ok"}
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        <ValidationSummaryFlag label="error" result="error" count={summary.errorCount} />
+        <ValidationSummaryFlag label="warn" result="warn" count={summary.warnCount} />
+        <ValidationSummaryFlag label="ok" result="ok" count={summary.okCount} />
       </div>
       {summary.failedClauseCount > 0 ? (
         <div className="mt-2 flex items-center justify-between gap-2">

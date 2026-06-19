@@ -127,6 +127,15 @@ function cloneValidationValue(
   };
 }
 
+function missingInspectionValue(): ViewerInspectionValue {
+  return {
+    raw: undefined,
+    text: "MISSING",
+    state: "missing",
+    validation: null,
+  };
+}
+
 function missingValidationValue(): ViewerValidationValue {
   return {
     text: "MISSING",
@@ -535,6 +544,113 @@ function toRuleFailure(
     result,
     description: compiledRule.description,
   };
+}
+
+function countInspectionGroupIssues(rows: ViewerInspectionRow[]) {
+  return (
+    rows.reduce((count, row) => count + Number(row.value.state !== "present"), 0) +
+    Number(rows.length === 0)
+  );
+}
+
+function countInspectionIssues(
+  summaryRows: ViewerInspectionRow[],
+  propertySets: ViewerInspectionGroup[],
+) {
+  return (
+    summaryRows.reduce((count, row) => count + Number(row.value.state !== "present"), 0) +
+    propertySets.reduce((count, group) => count + group.issueCount, 0)
+  );
+}
+
+function buildMissingPropertyInspectionRow(
+  target: Extract<ViewerValidationTarget, { kind: "property" }>,
+  targetId: string,
+): ViewerInspectionRow {
+  return {
+    key: `validation-missing:${targetId}`,
+    label: target.label,
+    target,
+    value: missingInspectionValue(),
+  };
+}
+
+function appendMissingValidationPropertyRows(
+  propertySets: ViewerInspectionGroup[],
+  compiledRules: CompiledViewerValidationRuleMap,
+  ifcType: string | null,
+) {
+  if (!ifcType) {
+    return propertySets;
+  }
+
+  const rulesForType = compiledRules.get(normalizeIfcType(ifcType));
+  if (!rulesForType) {
+    return propertySets;
+  }
+
+  const existingTargetIds = new Set<string>();
+  for (const group of propertySets) {
+    for (const row of group.rows) {
+      if (row.target?.kind === "property") {
+        existingTargetIds.add(buildViewerValidationTargetId(row.target));
+      }
+    }
+  }
+
+  const missingRowsByGroup = new Map<string, ViewerInspectionRow[]>();
+  const missingGroupTitles = new Map<string, string>();
+
+  for (const [targetId, rules] of rulesForType.entries()) {
+    const target = rules[0]?.rule.target;
+    if (!target || target.kind !== "property" || existingTargetIds.has(targetId)) {
+      continue;
+    }
+
+    const groupKey = normalizeToken(target.group);
+    const rows = missingRowsByGroup.get(groupKey) ?? [];
+    rows.push(buildMissingPropertyInspectionRow(target, targetId));
+    missingRowsByGroup.set(groupKey, rows);
+    missingGroupTitles.set(groupKey, target.group);
+  }
+
+  if (missingRowsByGroup.size === 0) {
+    return propertySets;
+  }
+
+  const appliedGroupKeys = new Set<string>();
+  const nextPropertySets = propertySets.map((group) => {
+    const groupKey = normalizeToken(group.title);
+    const missingRows = missingRowsByGroup.get(groupKey);
+    if (!missingRows) {
+      return group;
+    }
+
+    appliedGroupKeys.add(groupKey);
+    const rows = [...group.rows, ...missingRows];
+
+    return {
+      ...group,
+      rows,
+      issueCount: countInspectionGroupIssues(rows),
+    };
+  });
+
+  for (const [groupKey, rows] of missingRowsByGroup.entries()) {
+    if (appliedGroupKeys.has(groupKey)) {
+      continue;
+    }
+
+    nextPropertySets.push({
+      key: `validation-missing-group:${groupKey}`,
+      title: missingGroupTitles.get(groupKey) ?? "Missing Property Set",
+      subtitle: "Missing property set",
+      rows,
+      issueCount: countInspectionGroupIssues(rows),
+    });
+  }
+
+  return nextPropertySets;
 }
 
 function applyValidationToInspectionRows(
@@ -1028,15 +1144,26 @@ export function applyViewerValidationToInspection(
     inspectionIfcType,
     matches,
   );
-  const propertySets: ViewerInspectionGroup[] = inspection.propertySets.map((group) => ({
-    ...group,
-    rows: applyValidationToInspectionRows(group.rows, compiledRules, inspectionIfcType, matches),
-  }));
+  const propertySetsWithMissingRows = appendMissingValidationPropertyRows(
+    inspection.propertySets,
+    compiledRules,
+    inspectionIfcType,
+  );
+  const propertySets: ViewerInspectionGroup[] = propertySetsWithMissingRows.map((group) => {
+    const rows = applyValidationToInspectionRows(group.rows, compiledRules, inspectionIfcType, matches);
+
+    return {
+      ...group,
+      rows,
+      issueCount: countInspectionGroupIssues(rows),
+    };
+  });
 
   return {
     ...inspection,
     summaryRows,
     propertySets,
+    issueCount: countInspectionIssues(summaryRows, propertySets),
     validationSummary: summarizeValidation(matches),
   };
 }
