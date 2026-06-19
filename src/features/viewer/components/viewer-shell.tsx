@@ -45,7 +45,9 @@ import { ViewerToolbar } from "@/features/viewer/components/viewer-toolbar";
 import {
   applyViewerDataTableDraft,
   clearPersistedViewerDataTableDraft,
+  coerceViewerDataTableInputValue,
   readPersistedViewerDataTableDraft,
+  sanitizeViewerDataTableDraft,
   writePersistedViewerDataTableDraft,
 } from "@/features/viewer/lib/data-table-draft";
 import {
@@ -90,6 +92,7 @@ import type {
   ViewerDebugData,
   ViewerValidationDiagnosisElement,
   ViewerValidationDiagnosisReport,
+  ViewerDataTableCellEditRequest,
   ViewerDataTableDraft,
   ViewerDataTableExportStatus,
   ViewerDataTableImportReport,
@@ -1030,7 +1033,7 @@ export function ViewerShell() {
         (cachedDraft.edits.length > 0 || cachedDraft.importedColumns.length > 0)
         ? {
             phase: "success",
-            message: `Restored ${cachedDraft.edits.length} imported edits from draft cache.`,
+            message: `Restored ${cachedDraft.edits.length} draft edits from draft cache.`,
             issues: [],
           }
         : initialDataTableActionStatus,
@@ -1060,7 +1063,7 @@ export function ViewerShell() {
             (serverDraft.edits.length > 0 || serverDraft.importedColumns.length > 0)
             ? {
                 phase: "success",
-                message: `Restored ${serverDraft.edits.length} imported edits from server draft.`,
+                message: `Restored ${serverDraft.edits.length} draft edits from server draft.`,
                 issues: [],
               }
             : initialDataTableActionStatus,
@@ -1091,7 +1094,7 @@ export function ViewerShell() {
       if (!persisted.ok) {
         setDataTableActionStatus((current) => ({
           phase: current.phase === "error" ? current.phase : "success",
-          message: `${current.message || `Imported ${dataTableDraft.edits.length} edits.`} Local draft restore is unavailable: ${persisted.message}`,
+          message: `${current.message || `Saved ${dataTableDraft.edits.length} draft edits.`} Local draft restore is unavailable: ${persisted.message}`,
           issues: current.issues,
         }));
       }
@@ -2060,6 +2063,96 @@ export function ViewerShell() {
     void autoSaveToServer();
   };
 
+  const handleDataTableCellEdit = useCallback(
+    (edit: ViewerDataTableCellEditRequest) => {
+      if (!metadata?.sourceId || !dataTableState.data || !effectiveDataTableData) {
+        setDataTableActionStatus({
+          phase: "error",
+          message: "Load and index a model before editing table cells.",
+          issues: [],
+        });
+        return;
+      }
+
+      const column = effectiveDataTableData.columns.find(
+        (candidate) => candidate.key === edit.columnKey,
+      );
+      if (!column) {
+        setDataTableActionStatus({
+          phase: "error",
+          message: "The edited column no longer exists in the data table.",
+          issues: [],
+        });
+        return;
+      }
+
+      if (!column.editable) {
+        setDataTableActionStatus({
+          phase: "error",
+          message: column.editableReason ?? "This column is read-only.",
+          issues: [],
+        });
+        return;
+      }
+
+      const coerced = coerceViewerDataTableInputValue(edit.raw, column.valueKind);
+      if (!coerced.ok) {
+        setDataTableActionStatus({
+          phase: "error",
+          message: coerced.message,
+          issues: [{ rowKey: edit.rowKey, columnKey: edit.columnKey, message: coerced.message }],
+        });
+        return;
+      }
+
+      const nextEdits = [
+        ...(dataTableDraft?.edits.filter(
+          (currentEdit) =>
+            currentEdit.rowKey !== edit.rowKey || currentEdit.columnKey !== edit.columnKey,
+        ) ?? []),
+        {
+          rowKey: edit.rowKey,
+          columnKey: edit.columnKey,
+          value: coerced.value,
+        },
+      ];
+      const importedColumns =
+        dataTableDraft?.importedColumns ??
+        effectiveDataTableData.columns.filter((candidate) => candidate.origin === "import");
+      const { draft, issues } = sanitizeViewerDataTableDraft(
+        metadata.sourceId,
+        dataTableState.data,
+        nextEdits,
+        importedColumns,
+      );
+      const editStillApplied = Boolean(
+        draft?.edits.some(
+          (currentEdit) =>
+            currentEdit.rowKey === edit.rowKey && currentEdit.columnKey === edit.columnKey,
+        ),
+      );
+
+      commitDataTableDraft(draft, { writeThrough: true });
+      setDataTableActionStatus({
+        phase: issues.length > 0 ? "error" : "success",
+        message:
+          issues.length > 0
+            ? issues[0]?.message ?? "The edit could not be applied."
+            : editStillApplied
+              ? `Updated ${column.label}.`
+              : `Cleared edit for ${column.label}.`,
+        issues,
+      });
+    },
+    [
+      commitDataTableDraft,
+      dataTableDraft,
+      dataTableState.data,
+      effectiveDataTableData,
+      metadata?.sourceId,
+    ],
+  );
+
   const handleDataTableImport = async (file: File) => {
     if (!metadata?.sourceId || !dataTableState.data || !effectiveDataTableData) {
       startTransition(() => {
@@ -2216,7 +2309,7 @@ export function ViewerShell() {
     }
     setDataTableActionStatus({
       phase: "success",
-      message: "Cleared imported data-table edits.",
+      message: "Cleared data-table edits.",
       issues: [],
     });
   }, [commitDataTableDraft, metadata?.sourceId]);
@@ -2504,7 +2597,7 @@ export function ViewerShell() {
           ) : null}
           {draftEditCount > 0 ? (
             <span className="corey-mono-label inline-flex items-center rounded-[var(--r-chip)] border border-[color:var(--success-border)] bg-[color:var(--success-bg)] px-2.5 py-1 text-[color:var(--success-fg)]">
-              {draftEditCount} imported edits
+              {draftEditCount} draft edits
             </span>
           ) : null}
         </div>
@@ -2584,6 +2677,7 @@ export function ViewerShell() {
         importedColumnKeys={dataTableImportFocus.columnKeys}
         onSyncToView={handleSyncDataTableToView}
         onValidationClauseChange={setSelectedValidationClauseId}
+        onEditCell={handleDataTableCellEdit}
         onSelectRow={handleDataTableRowSelect}
         showMetaHeader={false}
       />

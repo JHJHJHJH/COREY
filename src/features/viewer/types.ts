@@ -350,6 +350,12 @@ export interface ViewerDataTableEdit {
   value: ViewerDataTableDraftValue;
 }
 
+export interface ViewerDataTableCellEditRequest {
+  rowKey: string;
+  columnKey: string;
+  raw: string;
+}
+
 export interface ViewerDataTableDraft {
   version: 2;
   sourceId: string;

@@ -43,7 +43,7 @@ const VIEWER_DATA_TABLE_BASE_COLUMNS = [
     kind: "base",
     group: null,
     editable: false,
-    editableReason: "Identity columns are read-only.",
+    editableReason: "IFC type is derived from the element category and cannot be edited.",
     binding: {
       kind: "attribute",
       name: "type",
@@ -58,7 +58,7 @@ const VIEWER_DATA_TABLE_BASE_COLUMNS = [
     kind: "base",
     group: null,
     editable: false,
-    editableReason: "Identity columns are read-only.",
+    editableReason: "GlobalId is used to resolve edited rows back to IFC elements.",
     binding: {
       kind: "attribute",
       name: "_guid",
@@ -72,8 +72,8 @@ const VIEWER_DATA_TABLE_BASE_COLUMNS = [
     label: "Name",
     kind: "base",
     group: null,
-    editable: false,
-    editableReason: "Identity columns are read-only.",
+    editable: true,
+    editableReason: null,
     binding: {
       kind: "attribute",
       name: "Name",

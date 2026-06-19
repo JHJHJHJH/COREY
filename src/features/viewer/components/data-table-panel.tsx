@@ -21,6 +21,8 @@ import {
 import type {
   ModelMetadata,
   ViewerValidationClauseTableView,
+  ViewerDataTableCell,
+  ViewerDataTableCellEditRequest,
   ViewerDataTableColumn,
   ViewerDataTableSort,
   ViewerDataTableState,
@@ -39,6 +41,7 @@ type DataTablePanelProps = {
   importedColumnKeys?: string[];
   onSyncToView: () => Promise<void>;
   onValidationClauseChange?: (clauseId: string) => void;
+  onEditCell: (edit: ViewerDataTableCellEditRequest) => void;
   onSelectRow: (localId: number) => void;
   showMetaHeader?: boolean;
 };
@@ -79,16 +82,10 @@ function compactButtonTone(active: boolean) {
     : "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]";
 }
 
-function cellTone(column: ViewerDataTableColumn, state: "present" | "missing" | "empty" | "null" | "undefined") {
-  if (state !== "present") {
-    return "text-[color:var(--warning-fg)]";
-  }
-
-  if (column.kind === "base") {
-    return "text-[color:var(--foreground)]";
-  }
-
-  return "text-[color:var(--foreground)]";
+function cellTone(state: "present" | "missing" | "empty" | "null" | "undefined") {
+  return state === "present"
+    ? "text-[color:var(--foreground)]"
+    : "text-[color:var(--warning-fg)]";
 }
 
 function sortLabel(sort: ViewerDataTableSort | null, columnKey: string) {
@@ -140,6 +137,74 @@ function rowHasImportedEdits(row: NonNullable<ViewerDataTableState["data"]>["row
   return Object.values(row.cells).some((cell) => cell.source === "draft");
 }
 
+function cellInputValue(cell: ViewerDataTableCell | undefined) {
+  if (!cell || cell.state !== "present") {
+    return "";
+  }
+
+  if (
+    typeof cell.raw === "string" ||
+    typeof cell.raw === "number" ||
+    typeof cell.raw === "boolean"
+  ) {
+    return String(cell.raw);
+  }
+
+  return cell.text;
+}
+
+type EditableDataTableCellProps = {
+  rowKey: string;
+  rowLabel: string;
+  column: ViewerDataTableColumn;
+  cell: ViewerDataTableCell | undefined;
+  onEditCell: (edit: ViewerDataTableCellEditRequest) => void;
+};
+
+function EditableDataTableCell({
+  rowKey,
+  rowLabel,
+  column,
+  cell,
+  onEditCell,
+}: EditableDataTableCellProps) {
+  const value = cellInputValue(cell);
+
+  const commitValue = (nextValue: string) => {
+    if (nextValue === value) {
+      return;
+    }
+
+    onEditCell({
+      rowKey,
+      columnKey: column.key,
+      raw: nextValue,
+    });
+  };
+
+  return (
+    <input
+      key={`${cell?.source ?? "none"}:${cell?.state ?? "missing"}:${cell?.text ?? ""}`}
+      defaultValue={value}
+      onBlur={(event) => commitValue(event.currentTarget.value)}
+      onClick={(event) => event.stopPropagation()}
+      onPointerDown={(event) => event.stopPropagation()}
+      onKeyDown={(event) => {
+        event.stopPropagation();
+        if (event.key === "Enter") {
+          event.currentTarget.blur();
+        }
+        if (event.key === "Escape") {
+          event.currentTarget.value = value;
+          event.currentTarget.blur();
+        }
+      }}
+      aria-label={`Edit ${column.label} for ${rowLabel}`}
+      className="min-h-8 w-full min-w-[10rem] rounded-lg border border-transparent bg-transparent px-2 py-1 font-mono text-[12px] leading-5 text-current outline-none transition hover:border-[color:var(--viewer-border)] hover:bg-[color:var(--surface-soft)] focus:border-[color:var(--accent)] focus:bg-[color:var(--surface-strong)]"
+    />
+  );
+}
+
 type DataTableContentProps = {
   data: ViewerDataTableState["data"];
   tablePhase: ViewerDataTableState["phase"];
@@ -154,6 +219,7 @@ type DataTableContentProps = {
   onToggleAllVisibleRows: () => void;
   onToggleSort: (columnKey: string) => void;
   onToggleRow: (rowKey: string) => void;
+  onEditCell: (edit: ViewerDataTableCellEditRequest) => void;
   onSelectRow: (localId: number) => void;
 };
 
@@ -171,6 +237,7 @@ const DataTableContent = memo(function DataTableContent({
   onToggleAllVisibleRows,
   onToggleSort,
   onToggleRow,
+  onEditCell,
   onSelectRow,
 }: DataTableContentProps) {
   return (
@@ -216,7 +283,7 @@ const DataTableContent = memo(function DataTableContent({
         </div>
       ) : data.rows.length === 0 ? (
         <div className="flex h-full items-center justify-center px-5 py-6">
-          <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[color:var(--viewer-border)] bg-white/60 px-6 py-6 text-center">
+          <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-6 py-6 text-center">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
               Empty Model Table
             </div>
@@ -231,7 +298,7 @@ const DataTableContent = memo(function DataTableContent({
         </div>
       ) : visibleRows.length === 0 ? (
         <div className="flex h-full items-center justify-center px-5 py-6">
-          <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[color:var(--viewer-border)] bg-white/60 px-6 py-6 text-center">
+          <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-6 py-6 text-center">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
               No Matching Rows
             </div>
@@ -303,11 +370,11 @@ const DataTableContent = memo(function DataTableContent({
                   <tr
                     key={row.key}
                     onClick={() => onSelectRow(row.localId)}
-                    className={`cursor-pointer transition hover:bg-white/45 ${
+                    className={`cursor-pointer transition hover:bg-[color:var(--surface-soft)] ${
                       selected
-                        ? "bg-[#e7f3ee]"
+                        ? "bg-[color:var(--accent-wash)]"
                         : checked
-                          ? "bg-[#f6efe3]"
+                          ? "bg-[color:var(--surface-strong)]"
                           : "bg-transparent"
                     }`}
                   >
@@ -324,6 +391,7 @@ const DataTableContent = memo(function DataTableContent({
                     {visibleColumns.map((column) => {
                       const cell = row.cells[column.key];
                       const draftCell = cell?.source === "draft";
+                      const editable = column.editable && Boolean(column.binding);
 
                       return (
                         <td
@@ -332,16 +400,26 @@ const DataTableContent = memo(function DataTableContent({
                             draftCell
                               ? "bg-[color:var(--success-bg)] text-[color:var(--success-fg)]"
                               : cell
-                                ? cellTone(column, cell.state)
+                                ? cellTone(cell.state)
                                 : "text-[color:var(--muted-ink)]"
                           }`}
                         >
-                          <div className="min-w-0 break-words font-mono text-[12px] leading-5">
-                            {cell?.text ?? "MISSING"}
-                          </div>
+                          {editable ? (
+                            <EditableDataTableCell
+                              rowKey={row.key}
+                              rowLabel={row.selection.label}
+                              column={column}
+                              cell={cell}
+                              onEditCell={onEditCell}
+                            />
+                          ) : (
+                            <div className="min-w-0 break-words font-mono text-[12px] leading-5">
+                              {cell?.text ?? "MISSING"}
+                            </div>
+                          )}
                           {draftCell ? (
                             <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--success-fg)]">
-                              Imported
+                              Edited
                             </div>
                           ) : null}
                         </td>
@@ -371,6 +449,7 @@ const DataTablePanelComponent = function DataTablePanel({
   importedColumnKeys = [],
   onSyncToView,
   onValidationClauseChange,
+  onEditCell,
   onSelectRow,
   showMetaHeader = true,
 }: DataTablePanelProps) {
@@ -735,12 +814,12 @@ const DataTablePanelComponent = function DataTablePanel({
               {tableState.phase}
             </span>
             {metadata ? (
-              <span className="inline-flex items-center rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-3 py-1 text-[color:var(--muted-ink)]">
+              <span className="inline-flex items-center rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 py-1 text-[color:var(--muted-ink)]">
                 {metadata.name}
               </span>
             ) : null}
             {metadata ? (
-              <span className="inline-flex items-center rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-3 py-1 text-[color:var(--muted-ink)]">
+              <span className="inline-flex items-center rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 py-1 text-[color:var(--muted-ink)]">
                 {formatBytes(metadata.size)}
               </span>
             ) : null}
@@ -760,8 +839,6 @@ const DataTablePanelComponent = function DataTablePanel({
           <span>{activeUiState.selectedRowKeys.size} checked rows</span>
           <span>{tableState.message}</span>
         </div>
-
-        
       </div>
 
       <div
@@ -786,7 +863,7 @@ const DataTablePanelComponent = function DataTablePanel({
                     ? activeFilterLabels.slice(0, 3).map((label) => (
                         <span
                           key={label}
-                          className="rounded-full border border-[color:var(--viewer-border)] bg-white/75 px-2.5 py-1"
+                          className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1"
                         >
                           {label}
                         </span>
@@ -809,7 +886,7 @@ const DataTablePanelComponent = function DataTablePanel({
                     placeholder="Filter by element values, attributes, or property set values"
                     aria-label="Filter table rows"
                     disabled={!data}
-                    className="h-10 w-full rounded-2xl border border-[color:var(--viewer-border)] bg-white/80 py-2 pl-11 pr-10 text-sm text-[color:var(--foreground)] outline-none transition placeholder:text-[color:var(--muted-ink)] focus:border-[color:var(--accent)] focus:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                    className="h-10 w-full rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] py-2 pl-11 pr-10 text-sm text-[color:var(--foreground)] outline-none transition placeholder:text-[color:var(--muted-ink)] focus:border-[color:var(--accent)] focus:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
                   />
                   {activeUiState.query ? (
                     <button
@@ -820,7 +897,7 @@ const DataTablePanelComponent = function DataTablePanel({
                           query: "",
                         }))
                       }
-                      className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-[color:var(--viewer-border)] bg-white/90 text-[color:var(--muted-ink)] transition hover:bg-white hover:text-[color:var(--foreground)]"
+                      className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
                       aria-label="Clear text filter"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -830,7 +907,7 @@ const DataTablePanelComponent = function DataTablePanel({
               </div>
 
               {hasActiveFilters ? (
-                <div className="flex h-10 min-w-[18rem] max-w-[24rem] shrink-0 items-center gap-2 rounded-2xl border border-[color:var(--viewer-border)] bg-white/65 px-3 text-[11px] text-[color:var(--muted-ink)]">
+                <div className="flex h-10 min-w-[18rem] max-w-[24rem] shrink-0 items-center gap-2 rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 text-[11px] text-[color:var(--muted-ink)]">
                   <span className="shrink-0 font-semibold uppercase tracking-[0.16em] text-[color:var(--foreground)]">
                     Active Filters
                   </span>
@@ -850,7 +927,7 @@ const DataTablePanelComponent = function DataTablePanel({
                       void resetFilters();
                     }}
                     disabled={!data || isSyncingToView}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[color:var(--viewer-border)] bg-white px-3 py-1 font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-3 py-1 font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:border-[color:var(--accent)] hover:bg-[color:var(--accent-wash)] hover:text-[color:var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <FilterX className="h-3.5 w-3.5" />
                     Reset
@@ -863,7 +940,7 @@ const DataTablePanelComponent = function DataTablePanel({
                 aria-controls="table-filters-content"
                 aria-expanded={showFilters}
                 onClick={() => setShowFilters((current) => !current)}
-                className="ml-auto inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[color:var(--viewer-border)] bg-white/75 text-[color:var(--foreground)] transition hover:bg-white"
+                className="ml-auto inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]"
                 aria-label={showFilters ? "Collapse filters drawer" : "Expand filters drawer"}
                 title={showFilters ? "Collapse filters" : "Expand filters"}
               >
@@ -894,7 +971,7 @@ const DataTablePanelComponent = function DataTablePanel({
                         }))
                       }
                       disabled={!data}
-                      className="w-full rounded-2xl border border-[color:var(--viewer-border)] bg-white/80 px-4 py-3 text-sm text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent)] focus:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                      className="w-full rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-4 py-3 text-sm text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent)] focus:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <option value="">All IFC types</option>
                       {data?.ifcTypes.map((ifcType) => (
@@ -940,7 +1017,7 @@ const DataTablePanelComponent = function DataTablePanel({
                             <button
                               type="button"
                               onClick={() => setShowClauseMenu(false)}
-                              className="flex h-8 w-8 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-white/75 text-[color:var(--muted-ink)] transition hover:bg-white hover:text-[color:var(--foreground)]"
+                              className="flex h-8 w-8 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
                               aria-label="Close validation clause filter"
                             >
                               <X className="h-4 w-4" />
@@ -953,7 +1030,7 @@ const DataTablePanelComponent = function DataTablePanel({
                               onClick={() => setValidationClauseFilter("")}
                               className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm transition ${
                                 activeClauseView
-                                  ? "border-[color:var(--viewer-border)] bg-white/60 text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
+                                  ? "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
                                   : "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
                               }`}
                             >
@@ -973,7 +1050,7 @@ const DataTablePanelComponent = function DataTablePanel({
                                     className={`flex w-full items-start justify-between gap-3 rounded-2xl border px-3 py-3 text-left text-sm transition ${
                                       activeClauseView?.clauseId === clause.clauseId
                                         ? validationClauseTone(clause.result)
-                                        : "border-[color:var(--viewer-border)] bg-white/60 text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
+                                        : "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
                                     }`}
                                   >
                                     <span className="min-w-0">
@@ -1038,7 +1115,7 @@ const DataTablePanelComponent = function DataTablePanel({
                         <Columns3 className="h-4 w-4 shrink-0" />
                         <span>Columns</span>
                         {dynamicColumns.length > 0 ? (
-                          <span className="rounded-full bg-black/8 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em]">
+                          <span className="rounded-full bg-[color:var(--accent-wash)] px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-[color:var(--accent-strong)]">
                             {visibleDynamicColumnCount}
                           </span>
                         ) : null}
@@ -1075,7 +1152,7 @@ const DataTablePanelComponent = function DataTablePanel({
                               <button
                                 type="button"
                                 onClick={() => setShowColumnMenu(false)}
-                                className="flex h-8 w-8 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-white/75 text-[color:var(--muted-ink)] transition hover:bg-white hover:text-[color:var(--foreground)]"
+                                className="flex h-8 w-8 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
                                 aria-label="Close columns menu"
                               >
                                 <X className="h-4 w-4" />
@@ -1087,7 +1164,7 @@ const DataTablePanelComponent = function DataTablePanel({
                             {dynamicColumns.map((column) => (
                               <label
                                 key={column.key}
-                                className="flex items-start gap-3 rounded-2xl border border-[color:var(--viewer-border)] bg-white/55 px-3 py-3 text-sm text-[color:var(--foreground)]"
+                                className="flex items-start gap-3 rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 py-3 text-sm text-[color:var(--foreground)]"
                               >
                                 <input
                                   type="checkbox"
@@ -1146,6 +1223,7 @@ const DataTablePanelComponent = function DataTablePanel({
         onToggleAllVisibleRows={toggleAllVisibleRows}
         onToggleSort={toggleSort}
         onToggleRow={toggleRow}
+        onEditCell={onEditCell}
         onSelectRow={onSelectRow}
       />
     </aside>

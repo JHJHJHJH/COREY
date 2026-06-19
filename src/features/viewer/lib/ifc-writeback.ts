@@ -14,6 +14,7 @@ type WebIfcModule = {
 };
 
 type IfcWrappedValue = {
+  name?: string;
   type?: number;
   value?: unknown;
 };
@@ -89,19 +90,27 @@ function buildSimpleType(
   api: IfcApiInstance,
   modelId: number,
   value: unknown,
-  currentType?: number | null,
+  currentValue?: IfcWrappedValue | null,
 ): IfcWrappedValue | null {
   if (value === undefined || value === null) {
     return null;
   }
 
-  const typeCode =
-    currentType ??
-    (typeof value === "number"
-      ? api.GetTypeCodeFromName("IFCREAL")
+  const currentTypeName =
+    typeof currentValue?.name === "string" && currentValue.name.trim().length > 0
+      ? currentValue.name.trim().toUpperCase()
+      : null;
+  const fallbackTypeName =
+    typeof value === "number"
+      ? "IFCREAL"
       : typeof value === "boolean"
-        ? api.GetTypeCodeFromName("IFCBOOLEAN")
-        : api.GetTypeCodeFromName("IFCLABEL"));
+        ? "IFCBOOLEAN"
+        : "IFCLABEL";
+  const currentTypeCode = currentTypeName ? api.GetTypeCodeFromName(currentTypeName) : 0;
+  const typeCode =
+    Number.isFinite(currentTypeCode) && currentTypeCode > 0
+      ? currentTypeCode
+      : api.GetTypeCodeFromName(fallbackTypeName);
 
   return api.CreateIfcType(modelId, typeCode, value) as IfcWrappedValue;
 }
@@ -346,7 +355,7 @@ async function applyAttributeEdit(
         api,
         modelId,
         edit.value.raw,
-        typeof currentValue?.type === "number" ? currentValue.type : null,
+        currentValue,
       );
     }
     api.WriteLine(modelId, line);
@@ -397,7 +406,7 @@ async function applyPropertyEdit(
               api,
               modelId,
               edit.value.raw,
-              typeof property.NominalValue?.type === "number" ? property.NominalValue.type : null,
+              property.NominalValue,
             )
           : null;
       api.WriteLine(modelId, property);
@@ -496,7 +505,7 @@ export async function exportEditedIfc(input: {
   if (liveEdits.length === 0) {
     return {
       phase: "error",
-      message: "No imported edits are available to export.",
+      message: "No data-table edits are available to export.",
       issues: [],
     };
   }
