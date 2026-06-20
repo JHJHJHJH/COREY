@@ -38,7 +38,7 @@ Ordered by recommended sequence. Each names the current client seam to replace.
 | 1 | **Model storage + remote loading** | Remote sources | `LocalFileModelSource` only (`lib/model-source.ts`); `ModelSource.kind: "local-file"` (`types.ts:179`); ephemeral `sourceId = name:size:lastModified` | Upload/list/fetch IFC via `/api/models`; `RemoteModelSource`; stable server `modelId` as `sourceId` |
 | 2 | **Validation rules config** | Persistence/multi-user | `localStorage["corey.validation-rules.v1"]` via `rules-provider.tsx` (read/write isolated in `readStoredConfig`/`writeStoredConfig`) | Server-backed rule sets; localStorage becomes offline cache |
 | 3 | **Data-table edits (drafts)** | Persistence/multi-user | `localStorage["corey:data-table-draft:…"]` via `lib/data-table-draft.ts` (`read/write/clearPersistedViewerDataTableDraft`), keyed by `sourceId` | Server-backed drafts keyed by `modelId`; localStorage cache |
-| 4 | **Validation reports** | Persistence | Ephemeral React state (`validationResult` in `viewer-shell.tsx`); export only to Excel | Persist `ViewerValidationDiagnosisReport` per model run; list/restore |
+| 4 | **Saved validation runs** | Persistence | Ephemeral React state (`validationResult` in `viewer-shell.tsx`) | Removed from current scope; keep validation results local to the active session |
 | 5 | **Rule templates** | Shared catalogs | Static `public/resources/*.json`, fetched in `rules-screen.tsx` (`STARTER_TEMPLATES`) | Server-managed `/api/rule-templates` library |
 | 6 | **Validation evaluation** | Compute offload | Already isomorphic; API route exists as worker *fallback* | (Largely done) make API path first-class for large models |
 | 7 | **IFC→Fragments conversion, data-table indexing, writeback, Excel** | Compute offload | All client-side (`ifc-viewport.tsx` import pipeline, `ifc-data.ts` `buildViewerDataTable`, `ifc-writeback.ts`, `data-table-excel.ts`) | Optional server jobs; **last** — tightly coupled to That Open client runtime |
@@ -102,8 +102,8 @@ contained to the source layer + shell entry points.
 
 Items 2–5 follow once `modelId` is stable: replace the two `localStorage` stores
 (`rules-provider.tsx`, `data-table-draft.ts`) with async server-backed stores keyed by
-`modelId`, keeping localStorage as an offline cache; then persist validation reports; then
-move catalogs server-side. Item 7 (heavy compute) is last and may not be worth it given the
+`modelId`, keeping localStorage as an offline cache; then move catalogs server-side.
+Item 7 (heavy compute) is last and may not be worth it given the
 That Open client coupling.
 
 ## Verification

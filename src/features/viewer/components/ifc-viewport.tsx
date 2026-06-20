@@ -117,6 +117,20 @@ function toModelIdMap(highlights: ViewerValidationHighlights["warn"]) {
   );
 }
 
+function buildValidationHighlightsSignature(highlights: ViewerValidationHighlights) {
+  return (["warn", "error"] as const)
+    .map((severity) =>
+      Object.entries(highlights[severity])
+        .sort(([leftModelId], [rightModelId]) => leftModelId.localeCompare(rightModelId))
+        .map(([modelId, localIds]) => {
+          const ids = [...localIds].sort((left, right) => left - right).join(",");
+          return `${modelId}:${ids}`;
+        })
+        .join("|"),
+    )
+    .join("::");
+}
+
 function cloneElementIdMap(map: ViewerElementIdMap | null): ViewerElementIdMap | null {
   if (!map) {
     return null;
@@ -163,6 +177,8 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
   const selectionLoadTimerRef = useRef<number | null>(null);
   const fragmentsUpdateFrameRef = useRef<number | null>(null);
   const pendingFragmentsForceRef = useRef(false);
+  const validationHighlightsSignatureRef = useRef("");
+  const validationHighlightsSequenceRef = useRef(0);
 
   const emitStatusChange = useEffectEvent(onStatusChange);
   const emitSelectionDetailsChange = useEffectEvent(onSelectionDetailsChange);
@@ -369,14 +385,30 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       return;
     }
 
+    const signature = buildValidationHighlightsSignature(validationHighlights);
+    if (validationHighlightsSignatureRef.current === signature) {
+      return;
+    }
+
+    validationHighlightsSignatureRef.current = signature;
+    const updateSequence = ++validationHighlightsSequenceRef.current;
+
     void (async () => {
       await runtime.highlighter.clear("validation-warn");
       await runtime.highlighter.clear("validation-error");
+
+      if (validationHighlightsSequenceRef.current !== updateSequence) {
+        return;
+      }
 
       if (runtime.model) {
         const warnMap = toModelIdMap(validationHighlights.warn);
         if (!OBC.ModelIdMapUtils.isEmpty(warnMap)) {
           await runtime.highlighter.highlightByID("validation-warn", warnMap, true, false);
+        }
+
+        if (validationHighlightsSequenceRef.current !== updateSequence) {
+          return;
         }
 
         const errorMap = toModelIdMap(validationHighlights.error);

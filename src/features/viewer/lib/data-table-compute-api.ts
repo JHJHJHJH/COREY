@@ -7,7 +7,6 @@ import type {
   ViewerDataTableImportReport,
   ViewerDataTableIssue,
   ViewerDataTableDraft,
-  ViewerValidationDiagnosisReport,
 } from "@/features/viewer/types";
 
 type DataTableExcelImportResult = {
@@ -112,26 +111,6 @@ export async function importViewerDataTableFromExcelViaApi(input: {
   return {
     draft: body.draft ? parseStoredViewerDataTableDraft(input.sourceId, body.draft) : null,
     report: body.report,
-  };
-}
-
-export async function exportViewerValidationDiagnosisToExcelViaApi(input: {
-  report: ViewerValidationDiagnosisReport;
-  fileName: string;
-}) {
-  const response = await fetch("/api/validation-diagnosis/excel/export", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-
-  if (!response.ok) {
-    const error = await readError(response, `Diagnosis Excel export failed (${response.status}).`);
-    throw new Error(error.message);
-  }
-
-  return {
-    fileName: await downloadResponse(response, input.fileName),
   };
 }
 

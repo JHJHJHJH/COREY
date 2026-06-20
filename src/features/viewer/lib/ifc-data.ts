@@ -327,7 +327,7 @@ function matchesInspectionTarget(
   }
 
   if (target.kind === "attribute" && binding.kind === "attribute") {
-    return target.name === binding.name;
+    return normalizeViewerAttributeName(target.name) === normalizeViewerAttributeName(binding.name);
   }
 
   if (target.kind === "property" && binding.kind === "property") {
@@ -335,6 +335,16 @@ function matchesInspectionTarget(
   }
 
   return false;
+}
+
+function normalizeViewerAttributeName(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized === "_guid" || normalized === "guid" || normalized === "globalid") {
+    return "globalid";
+  }
+
+  return normalized;
 }
 
 function computeInspectionIssueCount(
@@ -350,6 +360,25 @@ function computeInspectionIssueCount(
       );
       return count + rowIssueCount + Number(group.rows.length === 0);
     }, 0)
+  );
+}
+
+function readPresentInspectionRowText(rows: ViewerInspectionRow[], key: string) {
+  const row = rows.find((entry) => entry.key === key);
+  return row?.value.state === "present" && row.value.text.trim().length > 0
+    ? row.value.text.trim()
+    : null;
+}
+
+function deriveInspectionTitle(
+  inspection: ViewerElementInspection,
+  summaryRows: ViewerInspectionRow[],
+) {
+  return (
+    readPresentInspectionRowText(summaryRows, "Name") ??
+    readPresentInspectionRowText(summaryRows, "ObjectType") ??
+    readPresentInspectionRowText(summaryRows, "type") ??
+    inspection.title
   );
 }
 
@@ -553,7 +582,7 @@ export function buildSelectionInspection(
       hasIfcGuid(data),
       readIfcGuid(data),
       "MISSING GlobalId",
-      { kind: "attribute", name: "guid" },
+      { kind: "attribute", name: "GlobalId" },
     ),
     buildRow(
       "Name",
@@ -656,15 +685,14 @@ export function applyViewerDataTableToInspection(
   });
 
   const propertySetMap = new Map(propertySets.map((group) => [group.title, group]));
-  const importedColumns = data.columns.filter(
+  const unappliedColumns = data.columns.filter(
     (column) =>
-      column.origin === "import" &&
       column.binding?.kind === "property" &&
       row.cells[column.key] &&
       !appliedColumnKeys.has(column.key),
   );
 
-  for (const column of importedColumns) {
+  for (const column of unappliedColumns) {
     const cell = row.cells[column.key];
     const binding = column.binding;
     if (!cell || !binding || binding.kind !== "property") {
@@ -708,6 +736,7 @@ export function applyViewerDataTableToInspection(
 
   return {
     ...inspection,
+    title: deriveInspectionTitle(inspection, summaryRows),
     summaryRows,
     propertySets,
     issueCount: computeInspectionIssueCount(summaryRows, propertySets),

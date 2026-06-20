@@ -6,8 +6,33 @@ description: A typical start-to-finish model review, step by step.
 import { Steps, Step } from "fumadocs-ui/components/steps";
 
 This page walks through a normal review session — from opening a model to
-producing a report — without assuming any technical background. Each step links
-to the feature it uses.
+checking and correcting IFC data — without assuming any technical background.
+Each step links to the feature it uses.
+
+At a high level, the review loop is:
+
+```text
+Open IFC -> validate -> export to Excel -> batch edit -> import -> validate again
+```
+
+## Demo recording
+
+This recording follows the workflow below using
+<code>public/resources/Demo_RevitSampleProject.ifc</code> and the
+<code>Demo IfcWall</code> clause template.
+
+<figure className="my-6">
+  <video
+    controls
+    preload="metadata"
+    src="/docs-media/demo-workflow/demo-workflow.webm"
+    className="w-full rounded-lg border border-[color:var(--viewer-border)]"
+  />
+  <figcaption className="mt-2 text-sm text-[color:var(--muted-ink)]">
+    Playwright-recorded demo: open the Revit sample IFC, load the starter
+    clauses, validate, and review the table.
+  </figcaption>
+</figure>
 
 <Steps>
 
@@ -16,11 +41,22 @@ to the feature it uses.
 ### Open your model
 
 Launch COREY in your browser (your team will have a link, or run it locally — see
-[Getting Started](./getting-started)). Choose an `.ifc` file from your computer.
+[Local Setup](./getting-started)). Choose an `.ifc` file from your computer.
 The building appears in the 3D viewport.
 
 > Your file is read in the browser. It is not uploaded anywhere unless you are
 > using the optional shared backend.
+
+<figure className="my-5">
+  <img
+    src="/docs-media/demo-workflow/01-loaded-viewer.png"
+    alt="Demo_RevitSampleProject.ifc loaded in COREY with the model tree and 3D viewport visible."
+    className="w-full rounded-lg border border-[color:var(--viewer-border)]"
+  />
+  <figcaption className="mt-2 text-sm text-[color:var(--muted-ink)]">
+    The sample model after local upload and browser-side indexing.
+  </figcaption>
+</figure>
 
 </Step>
 
@@ -49,7 +85,8 @@ so on. Use **Isolate** or **Hide** to clear away clutter while you focus.
 
 Open the **data table** to compare many elements at once. Filter to the elements
 you're reviewing (for example, all walls), and scan for blanks or wrong values.
-If you prefer, **export to Excel** to review or annotate outside the app.
+If many values need the same kind of correction, **export to Excel** and update
+them there.
 
 </Step>
 
@@ -57,10 +94,10 @@ If you prefer, **export to Excel** to review or annotate outside the app.
 
 ### Set up your checks (clauses)
 
-Open the clause editor and define the rules your model must satisfy — for example
-"every wall has a fire rating" or "door widths are between 850 and 1200 mm".
-You can build these from scratch, or **import a saved set of clauses** that your
-team uses on every project. Full details are on [Clauses & Checks](./clauses).
+Open the clause editor and choose the checks your model must satisfy — for
+example "every wall has a fire rating" or "every wall has a GlobalId". You can
+use a saved set of clauses from your team, or create your own. Full details are
+on [Clauses & Checks](./clauses).
 
 </Step>
 
@@ -72,16 +109,47 @@ Run validation. COREY evaluates every relevant element against your clauses and
 marks each as **OK**, **Warning**, or **Error**. Failing elements are highlighted
 in the 3D view, so you can see *where* the problems are, not just that they exist.
 
+<figure className="my-5">
+  <img
+    src="/docs-media/demo-workflow/03-validation-summary.png"
+    alt="COREY validation summary showing six flagged elements across one clause."
+    className="w-full rounded-lg border border-[color:var(--viewer-border)]"
+  />
+  <figcaption className="mt-2 text-sm text-[color:var(--muted-ink)]">
+    The starter template flags six wall elements missing fire-rating metadata.
+  </figcaption>
+</figure>
+
 </Step>
 
 <Step>
 
-### Diagnose and report
+### Review failed clauses
 
-Open the validation results to see which clauses failed and which elements caused
-them. Click through to highlight a problem element in the viewport. When you're
-done, **export the report** (and your clause set) to share findings with the model
-author or keep a record of the review.
+Open the data table after validation and use the **Clauses** filter to see which
+rows were flagged by each failed clause. Select a row to highlight that element
+in the viewport and inspect its properties.
+
+<figure className="my-5">
+  <img
+    src="/docs-media/demo-workflow/04-data-table.png"
+    alt="COREY data table showing filtered IFC element rows after validation."
+    className="w-full rounded-lg border border-[color:var(--viewer-border)]"
+  />
+  <figcaption className="mt-2 text-sm text-[color:var(--muted-ink)]">
+    The data table keeps validation review close to the rows you can correct.
+  </figcaption>
+</figure>
+
+</Step>
+
+<Step>
+
+### Bring Excel edits back
+
+Import the edited Excel file into COREY, then run validation again. This closes
+the loop: check the model, fix repeated data issues in bulk, and confirm the
+updated model data passes the agreed checks.
 
 </Step>
 
@@ -90,6 +158,7 @@ author or keep a record of the review.
 ## What to do next
 
 <Cards>
+  <Card title="Excel Round Trip" href="./excel-roundtrip" description="Export IFC data, edit it in Excel, import it back, and validate again." />
   <Card title="Clauses & Checks" href="./clauses" description="Learn how to build the rules that drive the review." />
   <Card title="Features" href="./features" description="A reference for every tool mentioned above." />
 </Cards>

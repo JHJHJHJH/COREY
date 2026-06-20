@@ -16,18 +16,6 @@
             "kind": "empty"
           },
           "failSeverity": "error"
-        },
-        {
-          "id": "door-name-required",
-          "ifcType": "IfcDoor",
-          "target": {
-            "kind": "attribute",
-            "name": "Name"
-          },
-          "check": {
-            "kind": "empty"
-          },
-          "failSeverity": "warn"
         }
       ]
     },

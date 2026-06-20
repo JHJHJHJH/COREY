@@ -2,16 +2,16 @@
 
 import {
   BookOpenText,
+  ChevronDown,
   ClipboardCheck,
-  CircleAlert,
   FileOutput,
   FileSpreadsheet,
   Import,
   Moon,
   PanelLeftOpen,
   PanelRightOpen,
-  RotateCcw,
   Sun,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
@@ -43,7 +43,6 @@ import { DetachedWindow } from "@/features/viewer/components/detached-window";
 import { ModelTreePanel } from "@/features/viewer/components/model-tree-panel";
 import { IfcViewport } from "@/features/viewer/components/ifc-viewport";
 import { PropertiesPanel } from "@/features/viewer/components/properties-panel";
-import { ValidationDiagnosisReport } from "@/features/viewer/components/validation-diagnosis-report";
 import { ViewerToolbar } from "@/features/viewer/components/viewer-toolbar";
 import {
   applyViewerDataTableDraft,
@@ -61,15 +60,12 @@ import {
 import {
   exportEditedIfcViaApi,
   exportViewerDataTableToExcelViaApi,
-  exportViewerValidationDiagnosisToExcelViaApi,
   importViewerDataTableFromExcelViaApi,
 } from "@/features/viewer/lib/data-table-compute-api";
 import {
   buildViewerDataTableExcelFileName,
   buildViewerDataTableIfcFileName,
-  buildViewerValidationDiagnosisExcelFileName,
   exportViewerDataTableToExcel,
-  exportViewerValidationDiagnosisToExcel,
   importViewerDataTableFromExcel,
 } from "@/features/viewer/lib/data-table-excel";
 import {
@@ -81,20 +77,13 @@ import {
 import { LocalFileModelSource, RemoteModelSource } from "@/features/viewer/lib/model-source";
 import { isServerStorageAvailable, uploadModelToServer } from "@/features/viewer/lib/model-api";
 import { ServerModelsMenu } from "@/features/viewer/components/server-models-menu";
-import { buildViewerValidationDiagnosisReport } from "@/features/viewer/lib/validation-report";
-import {
-  listServerViewerValidationReports,
-  readServerViewerValidationReport,
-  saveServerViewerValidationReport,
-} from "@/features/viewer/lib/validation-report-api";
+import { buildViewerValidationClauseTableViews } from "@/features/viewer/lib/validation-clauses";
 import { exportEditedIfc } from "@/features/viewer/lib/ifc-writeback";
 import type {
   ModelMetadata,
   ModelSourceResult,
   ViewerCategorySummary,
   ViewerDebugData,
-  ViewerValidationDiagnosisElement,
-  ViewerValidationDiagnosisReport,
   ViewerDataTableCellEditRequest,
   ViewerDataTableDraft,
   ViewerDataTableExportStatus,
@@ -105,7 +94,6 @@ import type {
   ViewerStatus,
   ViewerValidationHighlights,
   ViewerValidationClauseTableView,
-  ViewerValidationReportSummary,
   ViewerValidationRunPayload,
   ViewerValidationRunResult,
   ViewerTreeNode,
@@ -158,20 +146,48 @@ const emptyValidationHighlights: ViewerValidationHighlights = {
   error: {},
 };
 
+function areValidationElementMapsEqual(
+  left: ViewerValidationHighlights["warn"],
+  right: ViewerValidationHighlights["warn"],
+) {
+  const leftModelIds = Object.keys(left);
+  const rightModelIds = Object.keys(right);
+  if (leftModelIds.length !== rightModelIds.length) {
+    return false;
+  }
+
+  for (const modelId of leftModelIds) {
+    const leftIds = left[modelId] ?? [];
+    const rightIds = right[modelId] ?? [];
+    if (leftIds.length !== rightIds.length) {
+      return false;
+    }
+
+    const rightIdSet = new Set(rightIds);
+    for (const localId of leftIds) {
+      if (!rightIdSet.has(localId)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+function areValidationHighlightsEqual(
+  left: ViewerValidationHighlights,
+  right: ViewerValidationHighlights,
+) {
+  return (
+    areValidationElementMapsEqual(left.warn, right.warn) &&
+    areValidationElementMapsEqual(left.error, right.error)
+  );
+}
+
 const initialDataTableActionStatus: ViewerDataTableExportStatus = {
   phase: "idle",
   message: "",
   issues: [],
-};
-
-type ValidationReportStatus = {
-  phase: "idle" | "running" | "success" | "error";
-  message: string;
-};
-
-const initialValidationReportStatus: ValidationReportStatus = {
-  phase: "idle" as const,
-  message: "",
 };
 
 const initialDebugData: ViewerDebugData = {
@@ -498,6 +514,132 @@ function HeaderActionFileButton({
   );
 }
 
+type HeaderEditsControlProps = {
+  draftEditCount: number;
+  busy?: boolean;
+  onExportIfc: () => void;
+  onDiscard: () => void;
+};
+
+// Model-level home for pending corrections: the deliverable (Export IFC) lives
+// in the global header so it survives closing the data table, and the
+// destructive reset is tucked behind a confirm in the overflow menu.
+function HeaderEditsControl({
+  draftEditCount,
+  busy = false,
+  onExportIfc,
+  onDiscard,
+}: HeaderEditsControlProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const closeMenu = useCallback(() => {
+    setMenuOpen(false);
+    setConfirmingDiscard(false);
+  }, []);
+
+  useEffect(() => {
+    if (!menuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        closeMenu();
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeMenu();
+      }
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closeMenu, menuOpen]);
+
+  return (
+    <div ref={containerRef} className="relative inline-flex">
+      <div className="inline-flex h-10 items-center overflow-hidden rounded-[var(--r-control)] border border-[color:var(--success-border)] shadow-sm">
+        <button
+          type="button"
+          onClick={onExportIfc}
+          disabled={busy}
+          className="inline-flex h-full items-center gap-2 bg-[color:var(--success-bg)] px-4 text-sm font-semibold text-[color:var(--success-fg)] transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <FileOutput className="h-4 w-4 shrink-0" />
+          <span>Export IFC</span>
+          <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-[color:var(--success-fg)]/15 px-1.5 text-[11px] font-bold tabular-nums">
+            {draftEditCount}
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-label="More edit actions"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          onClick={() => (menuOpen ? closeMenu() : setMenuOpen(true))}
+          disabled={busy}
+          className="inline-flex h-full items-center border-l border-[color:var(--success-border)] bg-[color:var(--success-bg)] px-2 text-[color:var(--success-fg)] transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <ChevronDown className={`h-4 w-4 transition ${menuOpen ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+
+      {menuOpen ? (
+        <div
+          role="menu"
+          className="absolute right-0 top-[calc(100%+0.375rem)] z-50 w-64 rounded-[var(--r-panel)] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] p-1.5 shadow-[var(--viewer-shadow-lift)]"
+        >
+          {confirmingDiscard ? (
+            <div className="px-2 py-1.5">
+              <p className="text-xs leading-relaxed text-[color:var(--foreground)]">
+                Discard {draftEditCount} {draftEditCount === 1 ? "edit" : "edits"}? This can’t be
+                undone.
+              </p>
+              <div className="mt-2.5 flex justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDiscard(false)}
+                  className="inline-flex h-8 items-center rounded-md border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-2.5 text-xs font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-hover)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDiscard();
+                    closeMenu();
+                  }}
+                  className="inline-flex h-8 items-center gap-1 rounded-md border border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] px-2.5 text-xs font-semibold text-[color:var(--danger-fg)] transition hover:opacity-90"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Discard
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => setConfirmingDiscard(true)}
+              className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--danger-bg)] hover:text-[color:var(--danger-fg)]"
+            >
+              <Trash2 className="h-4 w-4 shrink-0" />
+              <span>Discard all edits</span>
+            </button>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function clampDataTableDialogLayoutToBounds(
   layout: DataTableDialogLayout,
   boundsWidth: number,
@@ -747,7 +889,6 @@ export function ViewerShell() {
   const activeSourceRef = useRef<ModelSourceResult | null>(null);
   const dataTableDraftPersistenceVersionRef = useRef(0);
   const dataTableDraftWriteThroughRef = useRef(false);
-  const persistedValidationResultRef = useRef<ViewerValidationRunResult | null>(null);
   const [serverNotice, setServerNotice] = useState<{
     tone: "info" | "success" | "error";
     message: string;
@@ -804,11 +945,6 @@ export function ViewerShell() {
     emptyValidationHighlights,
   );
   const [validationResult, setValidationResult] = useState<ViewerValidationRunResult | null>(null);
-  const [validationReportStatus, setValidationReportStatus] = useState(initialValidationReportStatus);
-  const [savedValidationReports, setSavedValidationReports] = useState<ViewerValidationReportSummary[]>([]);
-  const [restoredValidationReport, setRestoredValidationReport] =
-    useState<ViewerValidationDiagnosisReport | null>(null);
-  const [activeSavedValidationReportId, setActiveSavedValidationReportId] = useState<string | null>(null);
   const [selectedValidationClauseId, setSelectedValidationClauseId] = useState("");
   const [viewerTheme, setViewerTheme] = useState<ViewerTheme>("dark");
   const [viewerThemeLoaded, setViewerThemeLoaded] = useState(false);
@@ -816,7 +952,6 @@ export function ViewerShell() {
   const [showProperties, setShowProperties] = useState(true);
   const [showDataTable, setShowDataTable] = useState(false);
   const [showDataTableInWindow, setShowDataTableInWindow] = useState(false);
-  const [showValidationReport, setShowValidationReport] = useState(false);
   const [treeDrawerWidth, setTreeDrawerWidth] = useState(DEFAULT_TREE_DRAWER_WIDTH);
   const [propertiesDrawerWidth, setPropertiesDrawerWidth] = useState(
     DEFAULT_PROPERTIES_DRAWER_WIDTH,
@@ -900,26 +1035,13 @@ export function ViewerShell() {
     }),
     [deferredClauses, effectiveDataTableData, selectionDetails],
   );
-  const validationDiagnosisReport = useMemo<ViewerValidationDiagnosisReport | null>(
+  const validationClauseTableViews = useMemo<ViewerValidationClauseTableView[]>(
     () =>
-      buildViewerValidationDiagnosisReport({
-        metadata,
+      buildViewerValidationClauseTableViews({
         data: effectiveDataTableData,
         result: validationResult,
       }),
-    [effectiveDataTableData, metadata, validationResult],
-  );
-  const activeValidationDiagnosisReport = restoredValidationReport ?? validationDiagnosisReport;
-  const validationClauseTableViews = useMemo<ViewerValidationClauseTableView[]>(
-    () =>
-      activeValidationDiagnosisReport?.clauses.map((clause) => ({
-        clauseId: clause.clauseId,
-        clauseTitle: clause.clauseTitle,
-        result: clause.result,
-        elementCount: clause.elementCount,
-        rowKeys: clause.elements.map((element) => element.rowKey),
-      })) ?? [],
-    [activeValidationDiagnosisReport],
+    [effectiveDataTableData, validationResult],
   );
   const debugTreeSample = useMemo(
     () => (tree.length > 0 ? buildViewerTreeDebugSample(tree) : null),
@@ -1190,84 +1312,6 @@ export function ViewerShell() {
 
     return () => controller?.abort();
   }, [dataTableDraft, metadata?.serverModelId, metadata?.sourceId]);
-
-  useEffect(() => {
-    setRestoredValidationReport(null);
-    setActiveSavedValidationReportId(null);
-  }, [validationResult]);
-
-  useEffect(() => {
-    const serverModelId = metadata?.serverModelId;
-    persistedValidationResultRef.current = null;
-    setSavedValidationReports([]);
-    setRestoredValidationReport(null);
-    setActiveSavedValidationReportId(null);
-
-    if (!serverModelId) {
-      return;
-    }
-
-    const controller = new AbortController();
-
-    listServerViewerValidationReports(serverModelId, controller.signal)
-      .then((reports) => {
-        setSavedValidationReports(reports);
-      })
-      .catch(() => {
-        // Offline / server error — validation still runs locally.
-      });
-
-    return () => controller.abort();
-  }, [metadata?.serverModelId]);
-
-  useEffect(() => {
-    const serverModelId = metadata?.serverModelId;
-    if (
-      !serverModelId ||
-      validationState.phase !== "ready" ||
-      !validationResult ||
-      !validationDiagnosisReport ||
-      validationDiagnosisReport.sourceId !== serverModelId ||
-      persistedValidationResultRef.current === validationResult
-    ) {
-      return;
-    }
-
-    persistedValidationResultRef.current = validationResult;
-    const controller = new AbortController();
-
-    saveServerViewerValidationReport(serverModelId, validationDiagnosisReport, controller.signal)
-      .then((record) => {
-        setSavedValidationReports((current) => [
-          record,
-          ...current.filter((report) => report.reportId !== record.reportId),
-        ].slice(0, 25));
-        setValidationReportStatus({
-          phase: "success",
-          message: "Saved validation report to server.",
-        });
-      })
-      .catch((error) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setValidationReportStatus({
-          phase: "error",
-          message:
-            error instanceof Error
-              ? `Validation report was not saved: ${error.message}`
-              : "Validation report was not saved.",
-        });
-      });
-
-    return () => controller.abort();
-  }, [
-    metadata?.serverModelId,
-    validationDiagnosisReport,
-    validationResult,
-    validationState.phase,
-  ]);
 
   const stopValidationWorker = useCallback(() => {
     validationWorkerRef.current?.terminate();
@@ -1742,7 +1786,11 @@ export function ViewerShell() {
 
     if (!metadata || status.phase !== "loaded" || !effectiveDataTableData) {
       startTransition(() => {
-        setValidationHighlights(emptyValidationHighlights);
+        setValidationHighlights((current) =>
+          areValidationHighlightsEqual(current, emptyValidationHighlights)
+            ? current
+            : emptyValidationHighlights,
+        );
         setValidationResult(null);
         setValidationState({
           phase: "idle",
@@ -1763,7 +1811,11 @@ export function ViewerShell() {
 
     if (!validationPayload) {
       startTransition(() => {
-        setValidationHighlights(emptyValidationHighlights);
+        setValidationHighlights((current) =>
+          areValidationHighlightsEqual(current, emptyValidationHighlights)
+            ? current
+            : emptyValidationHighlights,
+        );
         setValidationResult(null);
         setValidationState({
           phase: "idle",
@@ -1782,7 +1834,11 @@ export function ViewerShell() {
 
     if (validationPayload.rows.length === 0) {
       startTransition(() => {
-        setValidationHighlights(emptyValidationHighlights);
+        setValidationHighlights((current) =>
+          areValidationHighlightsEqual(current, emptyValidationHighlights)
+            ? current
+            : emptyValidationHighlights,
+        );
         setValidationResult(null);
         setValidationState({
           phase: "ready",
@@ -1812,7 +1868,10 @@ export function ViewerShell() {
       }
 
       startTransition(() => {
-        setValidationHighlights(groupViewerValidationResultsBySeverity(result.results));
+        const nextHighlights = groupViewerValidationResultsBySeverity(result.results);
+        setValidationHighlights((current) =>
+          areValidationHighlightsEqual(current, nextHighlights) ? current : nextHighlights,
+        );
         setValidationResult(result);
         setValidationState({
           phase: "ready",
@@ -2447,111 +2506,6 @@ export function ViewerShell() {
     void viewportRef.current?.selectNode(localId);
   }, []);
 
-  const handleValidationDiagnosisElementSelect = useCallback(
-    async (element: ViewerValidationDiagnosisElement) => {
-      setShowProperties(true);
-      await viewportRef.current?.selectNode(element.localId);
-      await viewportRef.current?.focusSelection();
-    },
-    [],
-  );
-
-  const handleShowClauseInDataTable = useCallback((clauseId: string) => {
-    setSelectedValidationClauseId(clauseId);
-    setShowDataTable(true);
-    setShowDataTableInWindow(true);
-  }, []);
-
-  const handleUseCurrentValidationReport = useCallback(() => {
-    setRestoredValidationReport(null);
-    setActiveSavedValidationReportId(null);
-  }, []);
-
-  const handleRestoreValidationReport = useCallback(
-    async (reportId: string) => {
-      const serverModelId = metadata?.serverModelId;
-      if (!serverModelId) {
-        setValidationReportStatus({
-          phase: "error",
-          message: "Load a server model before restoring a saved report.",
-        });
-        return;
-      }
-
-      setValidationReportStatus({
-        phase: "running",
-        message: "Restoring saved validation report...",
-      });
-
-      try {
-        const record = await readServerViewerValidationReport(serverModelId, reportId);
-        setRestoredValidationReport(record.report);
-        setActiveSavedValidationReportId(record.reportId);
-        setShowValidationReport(true);
-        setValidationReportStatus({
-          phase: "success",
-          message: `Restored saved report from ${new Date(record.createdAt).toLocaleString()}.`,
-        });
-      } catch (error) {
-        setValidationReportStatus({
-          phase: "error",
-          message: error instanceof Error ? error.message : "Validation report could not be restored.",
-        });
-      }
-    },
-    [metadata?.serverModelId],
-  );
-
-  const handleExportValidationDiagnosis = useCallback(async () => {
-    if (!metadata || !activeValidationDiagnosisReport) {
-      setValidationReportStatus({
-        phase: "error",
-        message: "Load a validated model before exporting a diagnosis report.",
-      });
-      return;
-    }
-
-    setValidationReportStatus({
-      phase: "running",
-      message: "Preparing clause diagnosis Excel export...",
-    });
-
-    try {
-      const fileName = buildViewerValidationDiagnosisExcelFileName(metadata.name);
-      let result;
-      try {
-        result = metadata.serverModelId
-          ? await exportViewerValidationDiagnosisToExcelViaApi({
-              report: activeValidationDiagnosisReport,
-              fileName,
-            })
-          : await exportViewerValidationDiagnosisToExcel({
-              report: activeValidationDiagnosisReport,
-              fileName,
-            });
-      } catch (error) {
-        if (!metadata.serverModelId) {
-          throw error;
-        }
-
-        result = await exportViewerValidationDiagnosisToExcel({
-          report: activeValidationDiagnosisReport,
-          fileName,
-        });
-      }
-
-      setValidationReportStatus({
-        phase: "success",
-        message: `Exported diagnosis report to ${result.fileName}.`,
-      });
-    } catch (error) {
-      setValidationReportStatus({
-        phase: "error",
-        message: error instanceof Error ? error.message : "Diagnosis Excel export failed.",
-      });
-    }
-  }, [activeValidationDiagnosisReport, metadata]);
-
   const syncDataTableToView = useCallback(() => {
     if (!effectiveDataTableData) {
       setDataTableVisibleRowKeysInView(null);
@@ -2610,31 +2564,24 @@ export function ViewerShell() {
   }, [metadata?.sourceId]);
 
   useEffect(() => {
-    setValidationReportStatus(initialValidationReportStatus);
     setSelectedValidationClauseId("");
   }, [metadata?.sourceId]);
 
   useEffect(() => {
-    if (validationState.phase === "running" || (validationResult === null && !restoredValidationReport)) {
-      setValidationReportStatus(initialValidationReportStatus);
-    }
-  }, [restoredValidationReport, validationResult, validationState.phase]);
-
-  useEffect(() => {
-    if (!activeValidationDiagnosisReport) {
+    if (validationClauseTableViews.length === 0) {
       setSelectedValidationClauseId("");
       return;
     }
 
     if (
       !selectedValidationClauseId ||
-      activeValidationDiagnosisReport.clauses.some((clause) => clause.clauseId === selectedValidationClauseId)
+      validationClauseTableViews.some((clause) => clause.clauseId === selectedValidationClauseId)
     ) {
       return;
     }
 
     setSelectedValidationClauseId("");
-  }, [activeValidationDiagnosisReport, selectedValidationClauseId]);
+  }, [selectedValidationClauseId, validationClauseTableViews]);
 
   useEffect(() => {
     if (!isDataTableSyncedToView) {
@@ -2710,22 +2657,6 @@ export function ViewerShell() {
         >
           <Import className="h-4 w-4" />
         </HeaderActionFileButton>
-        <HeaderActionButton
-          label="Clear edits"
-          onClick={handleClearImportedEdits}
-          disabled={draftEditCount === 0 || dataTableActionStatus.phase === "running"}
-        >
-          <RotateCcw className="h-4 w-4" />
-        </HeaderActionButton>
-        <HeaderActionButton
-          label="Export IFC"
-          onClick={() => {
-            void handleExportEditedIfc();
-          }}
-          disabled={draftEditCount === 0 || dataTableActionStatus.phase === "running"}
-        >
-          <FileOutput className="h-4 w-4" />
-        </HeaderActionButton>
         <HeaderActionButton
           label="Close"
           onClick={hideDataTable}
@@ -2822,14 +2753,16 @@ export function ViewerShell() {
                 <ClipboardCheck className="h-4 w-4 shrink-0" />
                 <span>Clauses</span>
               </Link>
-              <button
-                type="button"
-                onClick={() => setShowValidationReport(true)}
-                className="inline-flex h-10 items-center gap-2 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-4 text-sm font-semibold text-[color:var(--foreground)] shadow-sm transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)]"
-              >
-                <CircleAlert className="h-4 w-4" />
-                <span>Report</span>
-              </button>
+              {hasModel && draftEditCount > 0 ? (
+                <HeaderEditsControl
+                  draftEditCount={draftEditCount}
+                  busy={dataTableActionStatus.phase === "running"}
+                  onExportIfc={() => {
+                    void handleExportEditedIfc();
+                  }}
+                  onDiscard={handleClearImportedEdits}
+                />
+              ) : null}
               <Link
                 href="/docs"
                 className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-4 text-sm font-semibold text-[color:var(--foreground)] no-underline shadow-sm transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)]"
@@ -3067,43 +3000,6 @@ export function ViewerShell() {
                   className="flex h-screen min-h-0 flex-col bg-[color:var(--panel-bg)] text-[color:var(--foreground)]"
                 >
                   {dataTableSurface}
-                </div>
-              </DetachedWindow>
-            ) : null}
-            {showValidationReport ? (
-              <DetachedWindow
-                title={`Clause Diagnosis Report${metadata ? ` · ${metadata.name}` : ""}`}
-                name="corey-validation-diagnosis"
-                width={1480}
-                height={920}
-                fullscreen
-                onClose={() => setShowValidationReport(false)}
-                onOpenBlocked={() => setShowValidationReport(false)}
-              >
-                <div data-viewer-theme={viewerTheme}>
-                  <ValidationDiagnosisReport
-                    metadata={metadata}
-                    report={activeValidationDiagnosisReport}
-                    currentReport={validationDiagnosisReport}
-                    savedReports={savedValidationReports}
-                    activeSavedReportId={activeSavedValidationReportId}
-                    validationPhase={validationState.phase}
-                    validationMessage={validationState.message}
-                    statusMessage={validationReportStatus.message}
-                    activeSelection={session.selected}
-                    onExport={() => {
-                      void handleExportValidationDiagnosis();
-                    }}
-                    onShowClauseInTable={handleShowClauseInDataTable}
-                    onUseCurrentReport={handleUseCurrentValidationReport}
-                    onRestoreReport={(reportId) => {
-                      void handleRestoreValidationReport(reportId);
-                    }}
-                    onSelectElement={(element) => {
-                      void handleValidationDiagnosisElementSelect(element);
-                    }}
-                    onClose={() => setShowValidationReport(false)}
-                  />
                 </div>
               </DetachedWindow>
             ) : null}

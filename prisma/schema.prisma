@@ -1,6 +1,6 @@
 // Prisma schema for COREY's server-side persistence (Postgres).
 // Model bytes live in MinIO (S3); this database holds model metadata and the
-// validation rules configuration, data-table drafts, and validation reports. See
+// validation rules configuration and data-table drafts. See
 // docker/docker-compose.yml for local services.
 
 generator client {
@@ -21,7 +21,6 @@ model ModelRecord {
   size              Int
   uploadedAt        DateTime                 @default(now())
   draft             DraftRecord?
-  validationReports ValidationReportRecord[]
 
   @@map("model_records")
 }
@@ -67,24 +66,4 @@ model DraftRecord {
   model     ModelRecord @relation(fields: [modelId], references: [id], onDelete: Cascade)
 
   @@map("draft_records")
-}
-
-/// Persisted clause diagnosis reports. Each validation run can create a new
-/// row; summaries are duplicated into scalar columns so the report picker can
-/// list runs without reading every JSON document.
-model ValidationReportRecord {
-  id                  String      @id @default(uuid())
-  modelId             String
-  sourceId            String
-  modelName           String?
-  flaggedElementCount Int
-  warnElementCount    Int
-  errorElementCount   Int
-  failedClauseCount   Int
-  report              Json
-  createdAt           DateTime    @default(now())
-  model               ModelRecord @relation(fields: [modelId], references: [id], onDelete: Cascade)
-
-  @@index([modelId, createdAt])
-  @@map("validation_report_records")
 }

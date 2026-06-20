@@ -1,0 +1,120 @@
+---
+title: Excel Round Trip
+description: Export IFC data to Excel, make bulk edits, import it back, and validate again.
+---
+
+import { Steps, Step } from "fumadocs-ui/components/steps";
+
+The Excel round trip is for fixing repeated IFC data issues quickly. Use COREY to
+find the problems visually, use Excel to make bulk changes, then bring the edited
+data back into COREY for another validation run.
+
+```text
+Open IFC -> validate -> export Excel -> edit values -> import Excel -> validate again
+```
+
+## When to use it
+
+Use the round trip when many elements need similar data corrections, such as:
+
+- missing property values
+- repeated classification or reference codes
+- simple numeric values that need to be filled or corrected
+- review comments or extra columns your team wants to track during checking
+
+It is not a replacement for BIM authoring. COREY helps you review and correct IFC
+data; geometry changes still belong in your modelling tool.
+
+## Step-by-step
+
+<Steps>
+
+<Step>
+
+### Open and review the IFC
+
+Open the model in COREY, inspect it in 3D, and run the checks you care about.
+Use the validation results to understand which elements need attention.
+
+</Step>
+
+<Step>
+
+### Open the data table
+
+Open the **Data table** to see model elements and their IFC data in a spreadsheet
+style view. Use filters, clause views, and selection to focus on the rows you
+need to fix.
+
+</Step>
+
+<Step>
+
+### Export Excel
+
+Click **Export Excel** in the data table. COREY downloads a workbook containing
+the indexed model data for the currently loaded IFC.
+
+</Step>
+
+<Step>
+
+### Edit values in Excel
+
+Make the bulk edits in Excel. Keep the workbook structure intact:
+
+- keep the **Data Table** sheet
+- do not delete the hidden **_corey_meta** sheet
+- do not remove or rename the technical columns `__rowKey`, `__modelId`, or
+  `__localId`
+- edit values in data columns, not the model identity columns
+
+Blank cells are ignored on import, so leave a cell blank when you do not want to
+change that value.
+
+</Step>
+
+<Step>
+
+### Import Excel
+
+Return to COREY and click **Import Excel** in the data table. Choose the edited
+workbook. COREY matches the workbook to the currently loaded model and applies the
+valid edits as draft changes.
+
+</Step>
+
+<Step>
+
+### Check the imported edits
+
+COREY shows imported edits in the data table. Use **Show edited only** to focus on
+changed rows, inspect the affected elements in 3D, and review any skipped cells or
+import messages.
+
+</Step>
+
+<Step>
+
+### Validate again
+
+Run validation again. If the issues are resolved, export an edited IFC when you
+need a corrected IFC file.
+
+</Step>
+
+</Steps>
+
+## Good habits
+
+- Export a fresh workbook after loading the model you plan to edit.
+- Import the workbook back into the same model it came from.
+- Keep one reviewer responsible for each workbook to avoid conflicting edits.
+- Validate after import instead of assuming the Excel changes fixed the clauses.
+
+## Related guides
+
+<Cards>
+  <Card title="Workflow" href="./workflow" description="See where the Excel round trip fits in a full review." />
+  <Card title="Clauses & Checks" href="./clauses" description="Set up the checks that confirm whether the edits worked." />
+</Cards>

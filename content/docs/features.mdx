@@ -3,9 +3,12 @@ title: Features
 description: A plain-language tour of what you can do with COREY.
 ---
 
-COREY helps you open a building model (an IFC file) and check that it is complete,
-correct, and consistent — all in your web browser. You don't need to install
-modelling software, and by default your files stay on your own computer.
+COREY helps teams check IFC model data for CORENET X workflows. You can open a
+model, validate it against agreed checks, export the data to Excel, batch edit
+values, import the changes, and validate again.
+
+You don't need BIM authoring software to review the model. By default, your files
+stay on your own computer.
 
 This page describes each feature in everyday terms. If you'd rather follow a
 start-to-finish example, see the [Workflow](./workflow) page.
@@ -47,17 +50,41 @@ Instead of clicking elements one at a time, open the **data table** to see many
 elements and their values side by side, like a spreadsheet.
 
 - Filter rows to find what you're looking for.
-- **Import and export Excel** to review data outside the app or share it with
-  colleagues who don't use COREY.
+- **Export to Excel** to update repeated data issues in bulk.
+- **Import edited Excel** back into COREY, then validate again.
+
+For a step-by-step guide, see [Excel Round Trip](./excel-roundtrip).
+
+<figure className="my-6">
+  <img
+    src="/docs-media/demo-workflow/04-data-table.png"
+    alt="COREY data table for Demo_RevitSampleProject.ifc with filters and IFC attribute columns."
+    className="w-full rounded-lg border border-[color:var(--viewer-border)]"
+  />
+  <figcaption className="mt-2 text-sm text-[color:var(--muted-ink)]">
+    The Revit sample model indexed into the data table for filtering, export,
+    and bulk review.
+  </figcaption>
+</figure>
 
 ## Check the model against rules
 
-This is COREY's core review capability, and how it encodes **IFC-SG** requirements
-for CORENET X submissions. You define **clauses** — named groups of checks such as
-"every beam carries its required `SGPset_Beam` data" — and run them against the
+This is COREY's core review capability. You define **clauses** — named groups of
+checks such as "every beam carries its required data" — and run them against the
 model. COREY highlights the elements that pass, warn, or fail, and produces a
-report you can act on. A starter **BCA – Column + Beam** clause template, derived
-from the IFC-SG industry mapping, is included.
+clause-filtered table view you can act on.
+
+<figure className="my-6">
+  <img
+    src="/docs-media/demo-workflow/03-validation-summary.png"
+    alt="COREY viewer showing validation highlights and six flagged elements from the starter clause template."
+    className="w-full rounded-lg border border-[color:var(--viewer-border)]"
+  />
+  <figcaption className="mt-2 text-sm text-[color:var(--muted-ink)]">
+    The Demo IfcWall template highlights warning elements directly
+    in the 3D view.
+  </figcaption>
+</figure>
 
 <Callout title="Clauses get their own page">
 Because rule-checking is the heart of the tool, it's explained in full on the
@@ -70,10 +97,10 @@ By default COREY runs entirely on your machine. If your team sets up the optiona
 backend, you can additionally:
 
 - Store models on a shared server so colleagues can open the same model.
-- Save review drafts and reports so work isn't lost between sessions.
+- Save review drafts so work isn't lost between sessions.
 - Reuse clause templates across projects.
 
 <Callout type="info">
 The optional backend is something an administrator sets up once. As a reviewer,
-you simply open COREY in your browser and use it — see [Getting Started](./getting-started).
+you simply open COREY in your browser and use it — see [Local Setup](./getting-started).
 </Callout>

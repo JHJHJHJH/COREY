@@ -11,8 +11,8 @@ browser storage. Model bytes do not leave the browser in this mode.
 ## Self-Hosted Backend Mode
 
 The backend stores model metadata in Postgres and model bytes in S3-compatible
-object storage. Server-backed models use stable model ids for drafts, validation
-reports, rule templates, Excel compute, and IFC writeback.
+object storage. Server-backed models use stable model ids for drafts, rule
+templates, Excel compute, and IFC writeback.
 
 ## Main Boundaries
 

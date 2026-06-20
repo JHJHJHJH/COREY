@@ -3,29 +3,25 @@ title: Clauses & Checks
 description: How COREY's rule-based model checking works, in plain language.
 ---
 
-Checking a model means asking questions like "do all beams carry their required
-`SGPset_Beam` data?" or "are all door widths within the allowed range?". COREY lets
-you write those questions down as **clauses** and **rules**, then runs them across
-the whole model and tells you what passed, what to watch, and what failed.
+Checking a model means asking practical questions: "is the required data filled
+in?", "is this value allowed?", or "is this number within range?". COREY stores
+those checks as **clauses** and runs them across the whole IFC model.
 
-This is how COREY encodes **IFC-SG** requirements. The IFC-SG
-[industry Excel mapping file](https://info.corenet.gov.sg/ifc-sg/templates--apps-and-more/ifc-sg-excel-mapping-file)
-lists, per building component, the IFC entity, property set, and properties a model
-must carry for CORENET X submission. Each of those requirements becomes a **rule**;
-related rules are grouped into a **clause**. COREY ships a starter
-**BCA – Column + Beam** template built from that mapping, and you can extend it or
-import your own.
+For CORENET X workflows, clauses can represent IFC-SG data requirements from an
+Excel mapping or from your team's own review standard. COREY then shows which
+elements pass, need attention, or fail, so the team can fix issues before
+submission.
 
 ## The building blocks
 
 <Cards>
   <Card title="Rule" description="One specific check — e.g. 'a wall's fire rating must be filled in'." />
-  <Card title="Clause" description="A named group of related rules — e.g. 'Fire safety requirements'." />
-  <Card title="Check result" description="What COREY reports per element: OK, Warning, or Error." />
+  <Card title="Clause" description="A named group of related rules — e.g. 'Wall data requirements'." />
+  <Card title="Check result" description="What COREY shows per element: OK, Warning, or Error." />
 </Cards>
 
 A **clause** is just a titled folder of **rules**. Grouping rules into clauses
-keeps your checks organised and makes reports easier to read ("3 elements failed
+keeps your checks organised and makes results easier to read ("3 elements failed
 the *Fire safety* clause").
 
 ## Anatomy of a rule
@@ -86,28 +82,55 @@ Run this against a model and COREY checks every wall. A wall with no name shows 
 **Error**; a wall named correctly but with a `Reference` of `WALL-Z` shows a
 **Warning**; a wall that satisfies both is **OK**.
 
+### Demo wall template
+
+The bundled <code>Demo IfcWall</code> template is a small
+clause set used for demos and smoke checks. In the Revit sample model it checks
+element identity and wall fire-rating metadata.
+
+<figure className="my-6">
+  <img
+    src="/docs-media/demo-workflow/02-starter-clauses.png"
+    alt="Demo IfcWall template loaded in the COREY clauses workspace."
+    className="w-full rounded-lg border border-[color:var(--viewer-border)]"
+  />
+  <figcaption className="mt-2 text-sm text-[color:var(--muted-ink)]">
+    The demo wall template loaded from the clause workspace quick presets.
+  </figcaption>
+</figure>
+
 ## Reading the results
 
 After you run validation, COREY:
 
 - **Highlights** elements in the 3D viewport — one colour for warnings, another for
   errors — so problems are easy to spot.
-- Lists the **failed clauses**, how many elements each one affected, and the
-  specific rules that tripped.
-- Lets you click a result to **focus the matching element** in the view.
+- Lets the data table filter by **failed clause**, so you can review the affected
+  elements in bulk.
+- Keeps the selected element synced with the 3D viewport and properties panel.
+
+<figure className="my-6">
+  <img
+    src="/docs-media/demo-workflow/03-validation-summary.png"
+    alt="COREY viewer showing validation highlights for fire rating metadata warnings."
+    className="w-full rounded-lg border border-[color:var(--viewer-border)]"
+  />
+  <figcaption className="mt-2 text-sm text-[color:var(--muted-ink)]">
+    A validation run against the demo model highlights six flagged wall elements.
+  </figcaption>
+</figure>
 
 ## Saving and reusing clauses
 
-You can **export** your clauses to a file (`corey-clauses.json`) and **import**
-them later or on another project — so a team can agree on one standard set of
-checks and apply it everywhere. With the optional backend, clause sets can also be
-saved as shared templates.
+You can **export** your clauses and **import** them later or on another project.
+This lets a team agree on one standard set of checks and apply it consistently.
+With the optional backend, clause sets can also be saved as shared templates.
 
 <Callout title="For developers">
 Clauses are stored as a small JSON document (a `version` plus a `clauses` array,
 each clause holding `rules`). The repository includes a starter file,
-`sample-rules.json`, and the format is validated on import. The exact schema and
-evaluation logic live in `src/features/rules`.
+`public/resources/starter-essential-elements.json`, and the format is validated
+on import. The exact schema and evaluation logic live in `src/features/rules`.
 </Callout>
 
 ## Where to go next

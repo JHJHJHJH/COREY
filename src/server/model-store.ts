@@ -94,7 +94,7 @@ class MinioPostgresModelStore implements ModelStore {
 
   async delete(modelId: string): Promise<boolean> {
     // Remove metadata first — it's the source of truth for the catalog, and the
-    // cascade clears the model's drafts and validation reports. A failed object
+    // cascade clears the model's draft. A failed object
     // delete then only leaks bytes (invisible to callers), never the reverse.
     try {
       await prisma.modelRecord.delete({ where: { id: modelId } });

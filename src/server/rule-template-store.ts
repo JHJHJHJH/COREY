@@ -43,8 +43,8 @@ const RESOURCE_DIR = join(process.cwd(), "public", "resources");
 const BUILT_IN_RULE_TEMPLATES = [
   {
     id: "starter-essential-elements",
-    name: "Starter Essential Elements",
-    description: "Basic required-field checks for common IFC element categories.",
+    name: "Demo IfcWall",
+    description: "Demo wall checks for basic IFC wall identity and fire-rating metadata.",
     sourceKind: "starter",
     configFileName: "starter-essential-elements.json",
     sourceFileName: null,
@@ -106,29 +106,27 @@ async function readOptionalSourceText(fileName: string | null) {
 }
 
 async function seedBuiltInRuleTemplates() {
-  const existingRows = await prisma.ruleTemplateRecord.findMany({
-    where: { id: { in: BUILT_IN_RULE_TEMPLATES.map((template) => template.id) } },
-    select: { id: true },
-  });
-  const existingIds = new Set(existingRows.map((row) => row.id));
-  const missingTemplates = BUILT_IN_RULE_TEMPLATES.filter((template) => !existingIds.has(template.id));
-
-  for (const template of missingTemplates) {
+  for (const template of BUILT_IN_RULE_TEMPLATES) {
     const config = await readValidationConfig(template.configFileName);
     const sourceText = await readOptionalSourceText(template.sourceFileName);
+    const templateData = {
+      name: template.name,
+      description: template.description,
+      sourceKind: template.sourceKind,
+      sourceFileName: template.sourceFileName,
+      sourceText,
+      config: config as unknown as Prisma.InputJsonValue,
+      ruleCount: countRules(config),
+      sortOrder: template.sortOrder,
+    };
 
-    await prisma.ruleTemplateRecord.create({
-      data: {
+    await prisma.ruleTemplateRecord.upsert({
+      where: { id: template.id },
+      create: {
         id: template.id,
-        name: template.name,
-        description: template.description,
-        sourceKind: template.sourceKind,
-        sourceFileName: template.sourceFileName,
-        sourceText,
-        config: config as unknown as Prisma.InputJsonValue,
-        ruleCount: countRules(config),
-        sortOrder: template.sortOrder,
+        ...templateData,
       },
+      update: templateData,
     });
   }
 }

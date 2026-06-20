@@ -3,14 +3,12 @@
 import {
   DATA_TABLE_EXCEL_MIME_TYPE,
   buildViewerDataTableExcelBytes,
-  buildViewerValidationDiagnosisExcelBytes,
   parseViewerDataTableExcelBytes,
 } from "@/features/viewer/lib/data-table-excel-core";
 import type {
   ViewerDataTableData,
   ViewerDataTableImportReport,
   ViewerDataTableDraft,
-  ViewerValidationDiagnosisReport,
 } from "@/features/viewer/types";
 
 async function saveBytes(bytes: Uint8Array, fileName: string, type: string) {
@@ -44,15 +42,6 @@ export async function exportViewerDataTableToExcel(input: {
   return { fileName: input.fileName };
 }
 
-export async function exportViewerValidationDiagnosisToExcel(input: {
-  report: ViewerValidationDiagnosisReport;
-  fileName: string;
-}) {
-  const bytes = await buildViewerValidationDiagnosisExcelBytes({ report: input.report });
-  await saveBytes(bytes, input.fileName, DATA_TABLE_EXCEL_MIME_TYPE);
-  return { fileName: input.fileName };
-}
-
 export async function importViewerDataTableFromExcel(input: {
   file: File;
   sourceId: string;
@@ -76,9 +65,4 @@ export function buildViewerDataTableExcelFileName(name: string) {
 export function buildViewerDataTableIfcFileName(name: string) {
   const base = name.replace(/\.[^.]+$/, "") || "model";
   return `${base}-edited.ifc`;
-}
-
-export function buildViewerValidationDiagnosisExcelFileName(name: string) {
-  const base = name.replace(/\.[^.]+$/, "") || "model";
-  return `${base}-validation-diagnosis.xlsx`;
 }

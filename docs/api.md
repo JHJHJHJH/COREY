@@ -14,15 +14,11 @@ The API reference is intended for self-hosted COREY deployments.
 - `GET /api/models/[id]/file`: download model bytes.
 - `POST /api/models/[id]/writeback`: export edited IFC bytes for a server model.
 
-## Drafts And Reports
+## Drafts
 
 - `GET /api/models/[id]/draft`
 - `PUT /api/models/[id]/draft`
 - `DELETE /api/models/[id]/draft`
-- `GET /api/models/[id]/validation-reports`
-- `POST /api/models/[id]/validation-reports`
-- `GET /api/models/[id]/validation-reports/[reportId]`
-- `DELETE /api/models/[id]/validation-reports/[reportId]`
 
 ## Rules And Compute
 
@@ -35,4 +31,3 @@ The API reference is intended for self-hosted COREY deployments.
 - `GET /api/rule-templates/[id]?format=source`
 - `POST /api/data-table/excel/export`
 - `POST /api/data-table/excel/import`
-- `POST /api/validation-diagnosis/excel/export`

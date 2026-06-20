@@ -33,7 +33,7 @@ The pattern to follow already existed: `POST /api/rules/evaluate`
 | 1 | **Model storage + remote loading** | Remote sources | ✅ Done — bytes in MinIO, metadata in Postgres |
 | 2 | **Validation rules config** | Persistence / multi-user | ✅ Done — Postgres-backed, localStorage cache |
 | 3 | **Data-table edits (drafts)** | Persistence / multi-user | ✅ Done — Postgres-backed, localStorage cache |
-| 4 | **Validation reports** | Persistence | ✅ Done — persisted per server model run, list/restore UI |
+| 4 | **Saved validation runs** | Persistence | Removed from current scope — validation results stay session-local |
 | 5 | **Rule templates + industry mapping** | Shared catalogs | ✅ Done — Postgres-backed `/api/rule-templates` catalog |
 | 6 | **Validation evaluation** | Compute offload | ✅ Done — API-first for server-backed and large validation runs |
 | 7 | **IFC→Fragments / indexing / writeback / Excel** | Compute offload | ✅ Done — server jobs for Excel + server-model IFC writeback; Fragments/indexing remain client-bound |
@@ -86,23 +86,12 @@ shell entry points.
 - **Types:** `ModelMetadata.serverModelId` distinguishes server-backed models
   from local-only `sourceId` values.
 
-## Item 4 — Validation reports (done)
+## Item 4 — Saved validation runs (removed)
 
-- **Server:** `src/server/validation-report-store.ts` persists
-  `ViewerValidationDiagnosisReport` JSON rows in Postgres and duplicates summary
-  counts into scalar columns for fast listing.
-- **Routes:** `GET`/`POST /api/models/[id]/validation-reports` list and create
-  reports; `GET`/`DELETE /api/models/[id]/validation-reports/[reportId]` restore
-  or remove one run.
-- **Schema:** `ValidationReportRecord` is keyed by its own id and related to
-  `ModelRecord` with cascade delete.
-- **Client:** successful validation runs for server-backed models auto-save the
-  current diagnosis report. The report window lists saved runs and can restore a
-  prior report without rerunning validation. Local-only models keep reports
-  ephemeral.
-- **Types/helpers:** `ViewerValidationReportSummary` and
-  `ViewerValidationReportRecord` describe persisted runs; the shared
-  `parseStoredViewerValidationDiagnosisReport` parser validates server payloads.
+- Validation runs now stay in active viewer state only.
+- The removed server persistence surface had stored prior validation runs per
+  model; the current product keeps the local-first review loop focused on live
+  highlights and data-table clause filtering.
 
 ## Item 5 — Rule templates + industry mapping (done)
 
@@ -127,7 +116,7 @@ shell entry points.
   shared isomorphic evaluator from `src/features/rules/lib/validation.ts`.
 - **Client:** `src/features/rules/lib/validation-api.ts` wraps the evaluation API
   and validates the returned `ViewerValidationRunResult` before the shell commits
-  highlights or report state.
+  highlights or validation state.
 - **Shell:** validation now chooses the API as the primary path for server-backed
   models and for large local payloads (1,000+ validation rows). Smaller local runs
   still use the browser worker first to preserve the responsive local-first flow.
@@ -141,16 +130,15 @@ shell entry points.
   writeback now have API routes:
   - `POST /api/data-table/excel/export`
   - `POST /api/data-table/excel/import`
-  - `POST /api/validation-diagnosis/excel/export`
   - `POST /api/models/[id]/writeback`
 - **Shared compute cores:** `src/features/viewer/lib/data-table-excel-core.ts`
   contains server-safe ExcelJS workbook builders/parsers, and
   `src/features/viewer/lib/ifc-writeback-core.ts` contains server-safe `web-ifc`
   writeback logic. Existing browser utilities remain available for local-only
   files and fallback paths.
-- **Client:** server-backed models use the API path first for Excel import/export,
-  diagnosis Excel export, and edited IFC export. Local-only models keep the
-  client path so COREY remains usable without the backend. If an API job fails,
+- **Client:** server-backed models use the API path first for Excel import/export
+  and edited IFC export. Local-only models keep the client path so COREY remains
+  usable without the backend. If an API job fails,
   the shell falls back to the existing browser implementation where the local
   source bytes are available.
 - **Runtime-bound pieces:** IFC→Fragments conversion and data-table indexing stay
@@ -182,9 +170,6 @@ shell entry points.
 - Draft round-trip: `PUT → GET → DELETE /api/models/[id]/draft` persists and
   clears a model-keyed draft; localStorage remains an offline cache for the same
   `modelId`.
-- Validation report round-trip:
-  `POST → GET list → GET detail /api/models/[id]/validation-reports` persists
-  and restores a model-keyed diagnosis report.
 - Rule-template catalog:
   `GET /api/rule-templates` seeds and lists the built-ins;
   `GET /api/rule-templates/starter-essential-elements?format=config` returns raw
@@ -194,8 +179,8 @@ shell entry points.
   large validation payloads use the API path first, with worker fallback.
 - Excel/writeback compute:
   `POST /api/data-table/excel/export` returns a workbook stream;
-  `POST /api/data-table/excel/import` parses that workbook back to a draft/report;
-  `POST /api/validation-diagnosis/excel/export` returns a diagnosis workbook;
+  `POST /api/data-table/excel/import` parses that workbook back to a draft and
+  import summary;
   `POST /api/models/[id]/writeback` returns an edited IFC stream for a server model.
 - Still to do manually: click through the rules screen and the server-models menu in
   the browser (the `/verify` or `run` skill).

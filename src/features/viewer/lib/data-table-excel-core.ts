@@ -11,7 +11,6 @@ import type {
   ViewerDataTableEditableValueKind,
   ViewerDataTableImportReport,
   ViewerDataTableIssue,
-  ViewerValidationDiagnosisReport,
 } from "@/features/viewer/types";
 
 export const DATA_TABLE_EXCEL_MIME_TYPE =
@@ -20,8 +19,6 @@ export const DATA_TABLE_EXCEL_MIME_TYPE =
 const VIEWER_DATA_TABLE_WORKBOOK_VERSION = 2;
 const DATA_SHEET_NAME = "Data Table";
 const META_SHEET_NAME = "_corey_meta";
-const DIAGNOSIS_CLAUSES_SHEET_NAME = "Clause Summary";
-const DIAGNOSIS_ELEMENTS_SHEET_NAME = "Element Failures";
 const TECHNICAL_COLUMNS = ["__rowKey", "__modelId", "__localId"] as const;
 const IMPORTED_COLUMN_FALLBACK_GROUP = "Excel Import";
 const WORKBOOK_GROUP_DELIMITER = "|||";
@@ -395,35 +392,6 @@ function buildImportedColumnFromMeta(metaColumn: ColumnMetaRow): ViewerDataTable
   };
 }
 
-function buildDiagnosisClauseRows(report: ViewerValidationDiagnosisReport) {
-  return [
-    ["Clause", "Severity", "FailingElements", "FailedChecks"],
-    ...report.clauses.map((clause) => [
-      clause.clauseTitle,
-      clause.result,
-      clause.elementCount,
-      clause.ruleDescriptions.join(" | "),
-    ]),
-  ];
-}
-
-function buildDiagnosisElementRows(report: ViewerValidationDiagnosisReport) {
-  return [
-    ["Clause", "Severity", "Element", "IFCType", "GlobalId", "LocalId", "FailedChecks"],
-    ...report.clauses.flatMap((clause) =>
-      clause.elements.map((element) => [
-        clause.clauseTitle,
-        element.result,
-        element.label,
-        element.ifcType ?? "",
-        element.globalId ?? "",
-        element.localId,
-        element.failedRuleDescriptions.join(" | "),
-      ]),
-    ),
-  ];
-}
-
 function verifyWorkbook(workbook: Workbook, requiredSheets: string[], context: string) {
   for (const sheetName of requiredSheets) {
     if (!workbook.getWorksheet(sheetName)) {
@@ -459,26 +427,6 @@ export async function buildViewerDataTableExcelBytes(input: {
   const bytes = toUint8Array(await workbook.xlsx.writeBuffer({ useSharedStrings: true }));
   const verificationWorkbook = await loadWorkbook(bytes);
   verifyWorkbook(verificationWorkbook, [DATA_SHEET_NAME, META_SHEET_NAME], "Exported workbook");
-
-  return bytes;
-}
-
-export async function buildViewerValidationDiagnosisExcelBytes(input: {
-  report: ViewerValidationDiagnosisReport;
-}) {
-  const workbook = await createWorkbook();
-  const clauseSheet = workbook.addWorksheet(DIAGNOSIS_CLAUSES_SHEET_NAME);
-  const elementSheet = workbook.addWorksheet(DIAGNOSIS_ELEMENTS_SHEET_NAME);
-  appendRows(clauseSheet, buildDiagnosisClauseRows(input.report));
-  appendRows(elementSheet, buildDiagnosisElementRows(input.report));
-
-  const bytes = toUint8Array(await workbook.xlsx.writeBuffer({ useSharedStrings: true }));
-  const verificationWorkbook = await loadWorkbook(bytes);
-  verifyWorkbook(
-    verificationWorkbook,
-    [DIAGNOSIS_CLAUSES_SHEET_NAME, DIAGNOSIS_ELEMENTS_SHEET_NAME],
-    "Exported diagnosis workbook",
-  );
 
   return bytes;
 }

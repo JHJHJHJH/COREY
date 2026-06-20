@@ -4,7 +4,7 @@
 
 # COREY
 
-### Review your building models (IFC) right in the browser — no installs, no cloud account.
+### Review IFC model data visually, configure validation clauses, fix it in Excel, validate again.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
@@ -16,12 +16,19 @@
 
 ## 🤔 What is COREY?
 
-COREY is a tool for **opening, exploring, and checking IFC building models** — the
-standard file format produced by BIM software like Revit, ArchiCAD, and Tekla.
+COREY helps project teams review IFC model data for **CORENET X** workflows. It
+was built for a world where BIM submissions carry heavier data requirements, and
+teams need a faster way to check and correct those requirements before submission.
 
-You drag in an `.ifc` file and immediately get a **3D view** of the building, can
-click parts to read their properties, run **automatic rule checks** for compliance
-or quality, and export findings to **Excel**.
+The workflow is simple:
+
+```text
+Open IFC -> validate against checking clauses -> export to Excel
+-> batch edit -> import back into COREY -> validate again
+```
+
+You can see the building in 3D, click problem elements, inspect their data, and
+use familiar Excel workflows to fix repeated data gaps.
 
 > 💡 **No account, no upload required.** By default everything runs locally on your
 > machine — your model files never leave your computer.
@@ -35,7 +42,8 @@ or quality, and export findings to **Excel**.
 | 🔍 | Click any element to inspect its **properties** and place in the building tree |
 | 👁️ | **Hide, isolate, slice (section), and measure** parts of the model |
 | 📊 | Review model data in tables, with **Excel import/export** |
-| ✅ | Run **rule-based checks** and get validation & diagnosis reports |
+| ✏️ | Batch update IFC data through an Excel round trip |
+| ✅ | Run **rule-based checks** and highlight validation issues |
 | 🗄️ | *(Optional)* Save models to your own server with a database & file storage |
 
 ---

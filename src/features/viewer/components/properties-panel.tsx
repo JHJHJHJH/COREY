@@ -23,21 +23,6 @@ type ValidationPopupPayload = {
   result: ViewerValidationMatch["result"] | ViewerValidationSummary["result"];
 };
 
-function validationLabel(validation: ViewerValidationMatch | null) {
-  if (!validation) {
-    return null;
-  }
-
-  switch (validation.result) {
-    case "ok":
-      return "OK";
-    case "warn":
-      return "Warn";
-    case "error":
-      return "Error";
-  }
-}
-
 function rowClass(value: ViewerInspectionValue) {
   if (value.validation?.result === "ok") {
     return "bg-[color:var(--success-bg)]";
@@ -68,22 +53,6 @@ function valueClass(value: ViewerInspectionValue) {
   }
 
   return "text-[color:var(--foreground)]";
-}
-
-function badgeClass(value: ViewerInspectionValue) {
-  if (value.validation?.result === "ok") {
-    return "border-[color:var(--success-border)] bg-[color:var(--success-bg)] text-[color:var(--success-fg)]";
-  }
-
-  if (value.validation?.result === "warn") {
-    return "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
-  }
-
-  if (value.validation?.result === "error") {
-    return "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]";
-  }
-
-  return "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)]";
 }
 
 function summaryFlagClass(result: ViewerValidationMatch["result"]) {
@@ -219,7 +188,6 @@ function InspectionValueRow({
   value: ViewerInspectionValue;
   onOpenDetails: (payload: Omit<ValidationPopupPayload, "selectionKey">) => void;
 }) {
-  const badge = validationLabel(value.validation);
   const failedClauseCount = value.validation?.clauseFailures.length ?? 0;
   const validation = value.validation;
 
@@ -236,13 +204,6 @@ function InspectionValueRow({
         >
           {value.text}
         </div>
-        {badge ? (
-          <span
-            className={`inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${badgeClass(value)}`}
-          >
-            {badge}
-          </span>
-        ) : null}
         {failedClauseCount > 0 && validation ? (
           <ValidationDetailsButton
             title={failedClauseCount === 1 ? "View 1 failed clause" : `View ${failedClauseCount} failed clauses`}

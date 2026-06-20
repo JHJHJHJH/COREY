@@ -1,6 +1,6 @@
 ---
 title: Introduction
-description: What COREY is, who it's for, and the problem it solves.
+description: A simple guide to what COREY does and who it helps.
 ---
 
 <div className="flex items-center justify-center gap-4 py-3">
@@ -15,40 +15,40 @@ description: What COREY is, who it's for, and the problem it solves.
   </span>
 </div>
 
-COREY is a browser-based tool for **reviewing building models**. You open an IFC
-file — the standard format exported by BIM software like Revit, ArchiCAD, and
-Tekla — and COREY lets you explore it in 3D, inspect every element's information,
-and automatically check it against your own rules.
+COREY helps project teams check IFC building models before submission. It was
+built for CORENET X workflows, where models need to carry more complete BIM data
+than many teams are used to providing.
+
+The idea is simple:
+
+1. Open an IFC model.
+2. Validate the data against pre-configured checking clauses.
+3. Export the model data to Excel.
+4. Batch edit missing or incorrect values.
+5. Import the Excel file back into COREY and validate again.
+
+COREY keeps the review visual. You can see the model in 3D, click problem
+elements, inspect their data, and fix repeated issues using familiar spreadsheet
+workflows.
 
 ## The problem it solves
 
-In Singapore, building models submitted to the authorities must follow
-**IFC-SG** — the national BIM data standard used for regulatory submissions through
-**CORENET X**. IFC-SG defines, for each building component, the exact data a model
-must carry: which IFC entities, property sets (`SGPset_*`), and properties are
-required by agencies such as BCA, URA, and others. These requirements are published
-as an [industry **Excel mapping file**](https://info.corenet.gov.sg/ifc-sg/templates--apps-and-more/ifc-sg-excel-mapping-file).
+CORENET X raises the amount of BIM data that must be present in an IFC model.
+Before submission, teams need to confirm that required information is present,
+correct, and consistently filled in across many elements.
 
-The hard part is **conformance**: before a model can be submitted, someone has to
-confirm every relevant element actually carries the required, correctly-filled
-data. Doing that by hand — reading the mapping spreadsheet and checking elements
-one by one — is slow, inconsistent, and easy to get wrong. Different teams interpret
-the same requirements differently, and missing or malformed data is often caught
-only after a submission is rejected.
-
-COREY closes that gap. It turns the IFC-SG data requirements into **clauses** you
-can run across an entire model in seconds, then shows you exactly which elements
-pass, warn, or fail — so you can fix problems *before* submission rather than after
-rejection. COREY ships with a starter **BCA – Column + Beam** clause template
-derived from the IFC-SG industry mapping, and you can author or import your own.
+Checking that manually is slow. Reviewing a spreadsheet alone makes it hard to
+see where an issue is in the actual model. COREY brings both sides together:
+visual model review for understanding problems, and Excel import/export for fast
+bulk correction.
 
 ## Who it's for
 
 <Cards>
-  <Card title="Submission teams" description="Check a model against IFC-SG requirements and fix gaps before submitting through CORENET X." />
-  <Card title="BIM coordinators" description="Turn the IFC-SG mapping into reusable clause sets and apply the same standard across projects." />
-  <Card title="Reviewers & checkers" description="Open a model, run an agreed set of checks, and produce a report — no modelling software needed." />
-  <Card title="Anyone receiving an IFC" description="Quickly look inside a model and understand what information it carries." />
+  <Card title="Submission teams" description="Check IFC data before a CORENET X submission and reduce avoidable rework." />
+  <Card title="BIM coordinators" description="Run the same checks across projects and fix repeated data gaps in bulk." />
+  <Card title="Reviewers" description="Open a model, see problem elements, and filter failed clauses without BIM authoring software." />
+  <Card title="Model authors" description="Use Excel to update many IFC data values at once, then confirm the fixes in context." />
 </Cards>
 
 ## What makes it easy to adopt
@@ -56,8 +56,9 @@ derived from the IFC-SG industry mapping, and you can author or import your own.
 - **Runs in your browser.** Nothing to install for everyday use.
 - **Private by default.** Your files are read on your own machine and aren't
   uploaded anywhere, unless your team sets up the optional shared backend.
-- **No BIM authoring tool required.** COREY is for *reviewing* models, not creating
-  them.
+- **Works with Excel.** Export, edit, re-import, and validate again.
+- **No BIM authoring tool required.** COREY is for reviewing and correcting model
+  data, not modelling geometry.
 
 <Callout title="New here?">
 Head to the [Quick Start](./quick-start) to get COREY running, then follow the
@@ -67,7 +68,7 @@ Head to the [Quick Start](./quick-start) to get COREY running, then follow the
 ## How the docs are organised
 
 <Cards>
-  <Card title="Getting Started" description="Get COREY running — Quick Start for everyone, plus a local setup for developers." />
-  <Card title="User Guides" description="Features, the review workflow, and how clause-based checking works." />
-  <Card title="Developer" description="Architecture, APIs, runtime assets, deployment, and contributing." />
+  <Card title="Getting Started" description="Get COREY running with the Quick Start." />
+  <Card title="User Guides" description="Features, workflow, Excel round trip, and clause-based checking." />
+  <Card title="Developer" description="Local setup, architecture, APIs, deployment, and contributing." />
 </Cards>

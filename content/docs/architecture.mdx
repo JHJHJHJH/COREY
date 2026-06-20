@@ -14,8 +14,8 @@ storage. Model bytes do not leave the browser in this mode.
 ## Self-Hosted Backend Mode
 
 The backend stores model metadata in Postgres and model bytes in S3-compatible
-object storage. Server-backed models use stable model ids for drafts, validation
-reports, rule templates, Excel compute, and IFC writeback.
+object storage. Server-backed models use stable model ids for drafts, rule
+templates, Excel compute, and IFC writeback.
 
 ## Main Boundaries
 
@@ -25,7 +25,7 @@ reports, rule templates, Excel compute, and IFC writeback.
 - `src/features/viewer/lib/model-source.ts`: local and remote model-loading abstraction
 - `src/features/viewer/lib/ifc-data.ts`: tree, selection, category, table, and formatting helpers
 - `src/features/rules/*`: validation clause UI, provider, worker, and shared evaluator
-- `src/server/*`: Prisma, S3, model, draft, report, and rule-template stores
+- `src/server/*`: Prisma, S3, model, draft, and rule-template stores
 - `src/app/api/*`: supported self-hosted API routes
 
 ## Design Rules
