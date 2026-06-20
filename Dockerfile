@@ -54,6 +54,13 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl \
   && rm -rf /var/lib/apt/lists/*
 
+# Install Prisma CLI for pre-deploy migrations
+RUN npm install --no-audit --no-fund -g prisma@7.8.0 dotenv
+
+# Copy Prisma schema, migrations, and config for pre-deploy command
+COPY --chown=node:node --from=builder /app/prisma ./prisma
+COPY --chown=node:node --from=builder /app/prisma.config.ts ./prisma.config.ts
+
 COPY --chown=node:node --from=builder /app/.next/standalone ./
 COPY --chown=node:node --from=builder /app/.next/static ./.next/static
 COPY --chown=node:node --from=builder /app/public ./public
