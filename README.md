@@ -10,6 +10,10 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
 [![Runs in Docker](https://img.shields.io/badge/Runs%20in-Docker-blue?logo=docker&logoColor=white)](#-easy-setup-recommended)
 
+**[🚀 Try COREY online](https://coreyifc.vercel.app)** · **[📖 Docs](https://coreyifc.vercel.app/docs)**
+
+<video src="https://github.com/JHJHJHJH/Corey/raw/development/public/docs-media/demo-workflow/corey-demo.mp4" controls muted width="800"></video>
+
 </div>
 
 ---
@@ -30,8 +34,9 @@ Open IFC -> validate against checking clauses -> export to Excel
 You can see the building in 3D, click problem elements, inspect their data, and
 use familiar Excel workflows to fix repeated data gaps.
 
-> 💡 **No account, no upload required.** By default everything runs locally on your
-> machine — your model files never leave your computer.
+> 💡 **No account, no upload required.** Try it instantly at
+> **[coreyifc.vercel.app](https://coreyifc.vercel.app)** — by default everything runs
+> locally in your browser, so your model files never leave your computer.
 
 ## ✨ What can it do?
 
@@ -164,8 +169,9 @@ authentication, and rate limits there.
 <details>
 <summary><strong>Documentation, assets & verification</strong></summary>
 
-**Docs** are built with Fumadocs and served at `http://localhost:4000/docs`.
-Content lives in `content/docs`. After editing:
+**Docs** are built with Fumadocs and published at
+**[coreyifc.vercel.app/docs](https://coreyifc.vercel.app/docs)** (served locally at
+`http://localhost:4000/docs`). Content lives in `content/docs`. After editing:
 
 ```bash
 pnpm docs:generate
