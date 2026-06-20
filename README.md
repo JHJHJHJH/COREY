@@ -12,7 +12,11 @@
 
 **[🚀 Try COREY online](https://coreyifc.vercel.app)** · **[📖 Docs](https://coreyifc.vercel.app/docs)**
 
-<video src="https://github.com/JHJHJHJH/Corey/raw/development/public/docs-media/demo-workflow/corey-demo.mp4" controls muted width="800"></video>
+<a href="https://github.com/JHJHJHJH/Corey/raw/development/public/docs-media/demo-workflow/corey-demo.mp4">
+  <img src="public/docs-media/demo-workflow/corey-demo-preview.gif" alt="Animated preview of the COREY IFC review workflow" width="800" />
+</a>
+
+[Watch the full demo video](https://github.com/JHJHJHJH/Corey/raw/development/public/docs-media/demo-workflow/corey-demo.mp4)
 
 </div>
 

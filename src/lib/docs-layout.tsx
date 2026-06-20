@@ -21,7 +21,7 @@ export function baseOptions(): BaseLayoutProps {
       ),
       url: "/",
     },
-    githubUrl: "https://github.com/JHJHJHJH/Corey",
+    githubUrl: "https://github.com/JHJHJHJH/COREY",
     themeSwitch: {
       enabled: false,
     },
