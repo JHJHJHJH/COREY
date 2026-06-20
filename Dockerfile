@@ -53,7 +53,7 @@ WORKDIR /app
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl \
   && rm -rf /var/lib/apt/lists/*
-
+RUN npm install --no-audit --no-fund prisma@7.8.0 dotenv
 # Copy Prisma schema, migrations, and config for pre-deploy command
 COPY --chown=node:node --from=builder /app/prisma ./prisma
 COPY --chown=node:node --from=builder /app/prisma.config.ts ./prisma.config.ts
