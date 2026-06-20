@@ -16,7 +16,7 @@ RUN apt-get update \
 
 FROM base AS tools
 
-RUN npm install --no-audit --no-fund prisma@7.8.0 dotenv
+RUN npm install --no-audit --no-fund -g prisma@7.8.0 dotenv
 
 COPY prisma.config.ts ./
 COPY prisma ./prisma
@@ -53,6 +53,10 @@ WORKDIR /app
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl \
   && rm -rf /var/lib/apt/lists/*
+
+# Copy Prisma schema, migrations, and config for pre-deploy command
+COPY --chown=node:node --from=builder /app/prisma ./prisma
+COPY --chown=node:node --from=builder /app/prisma.config.ts ./prisma.config.ts
 
 COPY --chown=node:node --from=builder /app/.next/standalone ./
 COPY --chown=node:node --from=builder /app/.next/static ./.next/static

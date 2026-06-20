@@ -12,9 +12,9 @@
 
 **[🚀 Try COREY online](https://coreyifc.vercel.app)** · **[📖 Docs](https://coreyifc.vercel.app/docs)**
 
-<video src="https://raw.githubusercontent.com/JHJHJHJH/Corey/development/public/docs-media/demo-workflow/corey-demo-v2.mp4" controls muted playsinline width="800"></video>
+<video src="https://github.com/user-attachments/assets/eb3162f5-1aa9-489b-b0a7-f8d6d3b4a2e2" controls muted playsinline width="800"></video>
 
-[Watch the full demo video](https://raw.githubusercontent.com/JHJHJHJH/Corey/development/public/docs-media/demo-workflow/corey-demo-v2.mp4)
+[Watch the full demo video](https://github.com/user-attachments/assets/eb3162f5-1aa9-489b-b0a7-f8d6d3b4a2e2)
 
 </div>
 
