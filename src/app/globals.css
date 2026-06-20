@@ -230,6 +230,7 @@
 }
 
 html {
+  zoom: 0.75;
   background:
     radial-gradient(120% 80% at 50% -10%, rgba(10, 92, 255, 0.1), transparent 46%),
     linear-gradient(180deg, #ffffff 0%, #e9f1ff 100%);
