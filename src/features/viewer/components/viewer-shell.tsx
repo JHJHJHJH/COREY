@@ -37,6 +37,7 @@ import {
 } from "@/features/rules/lib/validation";
 import { evaluateViewerValidationViaApi } from "@/features/rules/lib/validation-api";
 import { useViewerRules } from "@/features/rules/rules-provider";
+import { RulesModal } from "@/features/rules/components/rules-modal";
 import { StatusBar, type StatusSegment, type StatusTone } from "@/components/status-bar/status-bar";
 import { InspectorDetailList, JsonInspectorTabs } from "@/components/status-bar/status-inspector";
 import { DataTablePanel } from "@/features/viewer/components/data-table-panel";
@@ -956,6 +957,7 @@ export function ViewerShell() {
   const [showProperties, setShowProperties] = useState(true);
   const [showDataTable, setShowDataTable] = useState(false);
   const [showDataTableInWindow, setShowDataTableInWindow] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
   const [treeDrawerWidth, setTreeDrawerWidth] = useState(DEFAULT_TREE_DRAWER_WIDTH);
   const [propertiesDrawerWidth, setPropertiesDrawerWidth] = useState(
     DEFAULT_PROPERTIES_DRAWER_WIDTH,
@@ -1944,7 +1946,9 @@ export function ViewerShell() {
       validationAbortControllerRef.current = controller;
 
       startTransition(() => {
-        setValidationResult(null);
+        setValidationResult((current) =>
+          current?.sourceId === validationPayload.sourceId ? current : null,
+        );
         setValidationState({
           phase: "running",
           mode: "api",
@@ -1993,7 +1997,9 @@ export function ViewerShell() {
       stopValidationRequest();
 
       startTransition(() => {
-        setValidationResult(null);
+        setValidationResult((current) =>
+          current?.sourceId === validationPayload.sourceId ? current : null,
+        );
         setValidationState({
           phase: "running",
           mode: "worker",
@@ -2777,13 +2783,14 @@ export function ViewerShell() {
                 onChange={handleFileChange}
                 className="hidden"
               />
-              <Link
-                href="/clause"
+              <button
+                type="button"
+                onClick={() => setShowRulesModal(true)}
                 className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-4 text-sm font-semibold text-[color:var(--foreground)] no-underline shadow-sm transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)]"
               >
                 <ClipboardCheck className="h-4 w-4 shrink-0" />
                 <span>Clauses</span>
-              </Link>
+              </button>
               {hasModel && draftEditCount > 0 ? (
                 <HeaderEditsControl
                   draftEditCount={draftEditCount}
@@ -3063,6 +3070,7 @@ export function ViewerShell() {
           </button>
         </div>
       ) : null}
+      {showRulesModal ? <RulesModal onClose={() => setShowRulesModal(false)} /> : null}
     </div>
   );
 }

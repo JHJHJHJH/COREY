@@ -77,9 +77,27 @@ function getServerSnapshot() {
   return emptyConfigSnapshot;
 }
 
+function notifyRulesStoreListeners() {
+  for (const listener of rulesStoreListeners) {
+    listener();
+  }
+}
+
 function subscribeToRulesStore(listener: () => void) {
   rulesStoreListeners.add(listener);
+  const handleStorage = (event: StorageEvent) => {
+    if (
+      event.storageArea === window.localStorage &&
+      (event.key === VIEWER_VALIDATION_STORAGE_KEY || event.key === null)
+    ) {
+      listener();
+    }
+  };
+
+  window.addEventListener("storage", handleStorage);
+
   return () => {
+    window.removeEventListener("storage", handleStorage);
     rulesStoreListeners.delete(listener);
   };
 }
@@ -91,9 +109,7 @@ function writeCache(config: ViewerValidationConfig): ViewerValidationConfig {
   if (typeof window !== "undefined") {
     window.localStorage.setItem(VIEWER_VALIDATION_STORAGE_KEY, cachedConfigText);
   }
-  for (const listener of rulesStoreListeners) {
-    listener();
-  }
+  notifyRulesStoreListeners();
   return sanitized;
 }
 
