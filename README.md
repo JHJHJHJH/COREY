@@ -4,7 +4,7 @@
 
 # COREY
 
-### Review IFC model data visually, configure validation clauses, fix it in Excel, validate again.
+### Review IFC model data visually, configure clauses & rules, validate, repeat.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
@@ -12,11 +12,9 @@
 
 **[🚀 Try COREY online](https://coreyifc.vercel.app)** · **[📖 Docs](https://coreyifc.vercel.app/docs)**
 
-<a href="https://github.com/JHJHJHJH/Corey/raw/development/public/docs-media/demo-workflow/corey-demo.mp4">
-  <img src="public/docs-media/demo-workflow/corey-demo-preview.gif" alt="Animated preview of the COREY IFC review workflow" width="800" />
-</a>
+<video src="https://raw.githubusercontent.com/JHJHJHJH/Corey/development/public/docs-media/demo-workflow/corey-demo-v2.mp4" controls muted playsinline width="800"></video>
 
-[Watch the full demo video](https://github.com/JHJHJHJH/Corey/raw/development/public/docs-media/demo-workflow/corey-demo.mp4)
+[Watch the full demo video](https://raw.githubusercontent.com/JHJHJHJH/Corey/development/public/docs-media/demo-workflow/corey-demo-v2.mp4)
 
 </div>
 
