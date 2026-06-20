@@ -951,7 +951,7 @@ export function ViewerShell() {
   );
   const [validationResult, setValidationResult] = useState<ViewerValidationRunResult | null>(null);
   const [selectedValidationClauseId, setSelectedValidationClauseId] = useState("");
-  const [viewerTheme, setViewerTheme] = useState<ViewerTheme>("dark");
+  const [viewerTheme, setViewerTheme] = useState<ViewerTheme>("light");
   const [viewerThemeLoaded, setViewerThemeLoaded] = useState(false);
   const [showTree, setShowTree] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
