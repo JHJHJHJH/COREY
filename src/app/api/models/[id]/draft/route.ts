@@ -3,15 +3,19 @@ import {
   getViewerDataTableDraft,
   saveViewerDataTableDraft,
 } from "@/server/data-table-draft-store";
+import { getUserIdOrResponse } from "@/server/identity";
 
 type ModelDraftRouteContext = {
   params: Promise<{ id: string }>;
 };
 
-export async function GET(_request: Request, { params }: ModelDraftRouteContext) {
+export async function GET(request: Request, { params }: ModelDraftRouteContext) {
   try {
+    const userId = getUserIdOrResponse(request);
+    if (userId instanceof Response) return userId;
+
     const { id } = await params;
-    const result = await getViewerDataTableDraft(id);
+    const result = await getViewerDataTableDraft(id, userId);
 
     if (!result.modelFound) {
       return Response.json({ error: "Model not found." }, { status: 404 });
@@ -26,9 +30,12 @@ export async function GET(_request: Request, { params }: ModelDraftRouteContext)
 
 export async function PUT(request: Request, { params }: ModelDraftRouteContext) {
   try {
+    const userId = getUserIdOrResponse(request);
+    if (userId instanceof Response) return userId;
+
     const { id } = await params;
     const body = (await request.json()) as unknown;
-    const result = await saveViewerDataTableDraft(id, body);
+    const result = await saveViewerDataTableDraft(id, userId, body);
 
     if (!result.modelFound) {
       return Response.json({ error: "Model not found." }, { status: 404 });
@@ -41,10 +48,13 @@ export async function PUT(request: Request, { params }: ModelDraftRouteContext) 
   }
 }
 
-export async function DELETE(_request: Request, { params }: ModelDraftRouteContext) {
+export async function DELETE(request: Request, { params }: ModelDraftRouteContext) {
   try {
+    const userId = getUserIdOrResponse(request);
+    if (userId instanceof Response) return userId;
+
     const { id } = await params;
-    const result = await clearViewerDataTableDraft(id);
+    const result = await clearViewerDataTableDraft(id, userId);
 
     if (!result.modelFound) {
       return Response.json({ error: "Model not found." }, { status: 404 });

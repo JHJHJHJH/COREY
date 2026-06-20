@@ -15,11 +15,11 @@ import { getS3Bucket, getS3Client, modelObjectKey } from "@/server/s3";
  * interface is the contract — swap either backend without touching callers.
  */
 export interface ModelStore {
-  save(input: { name: string; bytes: Uint8Array }): Promise<ServerModelSummary>;
-  list(): Promise<ServerModelSummary[]>;
-  getMetadata(modelId: string): Promise<ServerModelSummary | null>;
-  getBytes(modelId: string): Promise<Uint8Array | null>;
-  delete(modelId: string): Promise<boolean>;
+  save(input: { name: string; bytes: Uint8Array; ownerId: string }): Promise<ServerModelSummary>;
+  list(ownerId: string): Promise<ServerModelSummary[]>;
+  getMetadata(modelId: string, ownerId: string): Promise<ServerModelSummary | null>;
+  getBytes(modelId: string, ownerId: string): Promise<Uint8Array | null>;
+  delete(modelId: string, ownerId: string): Promise<boolean>;
 }
 
 type ModelRecordRow = {
@@ -39,7 +39,15 @@ function toSummary(record: ModelRecordRow): ServerModelSummary {
 }
 
 class MinioPostgresModelStore implements ModelStore {
-  async save({ name, bytes }: { name: string; bytes: Uint8Array }): Promise<ServerModelSummary> {
+  async save({
+    name,
+    bytes,
+    ownerId,
+  }: {
+    name: string;
+    bytes: Uint8Array;
+    ownerId: string;
+  }): Promise<ServerModelSummary> {
     const modelId = randomUUID();
 
     // Write bytes first; only record metadata once the object is durable.
@@ -54,7 +62,7 @@ class MinioPostgresModelStore implements ModelStore {
 
     try {
       const record = await prisma.modelRecord.create({
-        data: { id: modelId, name, size: bytes.byteLength },
+        data: { id: modelId, ownerId, name, size: bytes.byteLength },
       });
       return toSummary(record);
     } catch (error) {
@@ -66,19 +74,26 @@ class MinioPostgresModelStore implements ModelStore {
     }
   }
 
-  async list(): Promise<ServerModelSummary[]> {
+  async list(ownerId: string): Promise<ServerModelSummary[]> {
     const records = await prisma.modelRecord.findMany({
+      where: { ownerId },
       orderBy: { uploadedAt: "desc" },
     });
     return records.map(toSummary);
   }
 
-  async getMetadata(modelId: string): Promise<ServerModelSummary | null> {
-    const record = await prisma.modelRecord.findUnique({ where: { id: modelId } });
+  async getMetadata(modelId: string, ownerId: string): Promise<ServerModelSummary | null> {
+    const record = await prisma.modelRecord.findFirst({ where: { id: modelId, ownerId } });
     return record ? toSummary(record) : null;
   }
 
-  async getBytes(modelId: string): Promise<Uint8Array | null> {
+  async getBytes(modelId: string, ownerId: string): Promise<Uint8Array | null> {
+    // Enforce ownership at the metadata layer before touching object storage.
+    const owns = await prisma.modelRecord.count({ where: { id: modelId, ownerId } });
+    if (owns === 0) {
+      return null;
+    }
+
     try {
       const response = await getS3Client().send(
         new GetObjectCommand({ Bucket: getS3Bucket(), Key: modelObjectKey(modelId) }),
@@ -92,14 +107,14 @@ class MinioPostgresModelStore implements ModelStore {
     }
   }
 
-  async delete(modelId: string): Promise<boolean> {
+  async delete(modelId: string, ownerId: string): Promise<boolean> {
     // Remove metadata first — it's the source of truth for the catalog, and the
     // cascade clears the model's draft. A failed object
     // delete then only leaks bytes (invisible to callers), never the reverse.
-    try {
-      await prisma.modelRecord.delete({ where: { id: modelId } });
-    } catch {
-      // Record already gone (or never existed) — nothing to delete.
+    // Scope by ownerId so a non-owner can't delete another user's model.
+    const { count } = await prisma.modelRecord.deleteMany({ where: { id: modelId, ownerId } });
+    if (count === 0) {
+      // Record already gone, never existed, or owned by someone else.
       return false;
     }
 

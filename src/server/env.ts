@@ -1,4 +1,7 @@
 const DEFAULT_MAX_MODEL_BYTES = 250 * 1024 * 1024;
+const DEFAULT_USER_HEADER = "x-forwarded-user";
+const DEFAULT_USER_ID = "local";
+const TRUTHY_VALUES = new Set(["1", "true", "yes", "on"]);
 
 export type BackendEnv = {
   databaseUrl: string;
@@ -78,4 +81,28 @@ export function isS3StorageConfigured(env: S3Env): boolean {
 
 export function getMaxModelBytes() {
   return readPositiveIntegerEnv("COREY_MAX_MODEL_BYTES", DEFAULT_MAX_MODEL_BYTES);
+}
+
+// Lower-cased name of the request header a trusted reverse proxy injects to
+// identify the user. The proxy MUST strip any client-supplied value and set its
+// own, or the identity is spoofable.
+export function getUserHeaderName() {
+  const raw = process.env.COREY_USER_HEADER;
+  const value = raw?.trim().toLowerCase();
+  return value && value.length > 0 ? value : DEFAULT_USER_HEADER;
+}
+
+// User id assumed when the identity header is absent — keeps single-tenant /
+// local-dev (no proxy) working as one implicit user.
+export function getDefaultUserId() {
+  const raw = process.env.COREY_DEFAULT_USER;
+  const value = raw?.trim();
+  return value && value.length > 0 ? value : DEFAULT_USER_ID;
+}
+
+// When true, requests without an identity header are rejected (401) instead of
+// falling back to the default user.
+export function isUserRequired() {
+  const raw = process.env.COREY_REQUIRE_USER;
+  return raw ? TRUTHY_VALUES.has(raw.trim().toLowerCase()) : false;
 }

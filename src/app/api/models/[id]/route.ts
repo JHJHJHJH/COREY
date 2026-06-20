@@ -1,9 +1,13 @@
+import { getUserIdOrResponse } from "@/server/identity";
 import { getModelStore } from "@/server/model-store";
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const userId = getUserIdOrResponse(request);
+  if (userId instanceof Response) return userId;
+
   const { id } = await params;
   const store = getModelStore();
-  const summary = await store.getMetadata(id);
+  const summary = await store.getMetadata(id, userId);
 
   if (!summary) {
     return Response.json({ error: "Model not found." }, { status: 404 });
@@ -12,10 +16,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   return Response.json(summary);
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const userId = getUserIdOrResponse(request);
+  if (userId instanceof Response) return userId;
+
   const { id } = await params;
   const store = getModelStore();
-  const deleted = await store.delete(id);
+  const deleted = await store.delete(id, userId);
 
   if (!deleted) {
     return Response.json({ error: "Model not found." }, { status: 404 });

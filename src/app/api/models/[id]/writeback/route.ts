@@ -1,5 +1,6 @@
 import { buildEditedIfcBytes } from "@/features/viewer/lib/ifc-writeback-core";
 import type { ViewerDataTableData, ViewerDataTableIssue } from "@/features/viewer/types";
+import { getUserIdOrResponse } from "@/server/identity";
 import { getModelStore } from "@/server/model-store";
 
 type ModelWritebackRouteContext = {
@@ -16,6 +17,9 @@ function encodeIssues(issues: ViewerDataTableIssue[]) {
 
 export async function POST(request: Request, { params }: ModelWritebackRouteContext) {
   try {
+    const userId = getUserIdOrResponse(request);
+    if (userId instanceof Response) return userId;
+
     const { id } = await params;
     const body = (await request.json()) as {
       data?: ViewerDataTableData;
@@ -28,8 +32,8 @@ export async function POST(request: Request, { params }: ModelWritebackRouteCont
 
     const store = getModelStore();
     const [metadata, modelBytes] = await Promise.all([
-      store.getMetadata(id),
-      store.getBytes(id),
+      store.getMetadata(id, userId),
+      store.getBytes(id, userId),
     ]);
 
     if (!metadata || !modelBytes) {

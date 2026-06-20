@@ -16,7 +16,10 @@ RUN apt-get update \
 
 FROM base AS tools
 
-RUN npm install --no-audit --no-fund -g prisma@7.8.0 dotenv
+# Install locally (not -g) so prisma.config.ts's `import "prisma/config"` and
+# `import "dotenv/config"` resolve from /app/node_modules; `npx prisma` picks up
+# the local binary.
+RUN npm install --no-audit --no-fund prisma@7.8.0 dotenv
 
 COPY prisma.config.ts ./
 COPY prisma ./prisma

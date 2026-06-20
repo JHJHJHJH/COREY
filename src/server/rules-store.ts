@@ -6,12 +6,9 @@ import type { ViewerValidationConfig } from "@/features/viewer/types";
 import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/server/db";
 
-// The app has a single logical rules document today; key it by a stable id so a
-// per-project/per-user split can slot in later without a schema change.
-const RULE_CONFIG_ID = "default";
-
-export async function getRuleConfig(): Promise<ViewerValidationConfig> {
-  const row = await prisma.ruleConfig.findUnique({ where: { id: RULE_CONFIG_ID } });
+// Each user has one rules document, keyed by their user id.
+export async function getRuleConfig(userId: string): Promise<ViewerValidationConfig> {
+  const row = await prisma.ruleConfig.findUnique({ where: { id: userId } });
   if (!row) {
     return createEmptyViewerValidationConfig();
   }
@@ -24,14 +21,17 @@ export async function getRuleConfig(): Promise<ViewerValidationConfig> {
   }
 }
 
-export async function saveRuleConfig(input: unknown): Promise<ViewerValidationConfig> {
+export async function saveRuleConfig(
+  userId: string,
+  input: unknown,
+): Promise<ViewerValidationConfig> {
   // Parses, migrates legacy shapes, and sanitizes in one step.
   const config = parseStoredViewerValidationConfig(input);
   const json = config as unknown as Prisma.InputJsonValue;
 
   await prisma.ruleConfig.upsert({
-    where: { id: RULE_CONFIG_ID },
-    create: { id: RULE_CONFIG_ID, config: json },
+    where: { id: userId },
+    create: { id: userId, config: json },
     update: { config: json },
   });
 

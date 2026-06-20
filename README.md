@@ -165,10 +165,22 @@ Copy `.env.example` to `.env` for local development. Required backend variables:
 - `S3_SECRET_KEY`
 - `S3_BUCKET`
 - `COREY_MAX_MODEL_BYTES`
+- `COREY_USER_HEADER` (optional, default `x-forwarded-user`)
+- `COREY_DEFAULT_USER` (optional, default `local`)
+- `COREY_REQUIRE_USER` (optional, default `false`)
 
-The backend is intended for single-tenant / self-hosted deployments. Put a reverse
-proxy in front of it on public networks, and configure payload limits, TLS,
-authentication, and rate limits there.
+The backend is intended for self-hosted deployments. Put a reverse proxy in front
+of it on public networks, and configure payload limits, TLS, authentication, and
+rate limits there.
+
+**Multi-user.** Server-persisted rules, models, and data-table drafts are private
+per user. The user is identified from a request header (`COREY_USER_HEADER`,
+default `x-forwarded-user`) that your reverse proxy injects after authenticating
+the request. **The proxy must strip any client-supplied value of that header and
+set its own** — otherwise a client can impersonate any user. When the header is
+absent (e.g. local development with no proxy), all requests resolve to
+`COREY_DEFAULT_USER` (default `local`), preserving single-tenant behaviour; set
+`COREY_REQUIRE_USER=true` to reject unauthenticated requests instead.
 
 </details>
 

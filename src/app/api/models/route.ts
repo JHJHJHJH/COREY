@@ -1,5 +1,6 @@
 import { getModelStore } from "@/server/model-store";
 import { getMaxModelBytes } from "@/server/env";
+import { getUserIdOrResponse } from "@/server/identity";
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -7,15 +8,21 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const userId = getUserIdOrResponse(request);
+  if (userId instanceof Response) return userId;
+
   const store = getModelStore();
-  const models = await store.list();
+  const models = await store.list(userId);
 
   return Response.json({ models });
 }
 
 export async function POST(request: Request) {
   try {
+    const userId = getUserIdOrResponse(request);
+    if (userId instanceof Response) return userId;
+
     const headerName = request.headers.get("x-model-name");
     const name = headerName ? decodeURIComponent(headerName) : "model.ifc";
     const maxModelBytes = getMaxModelBytes();
@@ -45,7 +52,7 @@ export async function POST(request: Request) {
     }
 
     const store = getModelStore();
-    const summary = await store.save({ name, bytes });
+    const summary = await store.save({ name, bytes, ownerId: userId });
 
     return Response.json(summary, { status: 201 });
   } catch (error) {

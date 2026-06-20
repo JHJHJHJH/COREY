@@ -11,13 +11,18 @@ type DraftStoreResult = {
   draft: ViewerDataTableDraft | null;
 };
 
-async function modelRecordExists(modelId: string) {
-  const count = await prisma.modelRecord.count({ where: { id: modelId } });
+// Drafts are private through their model: a draft is only reachable by the user
+// that owns the underlying model record.
+async function modelOwnedBy(modelId: string, ownerId: string) {
+  const count = await prisma.modelRecord.count({ where: { id: modelId, ownerId } });
   return count > 0;
 }
 
-export async function getViewerDataTableDraft(modelId: string): Promise<DraftStoreResult> {
-  if (!(await modelRecordExists(modelId))) {
+export async function getViewerDataTableDraft(
+  modelId: string,
+  ownerId: string,
+): Promise<DraftStoreResult> {
+  if (!(await modelOwnedBy(modelId, ownerId))) {
     return { modelFound: false, draft: null };
   }
 
@@ -40,9 +45,10 @@ export async function getViewerDataTableDraft(modelId: string): Promise<DraftSto
 
 export async function saveViewerDataTableDraft(
   modelId: string,
+  ownerId: string,
   input: unknown,
 ): Promise<DraftStoreResult> {
-  if (!(await modelRecordExists(modelId))) {
+  if (!(await modelOwnedBy(modelId, ownerId))) {
     return { modelFound: false, draft: null };
   }
 
@@ -63,8 +69,8 @@ export async function saveViewerDataTableDraft(
   return { modelFound: true, draft };
 }
 
-export async function clearViewerDataTableDraft(modelId: string) {
-  if (!(await modelRecordExists(modelId))) {
+export async function clearViewerDataTableDraft(modelId: string, ownerId: string) {
+  if (!(await modelOwnedBy(modelId, ownerId))) {
     return { modelFound: false as const };
   }
 
