@@ -10,7 +10,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
 [![Runs in Docker](https://img.shields.io/badge/Runs%20in-Docker-blue?logo=docker&logoColor=white)](#-easy-setup-recommended)
 
-**[🚀 Try COREY online](https://coreyifc.vercel.app)** · **[📖 Docs](https://coreyifc.vercel.app/docs)**
+**[🚀 Try COREY online](https://coreyifc.com)** · **[📖 Docs](https://coreyifc.com/docs)**
 
 <video src="https://github.com/user-attachments/assets/eb3162f5-1aa9-489b-b0a7-f8d6d3b4a2e2" controls muted playsinline width="800"></video>
 
@@ -28,16 +28,20 @@ teams need a faster way to check and correct those requirements before submissio
 
 The workflow is simple:
 
-```text
-Open IFC -> validate against checking clauses -> export to Excel
--> batch edit -> import back into COREY -> validate again
+```mermaid
+flowchart LR
+  open["Open IFC"] --> validate["Validate against checking clauses"]
+  validate --> export["Export to Excel"]
+  export --> edit["Batch edit"]
+  edit --> import["Import back into COREY"]
+  import --> revalidate["Validate again"]
 ```
 
 You can see the building in 3D, click problem elements, inspect their data, and
 use familiar Excel workflows to fix repeated data gaps.
 
 > 💡 **No account, no upload required.** Try it instantly at
-> **[coreyifc.vercel.app](https://coreyifc.vercel.app)** — by default everything runs
+> **[coreyifc.com](https://coreyifc.com)** — by default everything runs
 > locally in your browser, so your model files never leave your computer.
 
 ## ✨ What can it do?
@@ -172,7 +176,7 @@ authentication, and rate limits there.
 <summary><strong>Documentation, assets & verification</strong></summary>
 
 **Docs** are built with Fumadocs and published at
-**[coreyifc.vercel.app/docs](https://coreyifc.vercel.app/docs)** (served locally at
+**[coreyifc.com/docs](https://coreyifc.com/docs)** (served locally at
 `http://localhost:4000/docs`). Content lives in `content/docs`. After editing:
 
 ```bash
