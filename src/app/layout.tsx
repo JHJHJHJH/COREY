@@ -16,7 +16,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="min-h-full antialiased" suppressHydrationWarning>
-      <body className="flex min-h-screen flex-col">
+      <body className="flex min-h-[calc(100vh/0.75)] flex-col">
         <ViewerRulesProvider>
           {children}
           {modal}
