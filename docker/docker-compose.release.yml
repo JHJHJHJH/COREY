@@ -1,10 +1,13 @@
-name: corey-no-minio
+name: corey-release
 
 services:
   app:
+    image: corey:release-with-docs
     build:
       context: ..
       target: runner
+      labels:
+        org.opencontainers.image.description: "COREY release package with bundled docs"
     restart: unless-stopped
     environment:
       DATABASE_URL: ${DOCKER_DATABASE_URL:-postgresql://corey:corey@postgres:5432/corey?schema=public}
@@ -57,7 +60,7 @@ services:
     ports:
       - "${POSTGRES_PORT:-5433}:5432"
     volumes:
-      - postgres-no-minio-data:/var/lib/postgresql/data
+      - postgres-release-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -65,4 +68,4 @@ services:
       retries: 10
 
 volumes:
-  postgres-no-minio-data:
+  postgres-release-data:

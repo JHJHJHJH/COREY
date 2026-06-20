@@ -15,6 +15,8 @@ export type S3Env = Pick<
   "s3Endpoint" | "s3Region" | "s3AccessKey" | "s3SecretKey" | "s3Bucket"
 >;
 
+const DISABLED_S3_VALUES = new Set(["disabled", "false", "none", "off"]);
+
 function readRequiredEnv(name: string) {
   const value = process.env[name];
   if (!value || value.trim().length === 0) {
@@ -58,6 +60,20 @@ export function getS3Env(): S3Env {
     s3SecretKey: readRequiredEnv("S3_SECRET_KEY"),
     s3Bucket: readRequiredEnv("S3_BUCKET"),
   };
+}
+
+function isDisabledS3Value(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return DISABLED_S3_VALUES.has(normalized) || normalized.includes("disabled.invalid");
+}
+
+export function isS3StorageConfigured(env: S3Env): boolean {
+  return ![
+    env.s3Endpoint,
+    env.s3AccessKey,
+    env.s3SecretKey,
+    env.s3Bucket,
+  ].some(isDisabledS3Value);
 }
 
 export function getMaxModelBytes() {

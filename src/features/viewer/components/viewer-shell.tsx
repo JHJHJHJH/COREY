@@ -6,6 +6,7 @@ import {
   ClipboardCheck,
   FileOutput,
   FileSpreadsheet,
+  FolderOpen,
   Import,
   Moon,
   PanelLeftOpen,
@@ -218,6 +219,7 @@ const initialValidationState: ViewerValidationState = {
 };
 
 type DrawerSide = "left" | "right";
+type ServerStorageStatus = "checking" | "available" | "unavailable";
 type ViewerTheme = "light" | "dark";
 
 type DrawerDragState = {
@@ -894,6 +896,8 @@ export function ViewerShell() {
     message: string;
     sticky?: boolean;
   } | null>(null);
+  const [serverStorageStatus, setServerStorageStatus] =
+    useState<ServerStorageStatus>("checking");
   const validationWorkerRef = useRef<Worker | null>(null);
   const validationAbortControllerRef = useRef<AbortController | null>(null);
   const validationRunIdRef = useRef(0);
@@ -972,6 +976,15 @@ export function ViewerShell() {
   const hasModel = Boolean(metadata && status.phase === "loaded");
   const isDataTableDetached = showDataTable && showDataTableInWindow;
   const activeDrawerResizeSide = drawerDragState?.side ?? null;
+  const serverStorageAvailable = serverStorageStatus === "available";
+  const openFileLabel = serverStorageStatus === "unavailable" ? "Open" : "Upload";
+  const OpenFileIcon = openFileLabel === "Open" ? FolderOpen : Upload;
+  const filesDisabledReason =
+    serverStorageStatus === "checking"
+      ? "Checking server storage..."
+      : serverStorageStatus === "unavailable"
+        ? "Files are disabled because S3 storage is not configured."
+        : undefined;
   const toggleViewerTheme = useCallback(() => {
     setViewerTheme((current) => (current === "dark" ? "light" : "dark"));
   }, []);
@@ -1203,6 +1216,20 @@ export function ViewerShell() {
       setViewerTheme(persistedTheme);
     }
     setViewerThemeLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void isServerStorageAvailable().then((available) => {
+      if (!cancelled) {
+        setServerStorageStatus(available ? "available" : "unavailable");
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -2129,7 +2156,9 @@ export function ViewerShell() {
       return;
     }
 
-    if (!(await isServerStorageAvailable())) {
+    const storageAvailable = await isServerStorageAvailable();
+    setServerStorageStatus(storageAvailable ? "available" : "unavailable");
+    if (!storageAvailable) {
       setServerNotice({
         tone: "info",
         message:
@@ -2725,11 +2754,13 @@ export function ViewerShell() {
                     onClick={openFilePicker}
                     className="inline-flex h-10 items-center gap-2 rounded-[var(--r-control)] bg-[color:var(--accent)] px-4 text-sm font-semibold text-[color:var(--accent-ink)] shadow-sm transition hover:bg-[color:var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)] focus-visible:ring-offset-2"
                   >
-                    <Upload className="h-4 w-4" />
-                    <span>Upload</span>
+                    <OpenFileIcon className="h-4 w-4" />
+                    <span>{openFileLabel}</span>
                   </button>
                   <ServerModelsMenu
                     theme={viewerTheme}
+                    disabled={!serverStorageAvailable}
+                    disabledReason={filesDisabledReason}
                     onLoadModel={(modelId) => {
                       void loadModelById(modelId);
                     }}
@@ -2862,10 +2893,13 @@ export function ViewerShell() {
                     activeTool={session.activeTool}
                     validationHighlights={validationHighlights}
                     onOpenFile={openFilePicker}
+                    openFileLabel={openFileLabel}
                     filesButton={
                       <ServerModelsMenu
                         variant="empty-state"
                         theme={viewerTheme}
+                        disabled={!serverStorageAvailable}
+                        disabledReason={filesDisabledReason}
                         onLoadModel={(modelId) => {
                           void loadModelById(modelId);
                         }}

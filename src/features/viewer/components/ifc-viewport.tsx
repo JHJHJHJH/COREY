@@ -7,7 +7,7 @@ import {
   useImperativeHandle,
   useRef,
 } from "react";
-import { Upload } from "lucide-react";
+import { FolderOpen, Upload } from "lucide-react";
 import Image from "next/image";
 import * as OBC from "@thatopen/components";
 import * as OBF from "@thatopen/components-front";
@@ -55,6 +55,7 @@ type IfcViewportProps = {
   onSelectionDetailsChange: (details: ViewerSelectionDetails) => void;
   onDebugDataChange: (data: ViewerDebugData) => void;
   onOpenFile?: () => void;
+  openFileLabel?: string;
   filesButton?: React.ReactNode;
 };
 
@@ -164,10 +165,12 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
     onStatusChange,
     onDebugDataChange,
     onOpenFile,
+    openFileLabel = "Upload",
     filesButton,
   },
   ref,
 ) {
+  const OpenFileIcon = openFileLabel === "Open" ? FolderOpen : Upload;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const runtimeRef = useRef<ViewerRuntime | null>(null);
   const activeToolRef = useRef<ViewerTool>(activeTool);
@@ -1154,8 +1157,8 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
                     onClick={onOpenFile}
                     className="pointer-events-auto inline-flex h-10 items-center gap-2 rounded-[var(--r-control)] bg-[color:var(--accent)] px-4 text-sm font-semibold text-[color:var(--accent-ink)] shadow-sm transition hover:bg-[color:var(--accent-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)] focus-visible:ring-offset-2"
                   >
-                    <Upload className="h-4 w-4" />
-                    <span>Upload</span>
+                    <OpenFileIcon className="h-4 w-4" />
+                    <span>{openFileLabel}</span>
                   </button>
                 ) : null}
                 {filesButton}

@@ -124,11 +124,11 @@ docker compose --env-file .env -f docker/docker-compose.dev.yml up -d --force-re
 <details>
 <summary><strong>Run without MinIO (Postgres only)</strong></summary>
 
-Use the no-MinIO Compose file when you only need the local-first viewer plus
+Use the release Compose file when you only need the local-first viewer plus
 Postgres-backed routes, or when object storage is provided separately:
 
 ```bash
-docker compose --env-file .env -f docker/docker-compose.no-minio.yml up --build
+docker compose --env-file .env -f docker/docker-compose.release.yml up --build
 ```
 
 This stack starts the app, Postgres, and migrations only. It sets placeholder S3
@@ -137,7 +137,7 @@ upload/download still requires real S3-compatible storage. To avoid a local port
 conflict, set `APP_PORT` for the host binding:
 
 ```bash
-APP_PORT=4010 docker compose --env-file .env -f docker/docker-compose.no-minio.yml up --build
+APP_PORT=4010 docker compose --env-file .env -f docker/docker-compose.release.yml up --build
 ```
 
 </details>

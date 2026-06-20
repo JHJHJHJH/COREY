@@ -1,5 +1,19 @@
 import type { ServerModelSummary } from "@/features/viewer/types";
 
+type HealthResponse = {
+  status?: string;
+  backend?: {
+    modelStorageAvailable?: boolean;
+    s3Bucket?: string;
+  };
+};
+
+const DISABLED_BUCKET_VALUES = new Set(["disabled", "false", "none", "off"]);
+
+function isDisabledBucketName(value: string | undefined) {
+  return !value || DISABLED_BUCKET_VALUES.has(value.trim().toLowerCase());
+}
+
 /**
  * Client helpers for the server model catalog (`/api/models`).
  *
@@ -10,8 +24,9 @@ import type { ServerModelSummary } from "@/features/viewer/types";
 /**
  * Reports whether server-side model storage (MinIO + Postgres) is configured.
  *
- * `/api/health` builds the backend env, which throws (→ 503) when the S3 or
- * database settings are missing. A clean `ok` means uploads will persist.
+ * `/api/health` builds the backend env, which throws (→ 503) when settings are
+ * missing. Release builds can intentionally use placeholder S3 values, so the
+ * response also carries `modelStorageAvailable`.
  */
 export async function isServerStorageAvailable(): Promise<boolean> {
   try {
@@ -19,8 +34,14 @@ export async function isServerStorageAvailable(): Promise<boolean> {
     if (!response.ok) {
       return false;
     }
-    const body = (await response.json().catch(() => null)) as { status?: string } | null;
-    return body?.status === "ok";
+    const body = (await response.json().catch(() => null)) as HealthResponse | null;
+    if (body?.status !== "ok") {
+      return false;
+    }
+    if (typeof body.backend?.modelStorageAvailable === "boolean") {
+      return body.backend.modelStorageAvailable;
+    }
+    return !isDisabledBucketName(body.backend?.s3Bucket);
   } catch {
     return false;
   }

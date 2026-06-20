@@ -29,14 +29,12 @@ services:
       - ..:/app
       - dev-node-modules:/app/node_modules
       - dev-next-cache:/app/.next
-      - dev-fumadocs-source:/app/.source
       - dev-pnpm-store:/pnpm/store
       - dev-prisma-generated:/app/src/generated/prisma
     command: >
       sh -c "pnpm config set store-dir /pnpm/store &&
-      CI=true pnpm install --frozen-lockfile &&
+      CI=true pnpm install --frozen-lockfile --ignore-scripts &&
       pnpm prisma generate &&
-      pnpm docs:generate &&
       pnpm db:deploy &&
       pnpm dev --webpack"
     healthcheck:
@@ -106,7 +104,6 @@ services:
 volumes:
   dev-node-modules:
   dev-next-cache:
-  dev-fumadocs-source:
   dev-pnpm-store:
   dev-prisma-generated:
   dev-postgres-data:

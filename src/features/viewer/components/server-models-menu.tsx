@@ -9,6 +9,7 @@ import type { ServerModelSummary } from "@/features/viewer/types";
 type ServerModelsMenuProps = {
   onLoadModel: (modelId: string) => void;
   disabled?: boolean;
+  disabledReason?: string;
   /**
    * `header` renders the bordered toolbar button; `empty-state` renders the
    * call-to-action used on the start screen. Both open the same Files dialog.
@@ -31,6 +32,7 @@ function formatSize(bytes: number) {
 export function ServerModelsMenu({
   onLoadModel,
   disabled,
+  disabledReason,
   variant = "header",
   theme,
 }: ServerModelsMenuProps) {
@@ -47,6 +49,12 @@ export function ServerModelsMenu({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (disabled) {
+      setOpen(false);
+    }
+  }, [disabled]);
 
   const confirmDelete = useCallback(async (modelId: string) => {
     setDeletingId(modelId);
@@ -261,6 +269,8 @@ export function ServerModelsMenu({
         type="button"
         onClick={() => setOpen(true)}
         disabled={disabled}
+        title={disabled ? disabledReason : undefined}
+        aria-label={disabled && disabledReason ? `Files (${disabledReason})` : "Files"}
         className="inline-flex h-10 items-center gap-2 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-4 text-sm font-semibold text-[color:var(--foreground)] shadow-sm transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
       >
         <FolderOpen className="h-4 w-4" />
