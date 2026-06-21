@@ -132,6 +132,14 @@ function nextCheckForKind(kind: ViewerValidationCheck["kind"]): ViewerValidation
     return { kind: "enum", allowedValues: ["Allowed Value"] };
   }
 
+  if (kind === "pattern") {
+    return { kind: "pattern", pattern: "", caseInsensitive: false };
+  }
+
+  if (kind === "boolean") {
+    return { kind: "boolean", expected: true };
+  }
+
   return { kind: "numberRange", min: null, max: null };
 }
 
@@ -152,6 +160,12 @@ function describeConstraint(check: ViewerValidationCheck) {
   }
   if (check.kind === "enum") {
     return `enum ${check.allowedValues.join(" ")}`;
+  }
+  if (check.kind === "pattern") {
+    return `pattern ${check.pattern}`;
+  }
+  if (check.kind === "boolean") {
+    return `boolean ${check.expected ? "true" : "false"}`;
   }
   return `range ${numberValue(check.min)} ${numberValue(check.max)}`;
 }
@@ -266,6 +280,61 @@ function EnumValuesCell({
   );
 }
 
+function PatternConstraintCell({
+  check,
+  onCommit,
+}: {
+  check: Extract<ViewerValidationCheck, { kind: "pattern" }>;
+  onCommit: (next: Extract<ViewerValidationCheck, { kind: "pattern" }>) => void;
+}) {
+  const serializedPattern = check.pattern;
+  const [draftPattern, setDraftPattern] = useState(serializedPattern);
+
+  useEffect(() => {
+    setDraftPattern(serializedPattern);
+  }, [serializedPattern]);
+
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-1">
+      <input
+        type="text"
+        value={draftPattern}
+        onChange={(event) => setDraftPattern(event.target.value)}
+        onBlur={() =>
+          onCommit({
+            kind: "pattern",
+            pattern: draftPattern.trim(),
+            caseInsensitive: check.caseInsensitive,
+          })
+        }
+        className={cellInputClassName(true)}
+        placeholder="^EC\d{3}$"
+        aria-label="Pattern (regular expression)"
+      />
+      <button
+        type="button"
+        onClick={() =>
+          onCommit({
+            kind: "pattern",
+            pattern: draftPattern.trim(),
+            caseInsensitive: !check.caseInsensitive,
+          })
+        }
+        className={`h-8 shrink-0 rounded-[var(--r-chip)] border px-1.5 text-[11px] font-semibold transition ${
+          check.caseInsensitive
+            ? "border-[color:var(--accent)] text-[color:var(--accent)]"
+            : "border-transparent text-[color:var(--muted-ink)] hover:border-[color:var(--viewer-border)]"
+        }`}
+        aria-pressed={check.caseInsensitive}
+        aria-label="Toggle case-insensitive matching"
+        title="Case-insensitive matching"
+      >
+        Aa
+      </button>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Target cell — kind selector + only the relevant inputs              */
 /* ------------------------------------------------------------------ */
@@ -373,6 +442,8 @@ function ConstraintCell({
         <option value="empty">Required</option>
         <option value="enum">Enum</option>
         <option value="numberRange">Range</option>
+        <option value="pattern">Pattern</option>
+        <option value="boolean">Boolean</option>
       </select>
       {check.kind === "empty" ? (
         <span className="px-1 text-xs text-[color:var(--muted-ink)]">value present</span>
@@ -381,6 +452,23 @@ function ConstraintCell({
           check={check}
           onCommit={(allowedValues) => onChange({ ...rule, check: { kind: "enum", allowedValues } })}
         />
+      ) : check.kind === "pattern" ? (
+        <PatternConstraintCell
+          check={check}
+          onCommit={(next) => onChange({ ...rule, check: next })}
+        />
+      ) : check.kind === "boolean" ? (
+        <select
+          value={check.expected ? "true" : "false"}
+          onChange={(event) =>
+            onChange({ ...rule, check: { kind: "boolean", expected: event.target.value === "true" } })
+          }
+          className={`${cellInputClassName(true)} uppercase`}
+          aria-label="Expected boolean value"
+        >
+          <option value="true">TRUE</option>
+          <option value="false">FALSE</option>
+        </select>
       ) : (
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <input
@@ -914,6 +1002,8 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
             <option value="empty">Required</option>
             <option value="enum">Enum</option>
             <option value="numberRange">Range</option>
+            <option value="pattern">Pattern</option>
+            <option value="boolean">Boolean</option>
           </select>
 
           {isFlat || hasActiveFilters ? (

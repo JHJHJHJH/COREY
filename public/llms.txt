@@ -1,0 +1,16 @@
+# COREY
+
+> Local-first IFC review app for loading IFC files, inspecting model data, and
+> validating elements against clause-based rules.
+
+## LLM References
+
+- [Validation rules contract](/llms-validation-rules.md): concise rules for generating COREY validation config JSON.
+- [Validation config JSON Schema](/schemas/validation-config-v2.schema.json): machine-readable schema for exported/imported rule config.
+- [User documentation](/docs/clauses): plain-language explanation of clauses and checks.
+- [Clause data model](/docs/clause-data-model): developer-facing rule model and API notes.
+
+## Notes
+
+Generate validation configs as JSON with root `version: 2` and `clauses`.
+Do not generate legacy root `rules` files.

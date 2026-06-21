@@ -1,35 +1,80 @@
 {
-  "version": 1,
-  "rules": [
+  "version": 2,
+  "clauses": [
     {
-      "id": "rule-attribute-name-required",
-      "ifcType": "IFCWALL",
-      "target": {
-        "kind": "attribute",
-        "name": "Name"
-      },
-      "check": {
-        "kind": "empty"
-      },
-      "failSeverity": "error"
-    },
-    {
-      "id": "rule-property-reference-enum",
-      "ifcType": "IFCWALL",
-      "target": {
-        "kind": "property",
-        "group": "Pset_WallCommon",
-        "label": "Reference"
-      },
-      "check": {
-        "kind": "enum",
-        "allowedValues": [
-          "WALL-A",
-          "WALL-B",
-          "WALL-C"
-        ]
-      },
-      "failSeverity": "warn"
+      "id": "sample-wall-basics",
+      "title": "Sample wall basics",
+      "rules": [
+        {
+          "id": "sample-wall-name-required",
+          "ifcType": "IfcWall",
+          "target": {
+            "kind": "attribute",
+            "name": "Name"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "sample-wall-globalid-format",
+          "ifcType": "IfcWall",
+          "target": {
+            "kind": "attribute",
+            "name": "GlobalId"
+          },
+          "check": {
+            "kind": "pattern",
+            "pattern": "[0-9A-Za-z_$]{22}",
+            "caseInsensitive": false
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "sample-wall-reference-enum",
+          "ifcType": "IfcWall",
+          "target": {
+            "kind": "property",
+            "group": "Pset_WallCommon",
+            "label": "Reference"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": ["WALL-A", "WALL-B", "WALL-C"]
+          },
+          "failSeverity": "warn"
+        },
+        {
+          "id": "sample-wall-external-boolean",
+          "ifcType": "IfcWall",
+          "target": {
+            "kind": "property",
+            "group": "Pset_WallCommon",
+            "label": "IsExternal"
+          },
+          "check": {
+            "kind": "boolean",
+            "expected": true
+          },
+          "failSeverity": "warn"
+        },
+        {
+          "id": "sample-wall-thermal-range",
+          "ifcType": "IfcWall",
+          "target": {
+            "kind": "property",
+            "group": "Pset_WallCommon",
+            "label": "ThermalTransmittance"
+          },
+          "check": {
+            "kind": "numberRange",
+            "min": 0,
+            "max": 5
+          },
+          "failSeverity": "warn"
+        }
+      ]
     }
   ]
 }

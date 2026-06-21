@@ -91,6 +91,45 @@ function sanitizeAllowedValues(values: string[]) {
   return [...new Set(values.map(normalizeStoredText).filter(Boolean))];
 }
 
+const TRUE_BOOLEAN_TOKENS: ReadonlySet<string> = new Set([
+  "true",
+  "1",
+  "yes",
+  "y",
+  ".t.",
+  "t",
+]);
+
+const FALSE_BOOLEAN_TOKENS: ReadonlySet<string> = new Set([
+  "false",
+  "0",
+  "no",
+  "n",
+  ".f.",
+  "f",
+]);
+
+function coerceBoolean(value: string): boolean | null {
+  const token = normalizeToken(value);
+  if (TRUE_BOOLEAN_TOKENS.has(token)) {
+    return true;
+  }
+
+  if (FALSE_BOOLEAN_TOKENS.has(token)) {
+    return false;
+  }
+
+  return null;
+}
+
+function compileAnchoredPattern(pattern: string, caseInsensitive: boolean): RegExp | null {
+  try {
+    return new RegExp(`^(?:${pattern})$`, caseInsensitive ? "i" : "");
+  } catch {
+    return null;
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -314,6 +353,21 @@ function sanitizeCheck(check: unknown): ViewerValidationCheck {
     };
   }
 
+  if (check.kind === "pattern") {
+    return {
+      kind: "pattern",
+      pattern: normalizeStoredText(String(check.pattern ?? "")),
+      caseInsensitive: Boolean(check.caseInsensitive),
+    };
+  }
+
+  if (check.kind === "boolean") {
+    return {
+      kind: "boolean",
+      expected: typeof check.expected === "boolean" ? check.expected : true,
+    };
+  }
+
   throw new Error(`Unsupported rule check kind: ${String(check.kind)}`);
 }
 
@@ -371,6 +425,13 @@ function isRunnableRule(rule: ViewerValidationRule) {
     return false;
   }
 
+  if (rule.check.kind === "pattern") {
+    const pattern = normalizeStoredText(rule.check.pattern);
+    if (!pattern || !compileAnchoredPattern(pattern, rule.check.caseInsensitive)) {
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -418,6 +479,24 @@ function evaluateRuleAgainstValue(
     return rule.check.allowedValues.some((entry) => normalizeToken(entry) === normalizedValue)
       ? "ok"
       : rule.failSeverity;
+  }
+
+  if (rule.check.kind === "pattern") {
+    const regex = compileAnchoredPattern(rule.check.pattern, rule.check.caseInsensitive);
+    if (!regex) {
+      return rule.failSeverity;
+    }
+
+    return regex.test(value.text) ? "ok" : rule.failSeverity;
+  }
+
+  if (rule.check.kind === "boolean") {
+    const booleanValue = coerceBoolean(value.text);
+    if (booleanValue === null) {
+      return rule.failSeverity;
+    }
+
+    return booleanValue === rule.check.expected ? "ok" : rule.failSeverity;
   }
 
   const numericValue = coerceFiniteNumber(value.text);
@@ -826,6 +905,14 @@ export function describeViewerValidationRule(rule: ViewerValidationRule) {
 
   if (rule.check.kind === "enum") {
     return `${targetLabel} must be one of ${rule.check.allowedValues.join(", ")}`;
+  }
+
+  if (rule.check.kind === "pattern") {
+    return `${targetLabel} must match /${rule.check.pattern}/${rule.check.caseInsensitive ? "i" : ""}`;
+  }
+
+  if (rule.check.kind === "boolean") {
+    return `${targetLabel} must be ${rule.check.expected ? "TRUE" : "FALSE"}`;
   }
 
   if (rule.check.min !== null && rule.check.max !== null) {

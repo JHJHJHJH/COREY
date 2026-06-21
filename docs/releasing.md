@@ -9,8 +9,8 @@
 2. Build and smoke-test Docker:
 
    ```bash
-   docker compose --env-file .env -f docker/docker-compose.yml build app
-   docker compose --env-file .env -f docker/docker-compose.yml up
+   docker compose --env-file .env -f docker/docker-compose.deploy.yml build app
+   docker compose --env-file .env -f docker/docker-compose.deploy.yml up
    ```
 
 3. Tag with semantic versioning:

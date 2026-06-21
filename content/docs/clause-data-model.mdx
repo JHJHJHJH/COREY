@@ -1,0 +1,127 @@
+---
+title: Clause data model
+description: The JSON contract for COREY clause and rule configurations.
+---
+
+COREY stores validation checks as a versioned JSON document. The same shape is
+used when users export clauses, import clauses, load rule templates, save backend
+rule configuration, and send rules into the validation evaluator.
+
+<Callout type="info">
+This page describes the portable rule configuration format. Validation run
+payloads add model rows around this config, but the `clauses` and `rules` shape
+is the same.
+</Callout>
+
+## Top-level config
+
+Every exported or imported clause file is a `ViewerValidationConfig`.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `version` | `2` | The current clause-based format version. |
+| `clauses` | array | Named groups of rules. |
+
+Version `1` files used a root `rules` array and are no longer accepted by manual
+import. Use version `2` with `clauses`.
+
+```json
+{
+  "version": 2,
+  "clauses": [
+    {
+      "id": "wall-basics",
+      "title": "Wall basics",
+      "rules": [
+        {
+          "id": "wall-name-required",
+          "ifcType": "IfcWall",
+          "target": {
+            "kind": "attribute",
+            "name": "Name"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        }
+      ]
+    }
+  ]
+}
+```
+
+## Clauses and rules
+
+A clause is a named group of rules. It exists so users can review failures by
+topic, standard, discipline, or submission requirement.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `id` | string | Stable identifier for the clause. |
+| `title` | string | Human-readable clause name shown in results. |
+| `rules` | array | Rules evaluated under this clause. |
+
+A rule says which IFC element type to inspect, which value to read, how to check
+it, and how serious a failed check is.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `id` | string | Stable identifier for the rule. |
+| `ifcType` | string | IFC entity name, such as `IfcWall` or `IfcBeam`. Matching is case-insensitive. |
+| `target` | object | The attribute or property to inspect. |
+| `check` | object | The requirement to apply. |
+| `failSeverity` | `error` or `warn` | Result severity when the rule fails. |
+
+## Targets
+
+Targets describe where COREY should read a value from each matching element.
+
+| Target kind | Fields | Example |
+|---|---|---|
+| `attribute` | `kind`, `name` | `{ "kind": "attribute", "name": "GlobalId" }` |
+| `property` | `kind`, `group`, `label` | `{ "kind": "property", "group": "Pset_WallCommon", "label": "FireRating" }` |
+
+Attribute names are matched case-insensitively. `GlobalId`, `GUID`, and `_guid`
+are treated as the same attribute target.
+
+## Checks
+
+All check kinds fail when the value is missing, empty, null, or undefined.
+
+| Check kind | Fields | Passes when |
+|---|---|---|
+| `empty` | `kind` | The value is present and not empty. |
+| `enum` | `kind`, `allowedValues` | The value matches one allowed value after trimming and case-insensitive comparison. |
+| `numberRange` | `kind`, `min`, `max` | The value can be read as a finite number and is within the provided bound or bounds. |
+| `pattern` | `kind`, `pattern`, `caseInsensitive` | The value matches the JavaScript regular expression pattern against the whole value. |
+| `boolean` | `kind`, `expected` | The value can be read as a boolean and equals the expected value. |
+
+Boolean checks understand common IFC/table values such as `true`, `false`, `1`,
+`0`, `yes`, `no`, `y`, `n`, `.t.`, `.f.`, `t`, and `f`.
+
+## Runnable rules
+
+COREY can store a draft rule before it is complete, but only runnable rules are
+compiled for validation. A rule is runnable when:
+
+- `ifcType` is not blank.
+- attribute targets have a non-blank `name`.
+- property targets have non-blank `group` and `label`.
+- enum checks have at least one allowed value.
+- number range checks have at least one of `min` or `max`.
+- pattern checks have a non-blank valid JavaScript regular expression.
+
+The JSON Schema at `/schemas/validation-config-v2.schema.json` documents the
+portable config shape. Runtime sanitizing and runnable-rule filtering remain in
+`src/features/rules/lib/validation.ts`.
+
+## API usage
+
+- `GET /api/rules/config` returns the saved config for the current user.
+- `PUT /api/rules/config` accepts this config shape and returns the sanitized
+  saved config.
+- `GET /api/rule-templates/[id]?format=config` downloads a template config in
+  this format.
+- `POST /api/rules/evaluate` accepts `version`, `sourceId`, `clauses`, and
+  validation `rows`; the `clauses` array uses this same rule model.

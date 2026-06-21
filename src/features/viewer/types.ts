@@ -31,6 +31,15 @@ export type ViewerValidationCheck =
       kind: "numberRange";
       min: number | null;
       max: number | null;
+    }
+  | {
+      kind: "pattern";
+      pattern: string;
+      caseInsensitive: boolean;
+    }
+  | {
+      kind: "boolean";
+      expected: boolean;
     };
 
 export interface ViewerValidationRule {

@@ -16,6 +16,20 @@
             "kind": "empty"
           },
           "failSeverity": "error"
+        },
+        {
+          "id": "wall-globalid-format",
+          "ifcType": "IfcWall",
+          "target": {
+            "kind": "attribute",
+            "name": "GlobalId"
+          },
+          "check": {
+            "kind": "pattern",
+            "pattern": "[0-9A-Za-z_$]{22}",
+            "caseInsensitive": false
+          },
+          "failSeverity": "error"
         }
       ]
     },
@@ -33,6 +47,26 @@
           },
           "check": {
             "kind": "empty"
+          },
+          "failSeverity": "warn"
+        }
+      ]
+    },
+    {
+      "id": "starter-external-flag",
+      "title": "External wall flag",
+      "rules": [
+        {
+          "id": "wall-is-external-boolean",
+          "ifcType": "IfcWall",
+          "target": {
+            "kind": "property",
+            "group": "Pset_WallCommon",
+            "label": "IsExternal"
+          },
+          "check": {
+            "kind": "boolean",
+            "expected": true
           },
           "failSeverity": "warn"
         }

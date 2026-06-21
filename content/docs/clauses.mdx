@@ -4,8 +4,9 @@ description: How COREY's rule-based model checking works, in plain language.
 ---
 
 Checking a model means asking practical questions: "is the required data filled
-in?", "is this value allowed?", or "is this number within range?". COREY stores
-those checks as **clauses** and runs them across the whole IFC model.
+in?", "is this value allowed?", "does this code match the expected pattern?", or
+"is this number within range?". COREY stores those checks as **clauses** and
+runs them across the whole IFC model.
 
 For CORENET X workflows, clauses can represent IFC-SG data requirements from an
 Excel mapping or from your team's own review standard. COREY then shows which
@@ -46,17 +47,20 @@ A target is either:
 
 ### Check: what to require
 
-COREY offers three kinds of check:
+COREY offers five kinds of check:
 
 | Check | Passes when… | Use it for… |
 |---|---|---|
 | **Required value** | the field is filled in (not blank/missing) | making sure information isn't left empty |
 | **Allowed values (enum)** | the value is one of a list you provide | codes, classifications, fixed vocabularies |
 | **Number range** | the number is within a minimum and/or maximum | dimensions, ratings, counts |
+| **Pattern** | the value matches a text pattern | IDs, codes, or naming standards |
+| **Boolean** | the value means true or false as expected | flags such as load-bearing or external |
 
 <Callout type="info">
 Any check automatically fails if the value is missing or empty — so "Allowed
-values" and "Number range" also guarantee the field is present.
+values", "Number range", "Pattern", and "Boolean" also guarantee the field is
+present.
 </Callout>
 
 ### Severity: how loud to be
@@ -131,11 +135,13 @@ Clauses are stored as a small JSON document (a `version` plus a `clauses` array,
 each clause holding `rules`). The repository includes a starter file,
 `public/resources/starter-essential-elements.json`, and the format is validated
 on import. The exact schema and evaluation logic live in `src/features/rules`.
+See [Clause data model](./clause-data-model) for the documented contract.
 </Callout>
 
 ## Where to go next
 
 <Cards>
   <Card title="Workflow" href="./workflow" description="See where clause-checking fits in a full review." />
+  <Card title="Clause data model" href="./clause-data-model" description="Read the exact JSON shape for clause files and API payloads." />
   <Card title="Features" href="./features" description="The rest of COREY's review tools." />
 </Cards>

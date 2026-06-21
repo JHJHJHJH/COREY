@@ -44,7 +44,7 @@ cp .env.example .env
 This starts the app, its database, and file storage together:
 
 ```bash
-docker compose --env-file .env -f docker/docker-compose.yml up --build
+docker compose --env-file .env -f docker/docker-compose.deploy.yml up --build
 ```
 
 The first run downloads and builds the images, so it takes a few minutes. Later

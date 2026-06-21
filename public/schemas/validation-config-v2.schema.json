@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "/schemas/validation-config-v2.schema.json",
+  "title": "COREY Validation Config v2",
+  "description": "Portable clause and rule configuration used by COREY validation import/export, templates, and rules config APIs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "clauses"],
+  "properties": {
+    "version": {
+      "const": 2,
+      "description": "Current clause-based validation config version."
+    },
+    "clauses": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/clause"
+      }
+    }
+  },
+  "$defs": {
+    "clause": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "rules"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable clause identifier."
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable clause title shown in validation results."
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rule"
+          }
+        }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "ifcType", "target", "check", "failSeverity"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable rule identifier."
+        },
+        "ifcType": {
+          "type": "string",
+          "description": "IFC entity type to evaluate, such as IfcWall or IfcBeam. Matching is case-insensitive."
+        },
+        "target": {
+          "$ref": "#/$defs/target"
+        },
+        "check": {
+          "$ref": "#/$defs/check"
+        },
+        "failSeverity": {
+          "type": "string",
+          "enum": ["error", "warn"],
+          "description": "Severity emitted when the rule fails."
+        }
+      }
+    },
+    "target": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/attributeTarget"
+        },
+        {
+          "$ref": "#/$defs/propertyTarget"
+        }
+      ]
+    },
+    "attributeTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name"],
+      "properties": {
+        "kind": {
+          "const": "attribute"
+        },
+        "name": {
+          "type": "string",
+          "description": "IFC attribute name, such as Name or GlobalId."
+        }
+      }
+    },
+    "propertyTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "group", "label"],
+      "properties": {
+        "kind": {
+          "const": "property"
+        },
+        "group": {
+          "type": "string",
+          "description": "Property set name, such as Pset_WallCommon."
+        },
+        "label": {
+          "type": "string",
+          "description": "Property label inside the property set."
+        }
+      }
+    },
+    "check": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/emptyCheck"
+        },
+        {
+          "$ref": "#/$defs/enumCheck"
+        },
+        {
+          "$ref": "#/$defs/numberRangeCheck"
+        },
+        {
+          "$ref": "#/$defs/patternCheck"
+        },
+        {
+          "$ref": "#/$defs/booleanCheck"
+        }
+      ]
+    },
+    "emptyCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "const": "empty",
+          "description": "Requires the value to be present and not empty."
+        }
+      }
+    },
+    "enumCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "allowedValues"],
+      "properties": {
+        "kind": {
+          "const": "enum"
+        },
+        "allowedValues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Allowed text values. Runtime comparison trims and ignores case."
+        }
+      }
+    },
+    "numberRangeCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "min", "max"],
+      "properties": {
+        "kind": {
+          "const": "numberRange"
+        },
+        "min": {
+          "type": ["number", "null"],
+          "description": "Inclusive lower bound, or null for no lower bound."
+        },
+        "max": {
+          "type": ["number", "null"],
+          "description": "Inclusive upper bound, or null for no upper bound."
+        }
+      }
+    },
+    "patternCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "pattern", "caseInsensitive"],
+      "properties": {
+        "kind": {
+          "const": "pattern"
+        },
+        "pattern": {
+          "type": "string",
+          "description": "JavaScript regular expression source. Runtime matching anchors it against the whole value."
+        },
+        "caseInsensitive": {
+          "type": "boolean"
+        }
+      }
+    },
+    "booleanCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "expected"],
+      "properties": {
+        "kind": {
+          "const": "boolean"
+        },
+        "expected": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

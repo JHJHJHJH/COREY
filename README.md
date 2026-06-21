@@ -69,7 +69,7 @@ cp .env.example .env
 **3.** Start everything (the app, database, and file storage):
 
 ```bash
-docker compose --env-file .env -f docker/docker-compose.yml up --build
+docker compose --env-file .env -f docker/docker-compose.deploy.yml up --build
 ```
 
 **4.** Open your browser to **[http://localhost:4000](http://localhost:4000)** 🎉

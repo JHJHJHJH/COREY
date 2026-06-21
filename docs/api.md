@@ -22,12 +22,15 @@ The API reference is intended for self-hosted COREY deployments.
 
 ## Rules And Compute
 
-- `GET /api/rules/config`
-- `PUT /api/rules/config`
-- `POST /api/rules/evaluate`
-- `GET /api/rule-templates`
-- `GET /api/rule-templates/[id]`
-- `GET /api/rule-templates/[id]?format=config`
-- `GET /api/rule-templates/[id]?format=source`
+- `GET /api/rules/config`: read the current user's validation config.
+- `PUT /api/rules/config`: save a validation config.
+- `POST /api/rules/evaluate`: evaluate validation rows against a config.
+- `GET /api/rule-templates`: list available validation templates.
+- `GET /api/rule-templates/[id]`: read one validation template.
+- `GET /api/rule-templates/[id]?format=config`: download a template config.
+- `GET /api/rule-templates/[id]?format=source`: download a template source file when available.
 - `POST /api/data-table/excel/export`
 - `POST /api/data-table/excel/import`
+
+Rules config and template config use the version 2 clause model documented in
+[Clause data model](clause-data-model.md).
