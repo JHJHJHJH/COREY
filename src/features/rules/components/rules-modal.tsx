@@ -35,6 +35,7 @@ const RULES_MODAL_DESKTOP_HORIZONTAL_PADDING = 48;
 const RULES_MODAL_VERTICAL_PADDING = 32;
 const RULES_MODAL_KEYBOARD_STEP = 24;
 const RULES_MODAL_KEYBOARD_LARGE_STEP = 80;
+const RULES_MODAL_ZOOM_RESET = "calc(1 / 0.75)";
 
 function clampRulesModalSize(size: RulesModalSize): RulesModalSize {
   if (typeof window === "undefined") {
@@ -190,6 +191,7 @@ export function RulesModal({ onClose }: RulesModalProps) {
   return (
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center overflow-hidden bg-[rgba(20,24,21,0.42)] px-4 py-4 backdrop-blur-[2px] sm:px-6"
+      style={{ zoom: RULES_MODAL_ZOOM_RESET }}
       onClick={close}
     >
       <div

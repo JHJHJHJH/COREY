@@ -1,7 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { Check, CircleAlert, Trash2, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  ChevronsUpDown,
+  CircleAlert,
+  LayoutTemplate,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { StatusBar } from "@/components/status-bar/status-bar";
 import { InspectorDetailList } from "@/components/status-bar/status-inspector";
@@ -20,8 +33,8 @@ import {
 import type {
   ViewerRuleTemplateSummary,
   ViewerValidationCheck,
-  ViewerValidationClause,
   ViewerValidationRule,
+  ViewerValidationTarget,
 } from "@/features/viewer/types";
 
 type RulesScreenProps = {
@@ -29,17 +42,70 @@ type RulesScreenProps = {
   onClose?: () => void;
 };
 
-function inputClassName() {
-  return "w-full rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-2 text-sm text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent)] disabled:cursor-not-allowed disabled:bg-[color:var(--panel-bg)] disabled:text-[color:var(--muted-ink)] disabled:opacity-80";
+type SortColumnKey = "clause" | "ifcType" | "target" | "constraint" | "severity";
+type SortDirection = "asc" | "desc";
+type RulesSort = { columnKey: SortColumnKey; direction: SortDirection };
+type SeverityFilter = "all" | ViewerValidationRule["failSeverity"];
+type CheckFilter = "all" | ViewerValidationCheck["kind"];
+
+type RuleRow = {
+  clauseId: string;
+  clauseTitle: string;
+  rule: ViewerValidationRule;
+};
+
+/* ------------------------------------------------------------------ */
+/* Token-driven class helpers — the workspace leans on the precise      */
+/* engineering identity (mono spec data, hairlines, tight radii).       */
+/* ------------------------------------------------------------------ */
+
+// Spreadsheet cell: invisible until you reach for it, then a crisp accent ring.
+function cellInputClassName(mono = false) {
+  return `min-h-8 w-full rounded-[var(--r-control)] border border-transparent bg-transparent px-2 py-1 text-[13px] leading-5 text-[color:var(--foreground)] outline-none transition placeholder:text-[color:var(--muted-ink)]/70 hover:border-[color:var(--viewer-border)] hover:bg-[color:var(--surface-soft)] focus:border-[color:var(--accent)] focus:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50 ${
+    mono ? "font-mono tabular-nums" : ""
+  }`;
 }
 
 function secondaryButtonClassName() {
-  return "rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 py-2 text-sm font-medium text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]";
+  return "inline-flex h-9 items-center gap-1.5 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 text-sm font-medium text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]";
 }
 
 function compactButtonClassName() {
-  return "inline-flex h-8 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 text-xs font-medium text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]";
+  return "inline-flex h-8 items-center gap-1 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 text-xs font-medium text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]";
 }
+
+function destructiveButtonClassName() {
+  return "inline-flex h-8 w-8 items-center justify-center rounded-[var(--r-control)] border border-[#d9a89d] bg-[#fff0ea] text-[#b5432f] transition hover:bg-[#ffe5dc] hover:text-[#962f1f]";
+}
+
+function filterSelectClassName() {
+  return "h-9 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 text-sm text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent)]";
+}
+
+function severitySelectClassName(severity: ViewerValidationRule["failSeverity"]) {
+  const tone =
+    severity === "error"
+      ? "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]"
+      : "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
+  return `h-8 rounded-[var(--r-chip)] border px-2 text-[11px] font-semibold uppercase tracking-[0.08em] outline-none transition focus:border-[color:var(--accent)] ${tone}`;
+}
+
+function severityRailClassName(severity: ViewerValidationRule["failSeverity"]) {
+  return severity === "error"
+    ? "border-l-[3px] border-l-[color:var(--danger-border)]"
+    : "border-l-[3px] border-l-[color:var(--warning-border)]";
+}
+
+const headerCellClassName =
+  "border-b border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-2 align-middle";
+const bodyCellClassName =
+  "border-b border-[color:var(--viewer-border)] px-2 py-1 align-middle";
+// Vertical hairline separating the IFC Type / Target / Constraint / Severity columns.
+const columnDividerClassName = "border-r border-[color:var(--viewer-border)]";
+
+/* ------------------------------------------------------------------ */
+/* Pure helpers                                                         */
+/* ------------------------------------------------------------------ */
 
 function canDownloadTemplateSource(template: ViewerRuleTemplateSummary) {
   return (
@@ -63,17 +129,10 @@ function nextCheckForKind(kind: ViewerValidationCheck["kind"]): ViewerValidation
   }
 
   if (kind === "enum") {
-    return {
-      kind: "enum",
-      allowedValues: ["Allowed Value"],
-    };
+    return { kind: "enum", allowedValues: ["Allowed Value"] };
   }
 
-  return {
-    kind: "numberRange",
-    min: null,
-    max: null,
-  };
+  return { kind: "numberRange", min: null, max: null };
 }
 
 function parseEnumValues(value: string) {
@@ -83,90 +142,331 @@ function parseEnumValues(value: string) {
     .filter(Boolean);
 }
 
-function headerCellClassName(widthClassName: string) {
-  return `${widthClassName} border-b border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-3 align-bottom`;
+function describeTarget(target: ViewerValidationTarget) {
+  return target.kind === "attribute" ? target.name : `${target.group}·${target.label}`;
 }
 
-function bodyCellClassName(widthClassName: string, subdued = false) {
-  return `${widthClassName} border-b border-[color:var(--viewer-border)] px-3 py-3 align-top ${subdued ? "bg-[color:var(--panel-bg)]/45" : "bg-white/45"}`;
+function describeConstraint(check: ViewerValidationCheck) {
+  if (check.kind === "empty") {
+    return "required";
+  }
+  if (check.kind === "enum") {
+    return `enum ${check.allowedValues.join(" ")}`;
+  }
+  return `range ${numberValue(check.min)} ${numberValue(check.max)}`;
 }
 
-function EnumValuesInput({
+function rowSortValue(row: RuleRow, columnKey: SortColumnKey) {
+  switch (columnKey) {
+    case "clause":
+      return row.clauseTitle;
+    case "ifcType":
+      return row.rule.ifcType;
+    case "target":
+      return `${row.rule.target.kind} ${describeTarget(row.rule.target)}`;
+    case "constraint":
+      return describeConstraint(row.rule.check);
+    case "severity":
+      return row.rule.failSeverity;
+  }
+}
+
+function rowMatchesQuery(row: RuleRow, query: string) {
+  const haystack = [
+    row.clauseTitle,
+    row.rule.ifcType,
+    row.rule.target.kind,
+    describeTarget(row.rule.target),
+    row.rule.check.kind,
+    describeConstraint(row.rule.check),
+    row.rule.failSeverity,
+  ]
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(query);
+}
+
+/* ------------------------------------------------------------------ */
+/* Sort glyph                                                           */
+/* ------------------------------------------------------------------ */
+
+function SortGlyph({ active, direction }: { active: boolean; direction: SortDirection }) {
+  if (!active) {
+    return <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-[color:var(--muted-ink)] opacity-50" />;
+  }
+  return direction === "asc" ? (
+    <ArrowUp className="h-3.5 w-3.5 shrink-0 text-[color:var(--accent)]" />
+  ) : (
+    <ArrowDown className="h-3.5 w-3.5 shrink-0 text-[color:var(--accent)]" />
+  );
+}
+
+function SortableHeader({
+  label,
+  columnKey,
+  sort,
+  onToggle,
+  widthClassName,
+}: {
+  label: string;
+  columnKey: SortColumnKey;
+  sort: RulesSort | null;
+  onToggle: (columnKey: SortColumnKey) => void;
+  widthClassName: string;
+}) {
+  const active = sort?.columnKey === columnKey;
+  return (
+    <th
+      scope="col"
+      aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}
+      className={`${headerCellClassName} ${widthClassName}`}
+    >
+      <button
+        type="button"
+        onClick={() => onToggle(columnKey)}
+        className="flex w-full items-center justify-between gap-2 rounded-[var(--r-chip)] text-left outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]"
+      >
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--foreground)]">
+          {label}
+        </span>
+        <SortGlyph active={active} direction={active ? sort.direction : "asc"} />
+      </button>
+    </th>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Enum values cell (draft + commit on blur)                            */
+/* ------------------------------------------------------------------ */
+
+function EnumValuesCell({
   check,
-  disabled,
   onCommit,
 }: {
   check: ViewerValidationCheck;
-  disabled: boolean;
   onCommit: (allowedValues: string[]) => void;
 }) {
   const serializedValue = enumText(check);
   const [draftValue, setDraftValue] = useState(serializedValue);
-  const previewValues = disabled ? [] : parseEnumValues(draftValue);
 
   useEffect(() => {
     setDraftValue(serializedValue);
   }, [serializedValue]);
 
   return (
-    <div className="space-y-2">
-      <input
-        type="text"
-        value={draftValue}
-        onChange={(event) => setDraftValue(event.target.value)}
-        onBlur={() => onCommit(parseEnumValues(draftValue))}
-        className={inputClassName()}
-        placeholder="A, B, C"
-        aria-label="Allowed values"
-        disabled={disabled}
-      />
-      <div className="flex min-h-6 flex-wrap gap-1">
-        {previewValues.length > 0 ? (
-          previewValues.map((value) => (
-            <span
-              key={value}
-              className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2 py-0.5 text-[11px] font-medium text-[color:var(--foreground)]"
-            >
-              {value}
-            </span>
-          ))
-        ) : (
-          <span className="text-[11px] text-[color:var(--muted-ink)]">Comma-separated values</span>
-        )}
-      </div>
+    <input
+      type="text"
+      value={draftValue}
+      onChange={(event) => setDraftValue(event.target.value)}
+      onBlur={() => onCommit(parseEnumValues(draftValue))}
+      className={cellInputClassName(true)}
+      placeholder="A, B, C"
+      aria-label="Allowed values"
+    />
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Target cell — kind selector + only the relevant inputs              */
+/* ------------------------------------------------------------------ */
+
+function TargetCell({
+  rule,
+  onChange,
+}: {
+  rule: ViewerValidationRule;
+  onChange: (rule: ViewerValidationRule) => void;
+}) {
+  const target = rule.target;
+  return (
+    <div className="flex items-center gap-1">
+      <select
+        value={target.kind}
+        onChange={(event) => {
+          const kind = event.target.value as ViewerValidationTarget["kind"];
+          onChange({
+            ...rule,
+            target:
+              kind === "attribute"
+                ? { kind: "attribute", name: target.kind === "attribute" ? target.name : "Name" }
+                : {
+                    kind: "property",
+                    group: "Pset_WallCommon",
+                    label: "Reference",
+                  },
+          });
+        }}
+        className="h-8 shrink-0 rounded-[var(--r-chip)] border border-transparent bg-transparent px-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--muted-ink)] outline-none transition hover:border-[color:var(--viewer-border)] focus:border-[color:var(--accent)]"
+        aria-label="Target kind"
+      >
+        <option value="attribute">Attr</option>
+        <option value="property">Prop</option>
+      </select>
+      {target.kind === "attribute" ? (
+        <input
+          value={target.name}
+          onChange={(event) =>
+            onChange({ ...rule, target: { kind: "attribute", name: event.target.value } })
+          }
+          className={cellInputClassName(true)}
+          placeholder="Name"
+          aria-label="Attribute name"
+        />
+      ) : (
+        <div className="flex min-w-0 flex-1 items-center gap-1">
+          <input
+            value={target.group}
+            onChange={(event) =>
+              onChange({
+                ...rule,
+                target: { kind: "property", group: event.target.value, label: target.label },
+              })
+            }
+            className={cellInputClassName(true)}
+            placeholder="Pset_WallCommon"
+            aria-label="Property set"
+          />
+          <span className="shrink-0 text-xs text-[color:var(--muted-ink)]">·</span>
+          <input
+            value={target.label}
+            onChange={(event) =>
+              onChange({
+                ...rule,
+                target: { kind: "property", group: target.group, label: event.target.value },
+              })
+            }
+            className={cellInputClassName(true)}
+            placeholder="Reference"
+            aria-label="Property label"
+          />
+        </div>
+      )}
     </div>
   );
 }
 
-function RuleRow({
+/* ------------------------------------------------------------------ */
+/* Constraint cell — kind selector + only the relevant inputs          */
+/* ------------------------------------------------------------------ */
+
+function ConstraintCell({
   rule,
   onChange,
-  onRemove,
 }: {
   rule: ViewerValidationRule;
   onChange: (rule: ViewerValidationRule) => void;
+}) {
+  const check = rule.check;
+  return (
+    <div className="flex items-center gap-1">
+      <select
+        value={check.kind}
+        onChange={(event) =>
+          onChange({
+            ...rule,
+            check: nextCheckForKind(event.target.value as ViewerValidationCheck["kind"]),
+          })
+        }
+        className="h-8 shrink-0 rounded-[var(--r-chip)] border border-transparent bg-transparent px-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[color:var(--muted-ink)] outline-none transition hover:border-[color:var(--viewer-border)] focus:border-[color:var(--accent)]"
+        aria-label="Check kind"
+      >
+        <option value="empty">Required</option>
+        <option value="enum">Enum</option>
+        <option value="numberRange">Range</option>
+      </select>
+      {check.kind === "empty" ? (
+        <span className="px-1 text-xs text-[color:var(--muted-ink)]">value present</span>
+      ) : check.kind === "enum" ? (
+        <EnumValuesCell
+          check={check}
+          onCommit={(allowedValues) => onChange({ ...rule, check: { kind: "enum", allowedValues } })}
+        />
+      ) : (
+        <div className="flex min-w-0 flex-1 items-center gap-1">
+          <input
+            type="number"
+            value={numberValue(check.min)}
+            onChange={(event) =>
+              onChange({
+                ...rule,
+                check: {
+                  kind: "numberRange",
+                  max: check.max,
+                  min: event.target.value === "" ? null : Number(event.target.value),
+                },
+              })
+            }
+            className={cellInputClassName(true)}
+            placeholder="min"
+            aria-label="Minimum value"
+          />
+          <span className="shrink-0 text-xs text-[color:var(--muted-ink)]">–</span>
+          <input
+            type="number"
+            value={numberValue(check.max)}
+            onChange={(event) =>
+              onChange({
+                ...rule,
+                check: {
+                  kind: "numberRange",
+                  min: check.min,
+                  max: event.target.value === "" ? null : Number(event.target.value),
+                },
+              })
+            }
+            className={cellInputClassName(true)}
+            placeholder="max"
+            aria-label="Maximum value"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* A single rule row                                                    */
+/* ------------------------------------------------------------------ */
+
+function RuleTableRow({
+  row,
+  showClause,
+  onChange,
+  onRemove,
+}: {
+  row: RuleRow;
+  showClause: boolean;
+  onChange: (rule: ViewerValidationRule) => void;
   onRemove: () => void;
 }) {
-  const attributeTarget = rule.target.kind === "attribute" ? rule.target : null;
-  const propertyTarget = rule.target.kind === "property" ? rule.target : null;
-  const numberRangeCheck = rule.check.kind === "numberRange" ? rule.check : null;
-  const isAttributeTarget = rule.target.kind === "attribute";
-  const isPropertyTarget = rule.target.kind === "property";
-  const isEnumCheck = rule.check.kind === "enum";
-  const isNumberRangeCheck = rule.check.kind === "numberRange";
+  const { rule } = row;
+  const railClassName = severityRailClassName(rule.failSeverity);
 
   return (
-    <tr className="transition hover:bg-white/25">
-      <td className={bodyCellClassName("min-w-[12rem]")}>
+    <tr className="transition hover:bg-[color:var(--surface-soft)]">
+      {showClause ? (
+        <td className={`${bodyCellClassName} ${railClassName}`}>
+          <span className="block truncate px-1 text-[13px] font-medium text-[color:var(--foreground)]">
+            {row.clauseTitle || "Untitled clause"}
+          </span>
+        </td>
+      ) : null}
+      <td className={`${bodyCellClassName} ${columnDividerClassName} ${showClause ? "" : railClassName}`}>
         <input
           value={rule.ifcType}
           onChange={(event) => onChange({ ...rule, ifcType: event.target.value })}
-          className={inputClassName()}
+          className={cellInputClassName(true)}
           placeholder="IFCWALL"
           aria-label="IFC type"
         />
       </td>
-      <td className={bodyCellClassName("min-w-[9rem]")}>
+      <td className={`${bodyCellClassName} ${columnDividerClassName}`}>
+        <TargetCell rule={rule} onChange={onChange} />
+      </td>
+      <td className={`${bodyCellClassName} ${columnDividerClassName}`}>
+        <ConstraintCell rule={rule} onChange={onChange} />
+      </td>
+      <td className={bodyCellClassName}>
         <select
           value={rule.failSeverity}
           onChange={(event) =>
@@ -175,168 +475,20 @@ function RuleRow({
               failSeverity: event.target.value as ViewerValidationRule["failSeverity"],
             })
           }
-          className={inputClassName()}
+          className={severitySelectClassName(rule.failSeverity)}
           aria-label="Fail severity"
         >
           <option value="error">Error</option>
           <option value="warn">Warn</option>
         </select>
       </td>
-      <td className={bodyCellClassName("min-w-[10rem]")}>
-        <select
-          value={rule.target.kind}
-          onChange={(event) => {
-            const kind = event.target.value as ViewerValidationRule["target"]["kind"];
-            onChange({
-              ...rule,
-              target:
-                kind === "attribute"
-                  ? { kind: "attribute", name: "Name" }
-                  : { kind: "property", group: "Pset_WallCommon", label: "Reference" },
-            });
-          }}
-          className={inputClassName()}
-          aria-label="Target kind"
-        >
-          <option value="attribute">Attribute</option>
-          <option value="property">Property</option>
-        </select>
-      </td>
-      <td className={bodyCellClassName("min-w-[12rem]", !isAttributeTarget)}>
-        <input
-          value={attributeTarget?.name ?? ""}
-          onChange={(event) =>
-            onChange({
-              ...rule,
-              target: {
-                kind: "attribute",
-                name: event.target.value,
-              },
-            })
-          }
-          className={inputClassName()}
-          placeholder="Name"
-          aria-label="Attribute name"
-          disabled={!isAttributeTarget}
-        />
-      </td>
-      <td className={bodyCellClassName("min-w-[13rem]", !isPropertyTarget)}>
-        <input
-          value={propertyTarget?.group ?? ""}
-          onChange={(event) =>
-            onChange({
-              ...rule,
-              target: {
-                kind: "property",
-                group: event.target.value,
-                label: propertyTarget?.label ?? "Reference",
-              },
-            })
-          }
-          className={inputClassName()}
-          placeholder="Pset_WallCommon"
-          aria-label="Property set"
-          disabled={!isPropertyTarget}
-        />
-      </td>
-      <td className={bodyCellClassName("min-w-[12rem]", !isPropertyTarget)}>
-        <input
-          value={propertyTarget?.label ?? ""}
-          onChange={(event) =>
-            onChange({
-              ...rule,
-              target: {
-                kind: "property",
-                group: propertyTarget?.group ?? "Pset_WallCommon",
-                label: event.target.value,
-              },
-            })
-          }
-          className={inputClassName()}
-          placeholder="Reference"
-          aria-label="Property label"
-          disabled={!isPropertyTarget}
-        />
-      </td>
-      <td className={bodyCellClassName("min-w-[11rem]")}>
-        <select
-          value={rule.check.kind}
-          onChange={(event) =>
-            onChange({
-              ...rule,
-              check: nextCheckForKind(event.target.value as ViewerValidationCheck["kind"]),
-            })
-          }
-          className={inputClassName()}
-          aria-label="Check kind"
-        >
-          <option value="empty">Required value</option>
-          <option value="enum">Enum</option>
-          <option value="numberRange">Number range</option>
-        </select>
-      </td>
-      <td className={bodyCellClassName("min-w-[16rem]", !isEnumCheck)}>
-        <EnumValuesInput
-          check={rule.check}
-          disabled={!isEnumCheck}
-          onCommit={(allowedValues) =>
-            onChange({
-              ...rule,
-              check: {
-                kind: "enum",
-                allowedValues,
-              },
-            })
-          }
-        />
-      </td>
-      <td className={bodyCellClassName("min-w-[8rem]", !isNumberRangeCheck)}>
-        <input
-          type="number"
-          value={numberValue(numberRangeCheck?.min ?? null)}
-          onChange={(event) =>
-            onChange({
-              ...rule,
-              check: {
-                kind: "numberRange",
-                max: numberRangeCheck?.max ?? null,
-                min: event.target.value === "" ? null : Number(event.target.value),
-              },
-            })
-          }
-          className={inputClassName()}
-          placeholder="0"
-          aria-label="Minimum value"
-          disabled={!isNumberRangeCheck}
-        />
-      </td>
-      <td className={bodyCellClassName("min-w-[8rem]", !isNumberRangeCheck)}>
-        <input
-          type="number"
-          value={numberValue(numberRangeCheck?.max ?? null)}
-          onChange={(event) =>
-            onChange({
-              ...rule,
-              check: {
-                kind: "numberRange",
-                min: numberRangeCheck?.min ?? null,
-                max: event.target.value === "" ? null : Number(event.target.value),
-              },
-            })
-          }
-          className={inputClassName()}
-          placeholder="100"
-          aria-label="Maximum value"
-          disabled={!isNumberRangeCheck}
-        />
-      </td>
-      <td className={bodyCellClassName("min-w-[7rem]")}>
+      <td className={`${bodyCellClassName} text-right`}>
         <button
           type="button"
           onClick={onRemove}
           aria-label="Remove rule"
           title="Remove rule"
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#d9a89d] bg-[#fff0ea] text-[#b5432f] transition hover:bg-[#ffe5dc] hover:text-[#962f1f]"
+          className={destructiveButtonClassName()}
         >
           <Trash2 className="h-4 w-4" />
         </button>
@@ -345,112 +497,209 @@ function RuleRow({
   );
 }
 
-function ClauseCard({
-  clause,
-  onChange,
-  onRemove,
-  onAddRule,
-  onUpdateRule,
-  onRemoveRule,
+/* ------------------------------------------------------------------ */
+/* Templates popover                                                    */
+/* ------------------------------------------------------------------ */
+
+function TemplatesPopover({
+  templates,
+  loading,
+  error,
+  loadingTemplateId,
+  onLoad,
 }: {
-  clause: ViewerValidationClause;
-  onChange: (clause: ViewerValidationClause) => void;
-  onRemove: () => void;
-  onAddRule: () => void;
-  onUpdateRule: (ruleId: string, nextRule: ViewerValidationRule) => void;
-  onRemoveRule: (ruleId: string) => void;
+  templates: ViewerRuleTemplateSummary[];
+  loading: boolean;
+  error: string | null;
+  loadingTemplateId: string | null;
+  onLoad: (template: ViewerRuleTemplateSummary) => void;
 }) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <section className="overflow-hidden rounded-[1.5rem] border border-[color:var(--viewer-border)] bg-white/55 shadow-[0_12px_30px_rgba(10,48,128,0.08)]">
-      <div className="border-b border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)]/70 px-4 py-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0 flex-1">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-              Clause
-            </div>
-            <div className="mt-2 max-w-xl">
-              <input
-                value={clause.title}
-                onChange={(event) => onChange({ ...clause, title: event.target.value })}
-                className={inputClassName()}
-                placeholder="Clause title"
-                aria-label="Clause title"
-              />
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted-ink)]">
-              <span className="rounded-full border border-[color:var(--viewer-border)] bg-white/70 px-3 py-1.5">
-                {clause.rules.length} rules
-              </span>
-            </div>
-          </div>
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className={secondaryButtonClassName()}
+      >
+        <LayoutTemplate className="h-4 w-4" />
+        Templates
+        <ChevronDown className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`} />
+      </button>
 
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <button type="button" onClick={onAddRule} className={compactButtonClassName()}>
-              Add rule
-            </button>
-            <button
-              type="button"
-              onClick={onRemove}
-              className="inline-flex h-8 items-center justify-center rounded-xl border border-[#d9a89d] bg-[#fff0ea] px-2.5 text-xs font-medium text-[#b5432f] transition hover:bg-[#ffe5dc] hover:text-[#962f1f]"
-            >
-              Remove clause
-            </button>
+      {open ? (
+        <>
+          <button
+            type="button"
+            aria-label="Close templates"
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-40 cursor-default"
+          />
+          <div className="absolute right-0 z-50 mt-2 w-[min(92vw,30rem)] rounded-[var(--r-panel)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] p-2.5 shadow-[var(--viewer-shadow-lift)]">
+            <div className="px-1 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+              Starter Templates
+            </div>
+            {loading ? (
+              <div className="px-1 py-2 text-xs text-[color:var(--muted-ink)]">Loading templates…</div>
+            ) : error ? (
+              <div className="rounded-[var(--r-control)] border border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] px-2.5 py-2 text-xs text-[color:var(--danger-fg)]">
+                {error}
+              </div>
+            ) : templates.length === 0 ? (
+              <div className="px-1 py-2 text-xs text-[color:var(--muted-ink)]">No templates available.</div>
+            ) : (
+              <div className="grid max-h-[60vh] gap-1.5 overflow-auto sm:grid-cols-2">
+                {templates.map((template) => {
+                  const isLoading = loadingTemplateId === template.templateId;
+                  return (
+                    <section
+                      key={template.templateId}
+                      className="rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] p-2.5"
+                    >
+                      <h2 className="text-sm font-semibold text-[color:var(--foreground)]">{template.name}</h2>
+                      <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-[color:var(--muted-ink)]">
+                        {template.description}
+                      </p>
+                      <p className="mt-1 font-mono text-[11px] tabular-nums text-[color:var(--muted-ink)]">
+                        {template.ruleCount} rules
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onLoad(template);
+                            setOpen(false);
+                          }}
+                          disabled={loadingTemplateId !== null}
+                          className={`${compactButtonClassName()} disabled:cursor-wait disabled:opacity-60`}
+                        >
+                          {isLoading ? "Loading…" : "Load"}
+                        </button>
+                        <a
+                          href={ruleTemplateConfigEndpoint(template.templateId)}
+                          download
+                          className={compactButtonClassName()}
+                        >
+                          JSON
+                        </a>
+                        {canDownloadTemplateSource(template) ? (
+                          <a
+                            href={ruleTemplateSourceEndpoint(template.templateId)}
+                            download
+                            className={compactButtonClassName()}
+                          >
+                            CSV
+                          </a>
+                        ) : null}
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        </div>
-      </div>
-
-      {clause.rules.length === 0 ? (
-        <div className="px-4 py-6 text-sm text-[color:var(--muted-ink)]">
-          This clause has no rules yet.
-        </div>
-      ) : (
-        <div className="overflow-auto">
-          <table className="min-w-full border-separate border-spacing-0 text-left">
-            <thead className="sticky top-0 z-10 bg-[color:var(--panel-bg)]">
-              <tr>
-                <th className={headerCellClassName("min-w-[12rem]")}>IFC Type</th>
-                <th className={headerCellClassName("min-w-[9rem]")}>Severity</th>
-                <th className={headerCellClassName("min-w-[10rem]")}>Target Kind</th>
-                <th className={headerCellClassName("min-w-[12rem]")}>Attribute Name</th>
-                <th className={headerCellClassName("min-w-[13rem]")}>Property Set</th>
-                <th className={headerCellClassName("min-w-[12rem]")}>Property Label</th>
-                <th className={headerCellClassName("min-w-[11rem]")}>Check Kind</th>
-                <th className={headerCellClassName("min-w-[16rem]")}>Allowed Values</th>
-                <th className={headerCellClassName("min-w-[8rem]")}>Min</th>
-                <th className={headerCellClassName("min-w-[8rem]")}>Max</th>
-                <th className={headerCellClassName("min-w-[7rem]")}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {clause.rules.map((rule) => (
-                <RuleRow
-                  key={rule.id}
-                  rule={rule}
-                  onChange={(nextRule) => onUpdateRule(rule.id, nextRule)}
-                  onRemove={() => onRemoveRule(rule.id)}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
+        </>
+      ) : null}
+    </div>
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* Main screen                                                          */
+/* ------------------------------------------------------------------ */
+
 export function RulesScreen({ mode, onClose }: RulesScreenProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { config, addClause, updateClause, removeClause, addRule, updateRule, removeRule, replaceConfig } =
-    useViewerRules();
+  const {
+    config,
+    addClause,
+    updateClause,
+    removeClause,
+    addRule,
+    updateRule,
+    removeRule,
+    replaceConfig,
+  } = useViewerRules();
+
   const [importError, setImportError] = useState<string | null>(null);
   const [loadingTemplateId, setLoadingTemplateId] = useState<string | null>(null);
   const [starterTemplates, setStarterTemplates] = useState<ViewerRuleTemplateSummary[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(true);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
 
+  const [searchText, setSearchText] = useState("");
+  const [clauseFilter, setClauseFilter] = useState("");
+  const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
+  const [checkFilter, setCheckFilter] = useState<CheckFilter>("all");
+  const [sort, setSort] = useState<RulesSort | null>(null);
+  const [collapsedClauseIds, setCollapsedClauseIds] = useState<Set<string>>(new Set());
+
   const totalRuleCount = useMemo(
     () => config.clauses.reduce((count, clause) => count + clause.rules.length, 0),
     [config.clauses],
+  );
+
+  const query = searchText.trim().toLowerCase();
+  const hasActiveFilters =
+    clauseFilter !== "" || severityFilter !== "all" || checkFilter !== "all";
+  const isFlat = sort !== null || query !== "";
+
+  const allRows = useMemo<RuleRow[]>(
+    () =>
+      config.clauses.flatMap((clause) =>
+        clause.rules.map((rule) => ({
+          clauseId: clause.id,
+          clauseTitle: clause.title,
+          rule,
+        })),
+      ),
+    [config.clauses],
+  );
+
+  const matchedRows = useMemo(
+    () =>
+      allRows.filter((row) => {
+        if (clauseFilter && row.clauseId !== clauseFilter) {
+          return false;
+        }
+        if (severityFilter !== "all" && row.rule.failSeverity !== severityFilter) {
+          return false;
+        }
+        if (checkFilter !== "all" && row.rule.check.kind !== checkFilter) {
+          return false;
+        }
+        if (query && !rowMatchesQuery(row, query)) {
+          return false;
+        }
+        return true;
+      }),
+    [allRows, clauseFilter, severityFilter, checkFilter, query],
+  );
+
+  const flatRows = useMemo(() => {
+    if (!sort) {
+      return matchedRows;
+    }
+    const sorted = [...matchedRows].sort((a, b) =>
+      rowSortValue(a, sort.columnKey).localeCompare(rowSortValue(b, sort.columnKey), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      }),
+    );
+    return sort.direction === "desc" ? sorted.reverse() : sorted;
+  }, [matchedRows, sort]);
+
+  const visibleClauses = useMemo(
+    () =>
+      config.clauses
+        .map((clause) => ({
+          clause,
+          rows: matchedRows.filter((row) => row.clauseId === clause.id),
+        }))
+        .filter(({ rows }) => rows.length > 0 || !hasActiveFilters),
+    [config.clauses, matchedRows, hasActiveFilters],
   );
 
   useEffect(() => {
@@ -466,7 +715,6 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
         if (controller.signal.aborted) {
           return;
         }
-
         setTemplatesError(
           error instanceof Error ? error.message : "Starter templates could not be listed.",
         );
@@ -481,9 +729,7 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
   }, []);
 
   const handleExport = () => {
-    const blob = new Blob([serializeViewerValidationConfig(config)], {
-      type: "application/json",
-    });
+    const blob = new Blob([serializeViewerValidationConfig(config)], { type: "application/json" });
     const href = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = href;
@@ -497,7 +743,6 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
     if (!file) {
       return;
     }
-
     try {
       const importedConfig = parseViewerValidationConfigText(await file.text());
       replaceConfig(importedConfig);
@@ -512,7 +757,6 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
   const handleLoadStarterTemplate = async (template: ViewerRuleTemplateSummary) => {
     try {
       setLoadingTemplateId(template.templateId);
-
       const importedTemplate = await readRuleTemplate(template.templateId);
       replaceConfig(importedTemplate.config);
       setImportError(null);
@@ -525,198 +769,374 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
     }
   };
 
+  const handleToggleSort = (columnKey: SortColumnKey) => {
+    setSort((current) => {
+      if (current?.columnKey !== columnKey) {
+        return { columnKey, direction: "asc" };
+      }
+      if (current.direction === "asc") {
+        return { columnKey, direction: "desc" };
+      }
+      return null;
+    });
+  };
+
+  const toggleClauseCollapse = (clauseId: string) => {
+    setCollapsedClauseIds((current) => {
+      const next = new Set(current);
+      if (next.has(clauseId)) {
+        next.delete(clauseId);
+      } else {
+        next.add(clauseId);
+      }
+      return next;
+    });
+  };
+
+  const resetView = () => {
+    setSearchText("");
+    setClauseFilter("");
+    setSeverityFilter("all");
+    setCheckFilter("all");
+    setSort(null);
+  };
+
+  const groupColumnCount = 5;
+  const hasRules = totalRuleCount > 0;
+  const showNoMatches = hasRules && matchedRows.length === 0;
+
   return (
     <section
-      className={`flex min-h-0 w-full flex-col overflow-hidden rounded-[1.75rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] shadow-[var(--viewer-shadow)] ${
+      className={`flex min-h-0 w-full flex-col overflow-hidden rounded-[var(--r-panel)] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] shadow-[var(--viewer-shadow)] ${
         mode === "modal" ? "h-full" : "min-h-[calc(100vh-5rem)]"
       }`}
     >
-      <div className="border-b border-[color:var(--viewer-border)] bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(234,242,255,0.94))] px-5 py-3">
-        <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(44rem,56rem)] lg:items-start lg:gap-4">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-ink)]">
-                  COREY Rules
-                </div>
-                <h1 className="mt-1 text-xl font-semibold tracking-tight text-[color:var(--foreground)]">
-                  Validation clauses workspace
-                </h1>
-                <p className="mt-1.5 max-w-2xl text-sm leading-5 text-[color:var(--muted-ink)]">
-                  Group validation rules into clauses so failed elements can report which clause and
-                  which checks they broke.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {mode === "page" ? (
-                  <Link href="/" className={secondaryButtonClassName()}>
-                    Open COREY
-                  </Link>
-                ) : null}
-              </div>
-            </div>
-
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--viewer-border)] bg-[image:var(--viewer-header-bg)] px-5 py-3">
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-ink)]">
+            COREY Rules
           </div>
-
-          <aside className="w-full rounded-[1.2rem] border border-[color:var(--viewer-border)] bg-white/55 p-2.5 lg:justify-self-stretch">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-                  Starter Templates
-                </div>
-                <p className="mt-0.5 text-[11px] leading-4 text-[color:var(--muted-ink)]">
-                  Quick presets
-                </p>
-              </div>
-              {mode === "modal" && onClose ? (
-                <button
-                  type="button"
-                  aria-label="Close"
-                  title="Close"
-                  onClick={onClose}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              ) : null}
-            </div>
-
-            <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {templatesLoading ? (
-                <div className="rounded-[1rem] border border-[color:var(--viewer-border)] bg-white/70 px-2.5 py-2.5 text-xs text-[color:var(--muted-ink)]">
-                  Loading templates...
-                </div>
-              ) : templatesError ? (
-                <div className="rounded-[1rem] border border-[#c78972] bg-[#fff0ea] px-2.5 py-2.5 text-xs text-[#8a3e1f]">
-                  {templatesError}
-                </div>
-              ) : starterTemplates.length === 0 ? (
-                <div className="rounded-[1rem] border border-[color:var(--viewer-border)] bg-white/70 px-2.5 py-2.5 text-xs text-[color:var(--muted-ink)]">
-                  No templates available.
-                </div>
-              ) : (
-                starterTemplates.map((template) => {
-                  const isLoading = loadingTemplateId === template.templateId;
-
-                  return (
-                    <section
-                      key={template.templateId}
-                      className="rounded-[1rem] border border-[color:var(--viewer-border)] bg-white/70 px-2.5 py-2.5"
-                    >
-                      <div className="flex h-full items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <h2 className="text-sm font-semibold text-[color:var(--foreground)]">
-                            {template.name}
-                          </h2>
-                          <p className="mt-0.5 text-[11px] leading-4 text-[color:var(--muted-ink)]">
-                            {template.description}
-                          </p>
-                          <p className="mt-1 text-[11px] leading-4 text-[color:var(--muted-ink)]">
-                            {template.ruleCount} rules
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5 self-center">
-                          <button
-                            type="button"
-                            onClick={() => void handleLoadStarterTemplate(template)}
-                            disabled={loadingTemplateId !== null}
-                            className={`${compactButtonClassName()} disabled:cursor-wait disabled:opacity-60`}
-                          >
-                            {isLoading ? "..." : "Load"}
-                          </button>
-                          <a
-                            href={ruleTemplateConfigEndpoint(template.templateId)}
-                            download
-                            className={compactButtonClassName()}
-                          >
-                            JSON
-                          </a>
-                          {canDownloadTemplateSource(template) ? (
-                            <a
-                              href={ruleTemplateSourceEndpoint(template.templateId)}
-                              download
-                              className={compactButtonClassName()}
-                            >
-                              CSV
-                            </a>
-                          ) : null}
-                        </div>
-                      </div>
-                    </section>
-                  );
-                })
-              )}
-            </div>
-          </aside>
+          <h1 className="mt-0.5 text-xl font-semibold tracking-tight text-[color:var(--foreground)]">
+            Validation clauses
+          </h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <TemplatesPopover
+            templates={starterTemplates}
+            loading={templatesLoading}
+            error={templatesError}
+            loadingTemplateId={loadingTemplateId}
+            onLoad={(template) => void handleLoadStarterTemplate(template)}
+          />
+          {mode === "page" ? (
+            <Link href="/" className={secondaryButtonClassName()}>
+              Open COREY
+            </Link>
+          ) : null}
+          {mode === "modal" && onClose ? (
+            <button
+              type="button"
+              aria-label="Close"
+              title="Close"
+              onClick={onClose}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
         </div>
       </div>
 
+      {/* Toolbar */}
       <div className="border-b border-[color:var(--viewer-border)] px-5 py-3">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json,.json"
+          onChange={handleImport}
+          className="hidden"
+        />
         <div className="flex flex-wrap items-center gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="application/json,.json"
-            onChange={handleImport}
-            className="hidden"
-          />
-          <button type="button" onClick={addClause} className={secondaryButtonClassName()}>
-            Add clause
-          </button>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className={secondaryButtonClassName()}
+          <div className="relative min-w-[12rem] flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--muted-ink)]" />
+            <input
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              placeholder="Search IFC type, target, constraint…"
+              aria-label="Search rules"
+              className="h-9 w-full rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] pl-9 pr-9 text-sm text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent)]"
+            />
+            {searchText ? (
+              <button
+                type="button"
+                onClick={() => setSearchText("")}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-[var(--r-chip)] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
+
+          <select
+            value={clauseFilter}
+            onChange={(event) => setClauseFilter(event.target.value)}
+            aria-label="Filter by clause"
+            className={filterSelectClassName()}
           >
-            Import JSON
-          </button>
-          <button type="button" onClick={handleExport} className={secondaryButtonClassName()}>
-            Export JSON
-          </button>
-          <button
-            type="button"
-            onClick={() => replaceConfig(createEmptyViewerValidationConfig())}
-            className={secondaryButtonClassName()}
+            <option value="">All clauses</option>
+            {config.clauses.map((clause) => (
+              <option key={clause.id} value={clause.id}>
+                {clause.title || "Untitled clause"}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={severityFilter}
+            onChange={(event) => setSeverityFilter(event.target.value as SeverityFilter)}
+            aria-label="Filter by severity"
+            className={filterSelectClassName()}
           >
-            Clear all
-          </button>
+            <option value="all">Any severity</option>
+            <option value="error">Error</option>
+            <option value="warn">Warn</option>
+          </select>
+
+          <select
+            value={checkFilter}
+            onChange={(event) => setCheckFilter(event.target.value as CheckFilter)}
+            aria-label="Filter by check"
+            className={filterSelectClassName()}
+          >
+            <option value="all">Any check</option>
+            <option value="empty">Required</option>
+            <option value="enum">Enum</option>
+            <option value="numberRange">Range</option>
+          </select>
+
+          {isFlat || hasActiveFilters ? (
+            <button type="button" onClick={resetView} className={compactButtonClassName()}>
+              Reset
+            </button>
+          ) : null}
+
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <button type="button" onClick={addClause} className={secondaryButtonClassName()}>
+              <Plus className="h-4 w-4" />
+              Add clause
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className={secondaryButtonClassName()}
+            >
+              Import
+            </button>
+            <button type="button" onClick={handleExport} className={secondaryButtonClassName()}>
+              Export
+            </button>
+            <button
+              type="button"
+              onClick={() => replaceConfig(createEmptyViewerValidationConfig())}
+              className={secondaryButtonClassName()}
+            >
+              Clear all
+            </button>
+          </div>
         </div>
 
         {importError ? (
-          <div className="mt-3 rounded-2xl border border-[#c78972] bg-[#fff0ea] px-3 py-2 text-sm text-[#8a3e1f]">
+          <div className="mt-3 rounded-[var(--r-control)] border border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] px-3 py-2 text-sm text-[color:var(--danger-fg)]">
             {importError}
           </div>
         ) : null}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+      {/* Grid */}
+      <div className="min-h-0 flex-1 overflow-auto">
         {config.clauses.length === 0 ? (
-          <div className="rounded-[1.5rem] border border-dashed border-[color:var(--viewer-border)] bg-white/45 px-6 py-8 text-center">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-              No Clauses Yet
+          <div className="flex h-full items-center justify-center px-5 py-8">
+            <div className="max-w-xl rounded-[var(--r-panel)] border border-dashed border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-6 py-8 text-center">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+                No clauses yet
+              </div>
+              <div className="mt-3 text-lg font-semibold text-[color:var(--foreground)]">
+                Add your first validation clause
+              </div>
+              <p className="mt-2 text-sm leading-6 text-[color:var(--muted-ink)]">
+                Group rules into clauses so failed elements report which clause and checks they broke.
+                Or load a starter set from Templates.
+              </p>
+              <button
+                type="button"
+                onClick={addClause}
+                className={`${secondaryButtonClassName()} mx-auto mt-4`}
+              >
+                <Plus className="h-4 w-4" />
+                Add clause
+              </button>
             </div>
-            <div className="mt-3 text-lg font-semibold text-[color:var(--foreground)]">
-              Add your first validation clause
+          </div>
+        ) : showNoMatches ? (
+          <div className="flex h-full items-center justify-center px-5 py-8">
+            <div className="max-w-xl rounded-[var(--r-panel)] border border-dashed border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-6 py-8 text-center">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+                No matching rules
+              </div>
+              <div className="mt-3 text-lg font-semibold text-[color:var(--foreground)]">
+                Every rule is hidden by the current view
+              </div>
+              <p className="mt-2 text-sm leading-6 text-[color:var(--muted-ink)]">
+                Adjust the search or the clause, severity, and check filters to bring rules back.
+              </p>
+              <button type="button" onClick={resetView} className={`${compactButtonClassName()} mx-auto mt-4`}>
+                Reset view
+              </button>
             </div>
-            <p className="mt-2 text-sm leading-6 text-[color:var(--muted-ink)]">
-              Clauses are global to this browser profile and export as version 2 clause-based JSON.
-            </p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {config.clauses.map((clause) => (
-              <ClauseCard
-                key={clause.id}
-                clause={clause}
-                onChange={(nextClause) => updateClause(clause.id, nextClause)}
-                onRemove={() => removeClause(clause.id)}
-                onAddRule={() => addRule(clause.id)}
-                onUpdateRule={(ruleId, nextRule) => updateRule(clause.id, ruleId, nextRule)}
-                onRemoveRule={(ruleId) => removeRule(clause.id, ruleId)}
-              />
-            ))}
-          </div>
+          <table className="min-w-full border-separate border-spacing-0 text-left">
+            <thead className="sticky top-0 z-10 bg-[color:var(--panel-bg)]">
+              <tr>
+                {isFlat ? (
+                  <SortableHeader
+                    label="Clause"
+                    columnKey="clause"
+                    sort={sort}
+                    onToggle={handleToggleSort}
+                    widthClassName="min-w-[12rem]"
+                  />
+                ) : null}
+                <SortableHeader
+                  label="IFC Type"
+                  columnKey="ifcType"
+                  sort={sort}
+                  onToggle={handleToggleSort}
+                  widthClassName={`min-w-[10rem] ${columnDividerClassName}`}
+                />
+                <SortableHeader
+                  label="Target"
+                  columnKey="target"
+                  sort={sort}
+                  onToggle={handleToggleSort}
+                  widthClassName={`min-w-[18rem] ${columnDividerClassName}`}
+                />
+                <SortableHeader
+                  label="Constraint"
+                  columnKey="constraint"
+                  sort={sort}
+                  onToggle={handleToggleSort}
+                  widthClassName={`min-w-[16rem] ${columnDividerClassName}`}
+                />
+                <SortableHeader
+                  label="Severity"
+                  columnKey="severity"
+                  sort={sort}
+                  onToggle={handleToggleSort}
+                  widthClassName="w-[8rem]"
+                />
+                <th scope="col" className={`${headerCellClassName} w-[4rem] text-right`}>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--foreground)]">
+                    {/* actions */}
+                  </span>
+                </th>
+              </tr>
+            </thead>
+
+            {isFlat ? (
+              <tbody>
+                {flatRows.map((row) => (
+                  <RuleTableRow
+                    key={row.rule.id}
+                    row={row}
+                    showClause
+                    onChange={(nextRule) => updateRule(row.clauseId, row.rule.id, nextRule)}
+                    onRemove={() => removeRule(row.clauseId, row.rule.id)}
+                  />
+                ))}
+              </tbody>
+            ) : (
+              visibleClauses.map(({ clause, rows }) => {
+                const collapsed = collapsedClauseIds.has(clause.id);
+                return (
+                  <tbody key={clause.id}>
+                    <tr className="bg-[color:var(--panel-bg)]/70">
+                      <td colSpan={groupColumnCount} className="border-b border-[color:var(--viewer-border)] px-2 py-1.5">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleClauseCollapse(clause.id)}
+                            aria-expanded={!collapsed}
+                            aria-label={collapsed ? "Expand clause" : "Collapse clause"}
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--r-chip)] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
+                          >
+                            {collapsed ? (
+                              <ChevronRight className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </button>
+                          <input
+                            value={clause.title}
+                            onChange={(event) =>
+                              updateClause(clause.id, { ...clause, title: event.target.value })
+                            }
+                            className="min-w-0 flex-1 rounded-[var(--r-control)] border border-transparent bg-transparent px-2 py-1 text-sm font-semibold text-[color:var(--foreground)] outline-none transition hover:border-[color:var(--viewer-border)] focus:border-[color:var(--accent)] focus:bg-[color:var(--surface-strong)]"
+                            placeholder="Clause title"
+                            aria-label="Clause title"
+                          />
+                          <span className="shrink-0 rounded-[var(--r-chip)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2 py-0.5 font-mono text-[11px] tabular-nums text-[color:var(--muted-ink)]">
+                            {clause.rules.length}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => addRule(clause.id)}
+                            className={compactButtonClassName()}
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            Rule
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeClause(clause.id)}
+                            aria-label="Remove clause"
+                            title="Remove clause"
+                            className={destructiveButtonClassName()}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {collapsed
+                      ? null
+                      : rows.length === 0
+                        ? (
+                          <tr>
+                            <td
+                              colSpan={groupColumnCount}
+                              className="border-b border-[color:var(--viewer-border)] px-4 py-3 text-sm text-[color:var(--muted-ink)]"
+                            >
+                              No rules yet — add one with the Rule button.
+                            </td>
+                          </tr>
+                        )
+                        : rows.map((row) => (
+                            <RuleTableRow
+                              key={row.rule.id}
+                              row={row}
+                              showClause={false}
+                              onChange={(nextRule) => updateRule(row.clauseId, row.rule.id, nextRule)}
+                              onRemove={() => removeRule(row.clauseId, row.rule.id)}
+                            />
+                          ))}
+                  </tbody>
+                );
+              })
+            )}
+          </table>
         )}
       </div>
 
@@ -725,6 +1145,9 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
         segments={[
           { id: "clauses", label: `${config.clauses.length} clauses` },
           { id: "rules", label: `${totalRuleCount} rules` },
+          ...(isFlat || hasActiveFilters
+            ? [{ id: "shown", label: `${matchedRows.length} shown` } as const]
+            : []),
           {
             id: "saved",
             label: importError ? "Not saved" : "Saved",
@@ -738,6 +1161,7 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
               { label: "Storage", value: "Auto-saved to this browser profile" },
               { label: "Clauses", value: config.clauses.length },
               { label: "Rules", value: totalRuleCount },
+              { label: "Matching view", value: matchedRows.length },
               { label: "Last error", value: importError ?? "None" },
             ]}
           />
