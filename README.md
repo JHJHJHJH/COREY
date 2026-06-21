@@ -12,8 +12,6 @@
 
 **[🚀 Try COREY online](https://coreyifc.com)** · **[📖 Docs](https://coreyifc.com/docs)**
 
-<video src="https://github.com/user-attachments/assets/eb3162f5-1aa9-489b-b0a7-f8d6d3b4a2e2" controls muted playsinline width="800"></video>
-
 [Watch the full demo video](https://github.com/user-attachments/assets/eb3162f5-1aa9-489b-b0a7-f8d6d3b4a2e2)
 
 </div>
@@ -28,14 +26,8 @@ teams need a faster way to check and correct those requirements before submissio
 
 The workflow is simple:
 
-```mermaid
-flowchart LR
-  open["Open IFC"] --> validate["Validate against checking clauses"]
-  validate --> export["Export to Excel"]
-  export --> edit["Batch edit"]
-  edit --> import["Import back into COREY"]
-  import --> revalidate["Validate again"]
-```
+**Open IFC** -> **Validate against checking clauses** -> **Export to Excel** ->
+**Batch edit** -> **Import back into COREY** -> **Validate again**
 
 You can see the building in 3D, click problem elements, inspect their data, and
 use familiar Excel workflows to fix repeated data gaps.
