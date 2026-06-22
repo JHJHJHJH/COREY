@@ -106,3 +106,12 @@ export function isUserRequired() {
   const raw = process.env.COREY_REQUIRE_USER;
   return raw ? TRUTHY_VALUES.has(raw.trim().toLowerCase()) : false;
 }
+
+// Externally hosted documentation site. When set, /docs requests redirect here
+// instead of serving the bundled docs (e.g. https://coreyifc.com/docs). The
+// trailing slash is trimmed so callers can append a path suffix. Returns null
+// when unset, leaving the bundled docs in place.
+export function getDocsExternalUrl() {
+  const value = process.env.DOCS_EXTERNAL_URL?.trim().replace(/\/+$/, "");
+  return value && value.length > 0 ? value : null;
+}
