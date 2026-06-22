@@ -46,31 +46,18 @@ Start or recreate the stack after rebuilding:
 docker compose --env-file .env -f docker/docker-compose.release.yml up -d --force-recreate
 ```
 
-## Railway Deployment
+## External Docs Redirect
 
-`Dockerfile.railway` (repo root) builds the app **without** the bundled fumadocs
-docs. The in-app "Docs" link and the `/docs` route are redirected to the
-canonical docs site (default `https://coreyifc.com/docs`), which removes the
-fumadocs-mdx content compile from the build.
-
-In the Railway service settings:
-
-- **Dockerfile Path:** `Dockerfile.railway`
-- **Pre-deploy command:** `npx prisma migrate deploy`
-- Railway injects `PORT` automatically; set `DATABASE_URL` and the usual app env
-  vars in the service.
-
-To point docs somewhere other than the public site, set a build arg/variable:
+Set `DOCS_EXTERNAL_URL` to redirect the in-app "Docs" link and the `/docs` route
+to externally hosted documentation instead of serving the bundled docs:
 
 ```bash
-DOCS_EXTERNAL_URL=https://docs.example.com/docs
+DOCS_EXTERNAL_URL=https://coreyifc.com/docs
 ```
 
-Build locally to verify:
-
-```bash
-docker build -f Dockerfile.railway -t corey:railway .
-```
+This is read at request time, so the standard image works with or without it —
+set the variable on the deployment (e.g. Railway) and `/docs/<path>` redirects to
+`https://coreyifc.com/docs/<path>`. Leave it unset to serve the bundled docs.
 
 ## Force a Clean Image Refresh
 
