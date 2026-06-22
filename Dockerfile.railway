@@ -1,0 +1,139 @@
+# Railway deployment image.
+#
+# Differs from the default ./Dockerfile in one way: it does NOT build the
+# bundled fumadocs documentation site. The in-app "Docs" link and the /docs
+# route are redirected to the canonical docs hosted at DOCS_EXTERNAL_URL
+# (default https://coreyifc.com/docs). This drops fumadocs-mdx from the build,
+# which removes the MDX content compile step and trims build time.
+#
+# Railway: set the service's Dockerfile path to "Dockerfile.railway". Run
+# migrations via a pre-deploy command: `npx prisma migrate deploy`.
+
+FROM node:22-slim AS base
+
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+
+WORKDIR /app
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/* \
+  && corepack enable \
+  && corepack prepare pnpm@10.32.1 --activate
+
+FROM base AS deps
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml prisma.config.ts tsconfig.json ./
+COPY prisma ./prisma
+
+# --ignore-scripts skips the postinstall `fumadocs-mdx` doc generation (and the
+# Prisma generate, which we run explicitly below).
+RUN mkdir -p src && pnpm install --frozen-lockfile --ignore-scripts
+
+FROM deps AS builder
+
+COPY . .
+
+# Strip the fumadocs documentation surface so nothing pulls in the generated
+# `.source` collection at build time:
+#   - src/app/docs           the docs UI route
+#   - src/app/api/search     fumadocs search endpoint (only used by docs UI)
+#   - src/lib/docs-*         docs source loader + layout
+#   - src/components/mdx.tsx MDX component map (only used by docs page)
+#   - content, source.config.ts  the MDX content + fumadocs-mdx config
+RUN rm -rf \
+  src/app/docs \
+  src/app/api/search \
+  src/lib/docs-source.ts \
+  src/lib/docs-layout.tsx \
+  src/components/mdx.tsx \
+  content \
+  source.config.ts
+
+# Replace next.config.mjs with a docs-free variant: drop the fumadocs `withMDX`
+# wrapper and redirect /docs to the externally hosted documentation.
+RUN cat > next.config.mjs <<'EOF'
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const appRoot = fileURLToPath(new URL(".", import.meta.url));
+// Canonical docs live off this deployment; default to the public site.
+const docsUrl = process.env.DOCS_EXTERNAL_URL ?? "https://coreyifc.com/docs";
+
+/** @type {import("next").NextConfig} */
+const nextConfig = {
+  output: "standalone",
+  async redirects() {
+    return [
+      {
+        source: "/rules",
+        destination: "/clause",
+        permanent: true,
+      },
+      {
+        source: "/docs",
+        destination: docsUrl,
+        permanent: false,
+      },
+      {
+        source: "/docs/:path*",
+        destination: `${docsUrl}/:path*`,
+        permanent: false,
+      },
+    ];
+  },
+  turbopack: {
+    // Keep Turbopack scoped to this app instead of the parent home directory.
+    root: resolve(appRoot),
+  },
+  // Keep native/server-only deps out of the bundler; they run only in route handlers.
+  serverExternalPackages: ["@prisma/client", "@prisma/adapter-pg", "pg", "web-ifc"],
+};
+
+export default nextConfig;
+EOF
+
+# Where the in-app docs links should point. Baked in at build time because
+# next.config redirects() is evaluated during `next build`.
+ARG DOCS_EXTERNAL_URL=https://coreyifc.com/docs
+ENV DOCS_EXTERNAL_URL=$DOCS_EXTERNAL_URL
+
+# Next imports API route modules during build; Prisma only needs a parseable URL here.
+ENV DATABASE_URL=postgresql://docker-build:docker-build@localhost:5432/docker-build?schema=public
+
+RUN pnpm prisma generate
+# Call next directly to skip the package.json `build` script's fumadocs-mdx step.
+RUN pnpm exec next build --webpack
+
+FROM node:22-slim AS runner
+
+ENV HOSTNAME=0.0.0.0
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+# Railway injects its own PORT at runtime, which overrides this default.
+ENV PORT=4000
+
+WORKDIR /app
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
+# Prisma kept available so a pre-deploy command can run `npx prisma migrate deploy`.
+RUN npm install --no-audit --no-fund prisma@7.8.0 dotenv
+COPY --chown=node:node --from=builder /app/prisma ./prisma
+COPY --chown=node:node --from=builder /app/prisma.config.ts ./prisma.config.ts
+
+COPY --chown=node:node --from=builder /app/.next/standalone ./
+COPY --chown=node:node --from=builder /app/.next/static ./.next/static
+COPY --chown=node:node --from=builder /app/public ./public
+
+USER node
+
+EXPOSE 4000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 4000) + '/api/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+
+CMD ["node", "server.js"]
