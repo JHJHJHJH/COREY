@@ -1,7 +1,10 @@
 "use client";
 
 import {
+  ArrowDown,
+  ArrowUp,
   ChevronDown,
+  ChevronsUpDown,
   ClipboardCheck,
   Columns3,
   FilterX,
@@ -59,6 +62,31 @@ type DataTableUiState = {
   selectedRowKeys: Set<string>;
 };
 
+/* ------------------------------------------------------------------ */
+/* Token-driven class helpers — mirror the clause page's precise        */
+/* engineering identity (mono spec data, hairlines, tight radii).       */
+/* ------------------------------------------------------------------ */
+
+function secondaryButtonClassName() {
+  return "inline-flex h-9 items-center gap-2 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 text-sm font-medium text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50";
+}
+
+function iconButtonClassName() {
+  return "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]";
+}
+
+// Mono tabular count/status pill.
+function chipClassName() {
+  return "inline-flex items-center rounded-[var(--r-chip)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2 py-0.5 font-mono text-[11px] tabular-nums text-[color:var(--muted-ink)]";
+}
+
+const headerCellClassName =
+  "border-b border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-2 align-bottom";
+const bodyCellClassName =
+  "border-b border-[color:var(--viewer-border)] px-3 py-2 align-top";
+// Vertical hairline separating columns, like the clause grid.
+const columnDividerClassName = "border-r border-[color:var(--viewer-border)]";
+
 function validationClauseTone(result: ViewerValidationClauseTableView["result"]) {
   return result === "error"
     ? "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]"
@@ -85,15 +113,15 @@ function sortLabel(sort: ViewerDataTableSort | null, columnKey: string) {
   return sort.direction === "asc" ? "Ascending" : "Descending";
 }
 
-function SortIndicator({ sort, columnKey }: { sort: ViewerDataTableSort | null; columnKey: string }) {
-  if (!sort || sort.columnKey !== columnKey) {
-    return <span className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">Sort</span>;
+// Inactive: a faint chevron pair. Active: an accent arrow in the sort direction.
+function SortGlyph({ active, direction }: { active: boolean; direction: "asc" | "desc" }) {
+  if (!active) {
+    return <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-[color:var(--muted-ink)] opacity-50" />;
   }
-
-  return (
-    <span className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--accent)]">
-      {sort.direction === "asc" ? "Asc" : "Desc"}
-    </span>
+  return direction === "asc" ? (
+    <ArrowUp className="h-3.5 w-3.5 shrink-0 text-[color:var(--accent)]" />
+  ) : (
+    <ArrowDown className="h-3.5 w-3.5 shrink-0 text-[color:var(--accent)]" />
   );
 }
 
@@ -189,7 +217,7 @@ function EditableDataTableCell({
         }
       }}
       aria-label={`Edit ${column.label} for ${rowLabel}`}
-      className="min-h-8 w-full min-w-[10rem] rounded-lg border border-transparent bg-transparent px-2 py-1 font-mono text-[12px] leading-5 text-current outline-none transition hover:border-[color:var(--viewer-border)] hover:bg-[color:var(--surface-soft)] focus:border-[color:var(--accent)] focus:bg-[color:var(--surface-strong)]"
+      className="min-h-8 w-full min-w-[10rem] rounded-[var(--r-control)] border border-transparent bg-transparent px-2 py-1 font-mono text-[12px] leading-5 tabular-nums text-current outline-none transition hover:border-[color:var(--viewer-border)] hover:bg-[color:var(--surface-soft)] focus:border-[color:var(--accent)] focus:bg-[color:var(--surface-strong)]"
     />
   );
 }
@@ -233,7 +261,7 @@ const DataTableContent = memo(function DataTableContent({
     <div className="min-h-0 flex-1 overflow-hidden">
       {!data && tablePhase === "loading" ? (
         <div className="flex h-full items-center justify-center px-5 py-6">
-          <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] px-6 py-6 text-center">
+          <div className="max-w-2xl rounded-[var(--r-panel)] border border-dashed border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] px-6 py-6 text-center">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--warning-fg)]">
               Loading Table
             </div>
@@ -245,7 +273,7 @@ const DataTableContent = memo(function DataTableContent({
         </div>
       ) : !data && tablePhase === "error" ? (
         <div className="flex h-full items-center justify-center px-5 py-6">
-          <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] px-6 py-6 text-center">
+          <div className="max-w-2xl rounded-[var(--r-panel)] border border-dashed border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] px-6 py-6 text-center">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--danger-fg)]">
               Table Unavailable
             </div>
@@ -257,7 +285,7 @@ const DataTableContent = memo(function DataTableContent({
         </div>
       ) : !data ? (
         <div className="flex h-full items-center justify-center px-5 py-6">
-          <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-6 py-6 text-center shadow-[inset_0_1px_0_var(--hairline)]">
+          <div className="max-w-2xl rounded-[var(--r-panel)] border border-dashed border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-6 py-6 text-center shadow-[inset_0_1px_0_var(--hairline)]">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
               No Table Data
             </div>
@@ -272,7 +300,7 @@ const DataTableContent = memo(function DataTableContent({
         </div>
       ) : data.rows.length === 0 ? (
         <div className="flex h-full items-center justify-center px-5 py-6">
-          <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-6 py-6 text-center">
+          <div className="max-w-2xl rounded-[var(--r-panel)] border border-dashed border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-6 py-6 text-center">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
               Empty Model Table
             </div>
@@ -287,7 +315,7 @@ const DataTableContent = memo(function DataTableContent({
         </div>
       ) : visibleRows.length === 0 ? (
         <div className="flex h-full items-center justify-center px-5 py-6">
-          <div className="max-w-2xl rounded-[1.5rem] border border-dashed border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-6 py-6 text-center">
+          <div className="max-w-2xl rounded-[var(--r-panel)] border border-dashed border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-6 py-6 text-center">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
               No Matching Rows
             </div>
@@ -305,7 +333,7 @@ const DataTableContent = memo(function DataTableContent({
           <table className="min-w-full border-separate border-spacing-0 text-left">
             <thead className="sticky top-0 z-10 bg-[color:var(--panel-bg)]">
               <tr>
-                <th className="w-12 border-b border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-3">
+                <th className={`w-12 ${headerCellClassName} ${columnDividerClassName} align-middle`}>
                   <input
                     ref={selectAllRef}
                     type="checkbox"
@@ -315,38 +343,39 @@ const DataTableContent = memo(function DataTableContent({
                     aria-label="Select all visible rows"
                   />
                 </th>
-                {visibleColumns.map((column) => (
-                  <th
-                    key={column.key}
-                    aria-sort={
-                      sort?.columnKey === column.key
-                        ? sort.direction === "asc"
-                          ? "ascending"
-                          : "descending"
-                        : "none"
-                    }
-                    className="min-w-[12rem] border-b border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-3 align-bottom"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => onToggleSort(column.key)}
-                      className="flex w-full items-end justify-between gap-3 text-left"
-                      aria-label={`${sortLabel(sort, column.key)} by ${column.label}`}
+                {visibleColumns.map((column, columnIndex) => {
+                  const active = sort?.columnKey === column.key;
+                  return (
+                    <th
+                      key={column.key}
+                      aria-sort={
+                        active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"
+                      }
+                      className={`min-w-[12rem] ${headerCellClassName} ${
+                        columnIndex < visibleColumns.length - 1 ? columnDividerClassName : ""
+                      }`}
                     >
-                      <span className="min-w-0">
-                        {column.group ? (
-                          <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-                            {column.group}
+                      <button
+                        type="button"
+                        onClick={() => onToggleSort(column.key)}
+                        className="flex w-full items-end justify-between gap-3 rounded-[var(--r-chip)] text-left outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]"
+                        aria-label={`${sortLabel(sort, column.key)} by ${column.label}`}
+                      >
+                        <span className="min-w-0">
+                          {column.group ? (
+                            <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+                              {column.group}
+                            </span>
+                          ) : null}
+                          <span className="mt-1 block break-words text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--foreground)]">
+                            {column.label}
                           </span>
-                        ) : null}
-                        <span className="mt-1 block break-words text-sm font-semibold text-[color:var(--foreground)]">
-                          {column.label}
                         </span>
-                      </span>
-                      <SortIndicator sort={sort} columnKey={column.key} />
-                    </button>
-                  </th>
-                ))}
+                        <SortGlyph active={active} direction={active ? sort.direction : "asc"} />
+                      </button>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
 
@@ -354,6 +383,7 @@ const DataTableContent = memo(function DataTableContent({
               {visibleRows.map((row) => {
                 const checked = selectedRowKeys.has(row.key);
                 const selected = activeSelection?.localId === row.localId;
+                const edited = rowHasImportedEdits(row);
 
                 return (
                   <tr
@@ -367,7 +397,11 @@ const DataTableContent = memo(function DataTableContent({
                           : "bg-transparent"
                     }`}
                   >
-                    <td className="border-b border-[color:var(--viewer-border)] px-3 py-3 align-top">
+                    <td
+                      className={`${bodyCellClassName} ${columnDividerClassName} border-l-[3px] align-middle ${
+                        edited ? "border-l-[color:var(--success-border)]" : "border-l-transparent"
+                      }`}
+                    >
                       <input
                         type="checkbox"
                         checked={checked}
@@ -377,7 +411,7 @@ const DataTableContent = memo(function DataTableContent({
                         aria-label={`Select row ${row.localId}`}
                       />
                     </td>
-                    {visibleColumns.map((column) => {
+                    {visibleColumns.map((column, columnIndex) => {
                       const cell = row.cells[column.key];
                       const draftCell = cell?.source === "draft";
                       const editable = column.editable && Boolean(column.binding);
@@ -385,7 +419,9 @@ const DataTableContent = memo(function DataTableContent({
                       return (
                         <td
                           key={column.key}
-                          className={`border-b border-[color:var(--viewer-border)] px-3 py-3 align-top text-sm ${
+                          className={`${bodyCellClassName} text-sm ${
+                            columnIndex < visibleColumns.length - 1 ? columnDividerClassName : ""
+                          } ${
                             draftCell
                               ? "bg-[color:var(--success-bg)] text-[color:var(--success-fg)]"
                               : cell
@@ -402,15 +438,10 @@ const DataTableContent = memo(function DataTableContent({
                               onEditCell={onEditCell}
                             />
                           ) : (
-                            <div className="min-w-0 break-words font-mono text-[12px] leading-5">
+                            <div className="min-w-0 break-words font-mono text-[12px] leading-5 tabular-nums">
                               {cell?.text ?? "MISSING"}
                             </div>
                           )}
-                          {draftCell ? (
-                            <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--success-fg)]">
-                              Edited
-                            </div>
-                          ) : null}
                         </td>
                       );
                     })}
@@ -836,19 +867,18 @@ const DataTablePanelComponent = function DataTablePanel({
       className={`flex h-full min-h-0 flex-col overflow-hidden ${
         embedded
           ? "bg-[color:var(--panel-bg)]/96"
-          : "rounded-[1.75rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] shadow-[var(--viewer-shadow)]"
+          : "rounded-[var(--r-panel)] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] shadow-[var(--viewer-shadow)]"
       }`}
     >
       <div
         id="table-filters"
         className="relative z-20 border-b border-[color:var(--viewer-border)] px-4 py-3"
       >
-        <div className="rounded-[1.4rem] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] p-3 shadow-[inset_0_1px_0_var(--hairline)]">
-          <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3">
             <div className="flex items-center gap-3">
               <div className="shrink-0">
-                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-                  Table Filters
+                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--muted-ink)]">
+                  Table filters
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[color:var(--muted-ink)]">
                   <span>{showFilters ? "Expanded" : "Collapsed"}</span>
@@ -859,10 +889,7 @@ const DataTablePanelComponent = function DataTablePanel({
                   )}
                   {!showFilters
                     ? activeFilterLabels.slice(0, 3).map((label) => (
-                        <span
-                          key={label}
-                          className="rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1"
-                        >
+                        <span key={label} className={chipClassName()}>
                           {label}
                         </span>
                       ))
@@ -884,7 +911,7 @@ const DataTablePanelComponent = function DataTablePanel({
                     placeholder="Filter by element values, attributes, or property set values"
                     aria-label="Filter table rows"
                     disabled={!data}
-                    className="h-10 w-full rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] py-2 pl-11 pr-10 text-sm text-[color:var(--foreground)] outline-none transition placeholder:text-[color:var(--muted-ink)] focus:border-[color:var(--accent)] focus:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="h-9 w-full rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] py-2 pl-11 pr-10 text-sm text-[color:var(--foreground)] outline-none transition placeholder:text-[color:var(--muted-ink)] focus:border-[color:var(--accent)] focus:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
                   />
                   {activeUiState.query ? (
                     <button
@@ -895,7 +922,7 @@ const DataTablePanelComponent = function DataTablePanel({
                           query: "",
                         }))
                       }
-                      className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
+                      className="absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-[var(--r-chip)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
                       aria-label="Clear text filter"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -905,16 +932,13 @@ const DataTablePanelComponent = function DataTablePanel({
               </div>
 
               {hasActiveFilters ? (
-                <div className="flex h-10 min-w-[18rem] max-w-[24rem] shrink-0 items-center gap-2 rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 text-[11px] text-[color:var(--muted-ink)]">
+                <div className="flex h-9 min-w-[18rem] max-w-[24rem] shrink-0 items-center gap-2 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 text-[11px] text-[color:var(--muted-ink)]">
                   <span className="shrink-0 font-semibold uppercase tracking-[0.16em] text-[color:var(--foreground)]">
-                    Active Filters
+                    Active
                   </span>
                   <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
                     {activeFilterLabels.map((label) => (
-                      <span
-                        key={label}
-                        className="shrink-0 rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-1"
-                      >
+                      <span key={label} className={`shrink-0 ${chipClassName()}`}>
                         {label}
                       </span>
                     ))}
@@ -925,7 +949,7 @@ const DataTablePanelComponent = function DataTablePanel({
                       void resetFilters();
                     }}
                     disabled={!data || isSyncingToView}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-3 py-1 font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:border-[color:var(--accent)] hover:bg-[color:var(--accent-wash)] hover:text-[color:var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--r-chip)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-2 py-1 font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:border-[color:var(--accent)] hover:bg-[color:var(--accent-wash)] hover:text-[color:var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <FilterX className="h-3.5 w-3.5" />
                     Reset
@@ -938,7 +962,7 @@ const DataTablePanelComponent = function DataTablePanel({
                 aria-controls="table-filters-content"
                 aria-expanded={showFilters}
                 onClick={() => setShowFilters((current) => !current)}
-                className="ml-auto inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]"
+                className={`ml-auto ${iconButtonClassName()}`}
                 aria-label={showFilters ? "Collapse filters drawer" : "Expand filters drawer"}
                 title={showFilters ? "Collapse filters" : "Expand filters"}
               >
@@ -969,7 +993,7 @@ const DataTablePanelComponent = function DataTablePanel({
                         }))
                       }
                       disabled={!data}
-                      className="w-full rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-4 py-3 text-sm text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent)] focus:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="h-9 w-full rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 text-sm text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent)] focus:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <option value="">All IFC types</option>
                       {data?.ifcTypes.map((ifcType) => (
@@ -990,7 +1014,7 @@ const DataTablePanelComponent = function DataTablePanel({
                           setShowColumnMenu(false);
                         }}
                         disabled={!data}
-                        className={`inline-flex max-w-full items-center gap-2 rounded-2xl border px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${activeClauseView ? validationClauseTone(activeClauseView.result) : compactButtonTone(showClauseMenu)}`}
+                        className={`inline-flex h-9 max-w-full items-center gap-2 rounded-[var(--r-control)] border px-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${activeClauseView ? validationClauseTone(activeClauseView.result) : compactButtonTone(showClauseMenu)}`}
                       >
                         <ClipboardCheck className="h-4 w-4 shrink-0" />
                         <span className="min-w-0 truncate">
@@ -1002,10 +1026,10 @@ const DataTablePanelComponent = function DataTablePanel({
                       </button>
 
                       {showClauseMenu ? (
-                        <div className="absolute left-0 top-[calc(100%+0.5rem)] z-40 w-[min(28rem,85vw)] rounded-[1.25rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] p-3 shadow-[var(--viewer-shadow)]">
+                        <div className="absolute left-0 top-[calc(100%+0.5rem)] z-40 w-[min(28rem,85vw)] rounded-[var(--r-panel)] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] p-3 shadow-[var(--viewer-shadow-lift)]">
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+                              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
                                 Validation Clauses
                               </div>
                               <div className="mt-1 text-[11px] text-[color:var(--muted-ink)]">
@@ -1015,7 +1039,7 @@ const DataTablePanelComponent = function DataTablePanel({
                             <button
                               type="button"
                               onClick={() => setShowClauseMenu(false)}
-                              className="flex h-8 w-8 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
+                              className="flex h-8 w-8 items-center justify-center rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
                               aria-label="Close validation clause filter"
                             >
                               <X className="h-4 w-4" />
@@ -1026,7 +1050,7 @@ const DataTablePanelComponent = function DataTablePanel({
                             <button
                               type="button"
                               onClick={() => setValidationClauseFilter("")}
-                              className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm transition ${
+                              className={`flex w-full items-center justify-between rounded-[var(--r-control)] border px-3 py-2.5 text-left text-sm transition ${
                                 activeClauseView
                                   ? "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
                                   : "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
@@ -1045,7 +1069,7 @@ const DataTablePanelComponent = function DataTablePanel({
                                     key={clause.clauseId}
                                     type="button"
                                     onClick={() => setValidationClauseFilter(clause.clauseId)}
-                                    className={`flex w-full items-start justify-between gap-3 rounded-2xl border px-3 py-3 text-left text-sm transition ${
+                                    className={`flex w-full items-start justify-between gap-3 rounded-[var(--r-control)] border px-3 py-2.5 text-left text-sm transition ${
                                       activeClauseView?.clauseId === clause.clauseId
                                         ? validationClauseTone(clause.result)
                                         : "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
@@ -1064,7 +1088,7 @@ const DataTablePanelComponent = function DataTablePanel({
                                 ))}
                               </div>
                             ) : (
-                              <div className="rounded-2xl border border-dashed border-[color:var(--viewer-border)] px-4 py-4 text-sm text-[color:var(--muted-ink)]">
+                              <div className="rounded-[var(--r-control)] border border-dashed border-[color:var(--viewer-border)] px-4 py-4 text-sm text-[color:var(--muted-ink)]">
                                 Run validation to filter the table by clause.
                               </div>
                             )}
@@ -1082,7 +1106,7 @@ const DataTablePanelComponent = function DataTablePanel({
                           showEditedOnly: !current.showEditedOnly,
                         }))
                       }
-                      className={`rounded-2xl border px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${compactButtonTone(activeUiState.showEditedOnly)}`}
+                      className={`h-9 rounded-[var(--r-control)] border px-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${compactButtonTone(activeUiState.showEditedOnly)}`}
                     >
                       Show edited only
                     </button>
@@ -1093,7 +1117,7 @@ const DataTablePanelComponent = function DataTablePanel({
                       onClick={() => {
                         void handleSyncToView();
                       }}
-                      className={`inline-flex items-center gap-2 rounded-2xl border px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${compactButtonTone(Boolean(visibleRowKeysInView))}`}
+                      className={`inline-flex items-center gap-2 h-9 rounded-[var(--r-control)] border px-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${compactButtonTone(Boolean(visibleRowKeysInView))}`}
                     >
                       <RefreshCw className={`h-4 w-4 ${isSyncingToView ? "animate-spin" : ""}`} />
                       {isSyncingToView ? "Syncing view..." : "Sync to view"}
@@ -1108,12 +1132,12 @@ const DataTablePanelComponent = function DataTablePanel({
                           setShowClauseMenu(false);
                         }}
                         disabled={!data}
-                        className={`inline-flex items-center gap-2 rounded-2xl border px-3.5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${compactButtonTone(showColumnMenu || hasCustomVisibleColumns)}`}
+                        className={`inline-flex items-center gap-2 h-9 rounded-[var(--r-control)] border px-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${compactButtonTone(showColumnMenu || hasCustomVisibleColumns)}`}
                       >
                         <Columns3 className="h-4 w-4 shrink-0" />
                         <span>Columns</span>
                         {dynamicColumns.length > 0 ? (
-                          <span className="rounded-full bg-[color:var(--accent-wash)] px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-[color:var(--accent-strong)]">
+                          <span className="rounded-[var(--r-chip)] bg-[color:var(--accent-wash)] px-2 py-0.5 font-mono text-[10px] tabular-nums uppercase tracking-[0.14em] text-[color:var(--accent-strong)]">
                             {visibleDynamicColumnCount}
                           </span>
                         ) : null}
@@ -1123,10 +1147,10 @@ const DataTablePanelComponent = function DataTablePanel({
                       </button>
 
                       {showColumnMenu ? (
-                        <div className="absolute right-0 top-[calc(100%+0.5rem)] z-40 w-[min(30rem,85vw)] rounded-[1.25rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] p-3 shadow-[var(--viewer-shadow)]">
+                        <div className="absolute right-0 top-[calc(100%+0.5rem)] z-40 w-[min(30rem,85vw)] rounded-[var(--r-panel)] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] p-3 shadow-[var(--viewer-shadow-lift)]">
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+                              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
                                 Visible Columns
                               </div>
                               <div className="mt-1 text-[11px] text-[color:var(--muted-ink)]">
@@ -1143,14 +1167,14 @@ const DataTablePanelComponent = function DataTablePanel({
                                     visibleColumnKeys: defaultVisibleColumnKeys,
                                   }));
                                 }}
-                                className="rounded-full border border-[color:var(--viewer-border)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                                className="rounded-[var(--r-chip)] border border-[color:var(--viewer-border)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] disabled:cursor-not-allowed disabled:opacity-50"
                               >
                                 Reset
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setShowColumnMenu(false)}
-                                className="flex h-8 w-8 items-center justify-center rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
+                                className="flex h-8 w-8 items-center justify-center rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
                                 aria-label="Close columns menu"
                               >
                                 <X className="h-4 w-4" />
@@ -1162,7 +1186,7 @@ const DataTablePanelComponent = function DataTablePanel({
                             {dynamicColumns.map((column) => (
                               <label
                                 key={column.key}
-                                className="flex items-start gap-3 rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 py-3 text-sm text-[color:var(--foreground)]"
+                                className="flex items-start gap-3 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 py-2.5 text-sm text-[color:var(--foreground)]"
                               >
                                 <input
                                   type="checkbox"
@@ -1179,7 +1203,7 @@ const DataTablePanelComponent = function DataTablePanel({
                               </label>
                             ))}
                             {dynamicColumns.length === 0 ? (
-                              <div className="rounded-2xl border border-dashed border-[color:var(--viewer-border)] px-4 py-4 text-sm text-[color:var(--muted-ink)]">
+                              <div className="rounded-[var(--r-control)] border border-dashed border-[color:var(--viewer-border)] px-4 py-4 text-sm text-[color:var(--muted-ink)]">
                                 Load a model to discover dynamic columns.
                               </div>
                             ) : null}
@@ -1194,7 +1218,7 @@ const DataTablePanelComponent = function DataTablePanel({
                         onClick={() =>
                           updateUiState((current) => ({ ...current, selectedRowKeys: new Set() }))
                         }
-                        className="rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3.5 py-2.5 text-sm font-medium text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]"
+                        className={secondaryButtonClassName()}
                       >
                         Clear checked
                       </button>
@@ -1205,7 +1229,6 @@ const DataTablePanelComponent = function DataTablePanel({
             </div>
           </div>
         </div>
-      </div>
 
       <DataTableContent
         data={data}

@@ -3038,7 +3038,16 @@ export function ViewerShell() {
               >
                 <div
                   data-viewer-theme={viewerTheme}
-                  className="flex h-screen min-h-0 flex-col bg-[color:var(--panel-bg)] text-[color:var(--foreground)]"
+                  style={{
+                    // Render the popped-out data table at 67% zoom (more rows/columns visible).
+                    // The popup inherits the global `html { zoom: 0.75 }`, so 0.67 / 0.75 nets to
+                    // a 67% effective scale; sizing to 100v*/0.67 keeps the surface filling the
+                    // window despite the down-scale instead of leaving a gap.
+                    zoom: "calc(0.67 / 0.75)",
+                    width: "calc(100vw / 0.67)",
+                    height: "calc(100vh / 0.67)",
+                  }}
+                  className="flex min-h-0 flex-col bg-[color:var(--panel-bg)] text-[color:var(--foreground)]"
                 >
                   {dataTableSurface}
                 </div>
