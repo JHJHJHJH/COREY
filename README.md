@@ -53,7 +53,11 @@ use familiar Excel workflows to fix repeated data gaps.
 
 ## 🚀 Easy Setup (Recommended)
 
-The simplest way to run COREY is with **Docker** — one command, nothing else to install.
+Deploy COREY on Railway in one click:
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/corey?referralCode=SEF788&utm_medium=integration&utm_source=template&utm_campaign=generic)
+
+For a local run, the simplest setup is **Docker** — one command, nothing else to install.
 
 **Before you start:** install [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 and make sure it's running.
