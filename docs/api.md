@@ -4,7 +4,8 @@ The API reference is intended for self-hosted COREY deployments.
 
 ## Health
 
-- `GET /api/health`: returns app status and configured upload limit.
+- `GET /api/health`: returns app status, configured upload limit, and whether
+  S3-backed model storage is available.
 
 ## Models
 
@@ -13,6 +14,8 @@ The API reference is intended for self-hosted COREY deployments.
 - `GET /api/models/[id]`: read model metadata.
 - `GET /api/models/[id]/file`: download model bytes.
 - `POST /api/models/[id]/writeback`: export edited IFC bytes for a server model.
+
+Model routes return `503` when S3-compatible storage is not configured.
 
 ## Drafts
 

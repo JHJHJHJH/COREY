@@ -1,6 +1,7 @@
 import { getModelStore } from "@/server/model-store";
 import { getMaxModelBytes } from "@/server/env";
 import { getUserIdOrResponse } from "@/server/identity";
+import { getModelStorageUnavailableResponse } from "@/server/model-storage-status";
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -12,6 +13,9 @@ export async function GET(request: Request) {
   const userId = getUserIdOrResponse(request);
   if (userId instanceof Response) return userId;
 
+  const storageUnavailable = getModelStorageUnavailableResponse();
+  if (storageUnavailable) return storageUnavailable;
+
   const store = getModelStore();
   const models = await store.list(userId);
 
@@ -22,6 +26,9 @@ export async function POST(request: Request) {
   try {
     const userId = getUserIdOrResponse(request);
     if (userId instanceof Response) return userId;
+
+    const storageUnavailable = getModelStorageUnavailableResponse();
+    if (storageUnavailable) return storageUnavailable;
 
     const headerName = request.headers.get("x-model-name");
     const name = headerName ? decodeURIComponent(headerName) : "model.ifc";

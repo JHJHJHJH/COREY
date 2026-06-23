@@ -34,6 +34,11 @@ docker run --rm -p 4000:4000 \
   corey:local
 ```
 
+For a local-first deployment without server model storage, provide
+`DATABASE_URL` only. `/api/health` will still return `status: "ok"` with
+`modelStorageAvailable: false`; the viewer continues to load local IFC files
+from the browser, while server-backed upload/download is disabled.
+
 ## Docker Compose
 
 For the app plus local Postgres and MinIO:

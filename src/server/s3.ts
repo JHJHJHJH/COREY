@@ -7,7 +7,7 @@ import {
   type BucketLocationConstraint,
   type CreateBucketCommandInput,
 } from "@aws-sdk/client-s3";
-import { getS3Env, isS3StorageConfigured, type S3Env } from "@/server/env";
+import { getOptionalS3Env, getS3Env, isS3StorageConfigured, type S3Env } from "@/server/env";
 
 let cachedClient: S3Client | null = null;
 let bucketEnsurePromise: Promise<S3BucketEnsureResult> | null = null;
@@ -91,6 +91,10 @@ export function getS3Bucket() {
   return getS3Env().s3Bucket;
 }
 
+export function isS3ModelStorageConfigured() {
+  return isS3StorageConfigured(getOptionalS3Env());
+}
+
 export function modelObjectKey(modelId: string): string {
   return `${modelId}.ifc`;
 }
@@ -101,8 +105,8 @@ export async function ensureS3BucketExists(): Promise<S3BucketEnsureResult> {
   }
 
   bucketEnsurePromise = (async (): Promise<S3BucketEnsureResult> => {
-    const env = getS3Env();
-    if (!isS3StorageConfigured(env)) {
+    const env = getOptionalS3Env();
+    if (!env || !isS3StorageConfigured(env)) {
       return { status: "skipped" };
     }
 

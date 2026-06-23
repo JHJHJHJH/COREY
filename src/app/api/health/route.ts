@@ -11,9 +11,9 @@ export async function GET() {
       service: "corey",
       backend: {
         maxModelBytes: env.maxModelBytes,
-        modelStorageAvailable: isS3StorageConfigured(env),
-        s3Bucket: env.s3Bucket,
-        s3Region: env.s3Region,
+        modelStorageAvailable: isS3StorageConfigured(env.s3),
+        s3Bucket: env.s3?.s3Bucket ?? null,
+        s3Region: env.s3?.s3Region ?? null,
       },
     });
   } catch (error) {

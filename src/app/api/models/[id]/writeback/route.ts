@@ -1,6 +1,7 @@
 import { buildEditedIfcBytes } from "@/features/viewer/lib/ifc-writeback-core";
 import type { ViewerDataTableData, ViewerDataTableIssue } from "@/features/viewer/types";
 import { getUserIdOrResponse } from "@/server/identity";
+import { getModelStorageUnavailableResponse } from "@/server/model-storage-status";
 import { getModelStore } from "@/server/model-store";
 
 type ModelWritebackRouteContext = {
@@ -19,6 +20,9 @@ export async function POST(request: Request, { params }: ModelWritebackRouteCont
   try {
     const userId = getUserIdOrResponse(request);
     if (userId instanceof Response) return userId;
+
+    const storageUnavailable = getModelStorageUnavailableResponse();
+    if (storageUnavailable) return storageUnavailable;
 
     const { id } = await params;
     const body = (await request.json()) as {

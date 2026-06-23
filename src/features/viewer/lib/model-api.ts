@@ -4,13 +4,13 @@ type HealthResponse = {
   status?: string;
   backend?: {
     modelStorageAvailable?: boolean;
-    s3Bucket?: string;
+    s3Bucket?: string | null;
   };
 };
 
 const DISABLED_BUCKET_VALUES = new Set(["disabled", "false", "none", "off"]);
 
-function isDisabledBucketName(value: string | undefined) {
+function isDisabledBucketName(value: string | null | undefined) {
   return !value || DISABLED_BUCKET_VALUES.has(value.trim().toLowerCase());
 }
 
@@ -24,9 +24,8 @@ function isDisabledBucketName(value: string | undefined) {
 /**
  * Reports whether server-side model storage (MinIO + Postgres) is configured.
  *
- * `/api/health` builds the backend env, which throws (→ 503) when settings are
- * missing. Release builds can intentionally use placeholder S3 values, so the
- * response also carries `modelStorageAvailable`.
+ * `/api/health` can be healthy when S3 is intentionally absent for local-first
+ * deployments, so the response carries `modelStorageAvailable` separately.
  */
 export async function isServerStorageAvailable(): Promise<boolean> {
   try {
