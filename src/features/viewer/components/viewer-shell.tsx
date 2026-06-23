@@ -2803,6 +2803,11 @@ export function ViewerShell() {
               ) : null}
               <Link
                 href="/docs"
+                prefetch={false}
+                onClick={(event) => {
+                  event.preventDefault();
+                  window.location.assign("/docs");
+                }}
                 className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-4 text-sm font-semibold text-[color:var(--foreground)] no-underline shadow-sm transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)]"
               >
                 <BookOpenText className="h-4 w-4 shrink-0" />
