@@ -186,6 +186,117 @@ export interface ServerModelSummary {
   name: string;
   size: number;
   uploadedAt: string;
+  versionCount?: number;
+  latestVersion?: number;
+  /** Change summary of the latest version, for the catalog's compact log line. */
+  latestChangeSummary?: ModelVersionChangeSummary | null;
+}
+
+/**
+ * Structural diff of a version against the previous latest version, computed
+ * server-side when the version is uploaded and stored on the version row as
+ * its change-log entry. `null` on `ServerModelVersionSummary` means there was
+ * no previous version (initial upload) or the row predates this feature.
+ */
+export interface ModelVersionChangeSummary {
+  comparedToVersion: number;
+  baseElementCount: number;
+  targetElementCount: number;
+  addedCount: number;
+  removedCount: number;
+  changedCount: number;
+  /** Up to a few element display names per list, for tooltips. */
+  examples: { added: string[]; removed: string[]; changed: string[] };
+  computedAt: string;
+  /** Present when the diff computation failed; counts are zero. */
+  failed?: true;
+}
+
+export interface ServerModelVersionSummary {
+  versionId: string;
+  modelId: string;
+  versionNumber: number;
+  size: number;
+  label: string | null;
+  changeSummary: ModelVersionChangeSummary | null;
+  uploadedAt: string;
+}
+
+export interface ModelCompareValue {
+  text: string;
+  state: ViewerInspectionValueState;
+}
+
+export interface ModelCompareElementRef {
+  globalId: string;
+  ifcType: string;
+  name: string | null;
+  baseExpressId: number | null;
+  targetExpressId: number | null;
+}
+
+export interface ModelCompareFieldChange {
+  /** Field key: "attribute:{name}", "property:{group}::{label}", or "attribute:type". */
+  field: string;
+  label: string;
+  base: ModelCompareValue | null;
+  target: ModelCompareValue | null;
+}
+
+export interface ModelCompareChangedElement extends ModelCompareElementRef {
+  fields: ModelCompareFieldChange[];
+  fieldsTruncated: boolean;
+}
+
+export interface ModelCompareValidationEntry extends ModelCompareElementRef {
+  severity: ViewerValidationFailureSeverity;
+  clauses: ViewerValidationClauseFailure[];
+  elementAdded?: boolean;
+  elementRemoved?: boolean;
+}
+
+export interface ModelCompareValidationSideSummary {
+  failedElementCount: number;
+  failedClauseCount: number;
+}
+
+export interface ModelCompareValidationDiff {
+  base: ModelCompareValidationSideSummary;
+  target: ModelCompareValidationSideSummary;
+  resolved: ModelCompareValidationEntry[];
+  introduced: ModelCompareValidationEntry[];
+  stillFailing: ModelCompareValidationEntry[];
+}
+
+export interface ModelCompareSummary {
+  baseElementCount: number;
+  targetElementCount: number;
+  addedCount: number;
+  removedCount: number;
+  changedCount: number;
+  truncated: boolean;
+  warnings: string[];
+}
+
+export interface ModelCompareResult {
+  modelId: string;
+  baseVersion: number;
+  targetVersion: number;
+  summary: ModelCompareSummary;
+  added: ModelCompareElementRef[];
+  removed: ModelCompareElementRef[];
+  changed: ModelCompareChangedElement[];
+  validation: ModelCompareValidationDiff | null;
+}
+
+/** Everything the visual (side-by-side 3D) compare overlay needs to open. */
+export interface VisualCompareRequest {
+  modelId: string;
+  name: string;
+  baseVersion: number;
+  targetVersion: number;
+  /** The already-computed diff — the overlay never re-runs the compare. */
+  result: ModelCompareResult;
 }
 
 export interface ViewerTreeNode {

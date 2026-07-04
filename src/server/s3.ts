@@ -95,8 +95,15 @@ export function isS3ModelStorageConfigured() {
   return isS3StorageConfigured(getOptionalS3Env());
 }
 
+/// Legacy key for models uploaded before versioning; version-1 rows backfilled
+/// by the add_model_versions migration point here. New code should read the
+/// key stored on the version row instead of calling this.
 export function modelObjectKey(modelId: string): string {
   return `${modelId}.ifc`;
+}
+
+export function modelVersionObjectKey(modelId: string, versionNumber: number): string {
+  return `${modelId}/v${versionNumber}.ifc`;
 }
 
 export async function ensureS3BucketExists(): Promise<S3BucketEnsureResult> {

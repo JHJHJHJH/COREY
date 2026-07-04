@@ -1,4 +1,4 @@
-import type { ServerModelSummary } from "@/features/viewer/types";
+import type { ServerModelSummary, ServerModelVersionSummary } from "@/features/viewer/types";
 
 type HealthResponse = {
   status?: string;
@@ -83,4 +83,61 @@ export async function uploadModelToServer(
   }
 
   return (await response.json()) as ServerModelSummary;
+}
+
+export async function listModelVersions(modelId: string): Promise<ServerModelVersionSummary[]> {
+  const response = await fetch(`/api/models/${encodeURIComponent(modelId)}/versions`, {
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `Model versions could not be listed (${response.status}).`);
+  }
+
+  const body = (await response.json()) as { versions: ServerModelVersionSummary[] };
+  return body.versions;
+}
+
+/** Deletes the given versions; resolves to the remaining version list (descending). */
+export async function deleteModelVersions(
+  modelId: string,
+  versionNumbers: number[],
+): Promise<ServerModelVersionSummary[]> {
+  const response = await fetch(`/api/models/${encodeURIComponent(modelId)}/versions`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ versionNumbers }),
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `Versions could not be deleted (${response.status}).`);
+  }
+
+  const body = (await response.json()) as { versions: ServerModelVersionSummary[] };
+  return body.versions;
+}
+
+export async function uploadModelVersion(
+  modelId: string,
+  label: string | null,
+  body: BodyInit,
+): Promise<ServerModelVersionSummary> {
+  const headers: Record<string, string> = { "Content-Type": "application/octet-stream" };
+  if (label && label.trim().length > 0) {
+    headers["x-version-label"] = encodeURIComponent(label.trim());
+  }
+
+  const response = await fetch(`/api/models/${encodeURIComponent(modelId)}/versions`, {
+    method: "POST",
+    headers,
+    body,
+  });
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(errorBody?.error ?? `Version upload failed (${response.status}).`);
+  }
+
+  return (await response.json()) as ServerModelVersionSummary;
 }

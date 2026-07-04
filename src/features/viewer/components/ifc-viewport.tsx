@@ -18,6 +18,7 @@ import {
   buildViewerDataTable,
   sanitizeViewerDebugValue,
   buildSelectionInspection,
+  elementInspectionDataConfig,
   buildSingleItemMap,
   buildViewerTree,
   countItems,
@@ -141,15 +142,6 @@ function cloneElementIdMap(map: ViewerElementIdMap | null): ViewerElementIdMap |
     Object.entries(map).map(([modelId, ids]) => [modelId, new Set(ids)]),
   );
 }
-
-const selectionDetailsDataConfig = {
-  attributesDefault: true,
-  relations: {
-    IsDefinedBy: { attributes: true, relations: true },
-    HasAssociations: { attributes: true, relations: false },
-  },
-  relationsDefault: { attributes: false, relations: false },
-} satisfies Partial<FRAGS.ItemsDataConfig>;
 
 export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(function IfcViewport(
   {
@@ -295,7 +287,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
         try {
           const data = await activeRuntime.model.getItemsData(
             [selection.localId],
-            selectionDetailsDataConfig,
+            elementInspectionDataConfig,
           );
 
           if (selectionLoadSequenceRef.current !== requestId) {
@@ -607,7 +599,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
                   const sampleLocalId = dataTable.rows[0].localId;
                   const sampleData = await activeRuntime.model.getItemsData(
                     [sampleLocalId],
-                    selectionDetailsDataConfig,
+                    elementInspectionDataConfig,
                   );
                   const firstSample = sampleData[0] ?? null;
 

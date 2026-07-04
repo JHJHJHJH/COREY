@@ -29,6 +29,17 @@ const nextConfig = {
   ...(watchOptions ? { watchOptions } : {}),
   // Keep native/server-only deps out of the bundler; they run only in route handlers.
   serverExternalPackages: ["@prisma/client", "@prisma/adapter-pg", "pg", "web-ifc"],
+  // web-ifc reads web-ifc-node.wasm at runtime from a computed path, which
+  // output file tracing cannot see; without this the standalone (Docker) build
+  // ships the JS but not the WASM, and writeback/compare routes fail ENOENT.
+  outputFileTracingIncludes: {
+    "/api/models/**": [
+      // Direct dependency layouts (npm/yarn or pnpm's real package dir); the
+      // copies hoisted under @thatopen peer-dep dirs are never resolved.
+      "./node_modules/web-ifc/web-ifc-node.wasm",
+      "./node_modules/.pnpm/web-ifc@*/node_modules/web-ifc/web-ifc-node.wasm",
+    ],
+  },
 };
 
 export default withMDX(nextConfig);

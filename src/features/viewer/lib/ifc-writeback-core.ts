@@ -6,68 +6,20 @@ import type {
   ViewerDataTableIssue,
   ViewerDataTableRow,
 } from "@/features/viewer/types";
-
-type WebIfcModule = {
-  IfcAPI: new () => IfcApiInstance;
-};
-
-type IfcWrappedValue = {
-  name?: string;
-  type?: number;
-  value?: unknown;
-};
-
-type IfcPropertyLine = {
-  Name?: unknown;
-  NominalValue?: IfcWrappedValue | null;
-};
-
-type IfcPropertySetLine = {
-  Name?: unknown;
-  HasProperties?: unknown[];
-  expressID?: number;
-};
+import {
+  loadWebIfc,
+  readWrappedValue,
+  type IfcApiInstance,
+  type IfcPropertyLine,
+  type IfcPropertySetLine,
+  type IfcWrappedValue,
+} from "@/features/viewer/lib/ifc-node-core";
 
 type IfcElementLine = Record<string, unknown> & {
   OwnerHistory?: unknown;
   IsDefinedBy?: Array<{ type: number; value: number }>;
   expressID?: number;
 };
-
-type IfcApiInstance = {
-  properties: {
-    getPropertySets: (
-      modelId: number,
-      elementId: number,
-      recursive?: boolean,
-      includeTypeProperties?: boolean,
-    ) => Promise<unknown[]>;
-  };
-  SetWasmPath: (path: string, absolute?: boolean) => void;
-  Init: () => Promise<void>;
-  OpenModel: (bytes: Uint8Array) => number;
-  GetLine: (modelId: number, expressId: number, flatten?: boolean, inverse?: boolean) => unknown;
-  GetLineIDsWithType: (modelId: number, type: number) => { size: () => number; get: (index: number) => number };
-  GetTypeCodeFromName: (typeName: string) => number;
-  CreateIfcEntity: (modelId: number, type: number, ...args: unknown[]) => unknown;
-  CreateIfcType: (modelId: number, type: number, value: unknown) => unknown;
-  CreateIFCGloballyUniqueId: (modelId: number) => unknown;
-  WriteLine: (modelId: number, line: unknown) => void;
-  SaveModel: (modelId: number) => Uint8Array;
-  CloseModel: (modelId: number) => void;
-};
-
-async function loadWebIfc(): Promise<WebIfcModule> {
-  return (await import("web-ifc")) as unknown as WebIfcModule;
-}
-
-function readWrappedValue(value: unknown) {
-  if (value && typeof value === "object" && "value" in value) {
-    return (value as IfcWrappedValue).value;
-  }
-
-  return value;
-}
 
 function resolveOwnerHistoryHandle(line: IfcElementLine) {
   return line?.OwnerHistory ?? null;
