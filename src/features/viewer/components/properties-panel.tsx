@@ -24,7 +24,37 @@ type ValidationPopupPayload = {
   result: ViewerValidationMatch["result"] | ViewerValidationSummary["result"];
 };
 
-function rowClass(value: ViewerInspectionValue, highlighted: boolean) {
+/** Version-diff status of a row: red = removed, green = added, orange = modified. */
+export type PropertyDiffTone = "added" | "removed" | "modified";
+
+const diffToneRowBg: Record<PropertyDiffTone, string> = {
+  added: "bg-[color:var(--success-bg)]",
+  removed: "bg-[color:var(--danger-bg)]",
+  modified: "bg-[color:var(--warning-bg)]",
+};
+
+const diffToneRowFg: Record<PropertyDiffTone, string> = {
+  added: "text-[color:var(--success-fg)]",
+  removed: "text-[color:var(--danger-fg)]",
+  modified: "text-[color:var(--warning-fg)]",
+};
+
+const diffToneBadge: Record<PropertyDiffTone, string> = {
+  added:
+    "border-[color:var(--success-border)] bg-[color:var(--success-bg)] text-[color:var(--success-fg)]",
+  removed:
+    "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]",
+  modified:
+    "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]",
+};
+
+const diffToneLabel: Record<PropertyDiffTone, string> = {
+  added: "added",
+  removed: "removed",
+  modified: "changed",
+};
+
+function rowClass(value: ViewerInspectionValue, tone: PropertyDiffTone | null) {
   if (value.validation?.result === "ok") {
     return "bg-[color:var(--success-bg)]";
   }
@@ -37,14 +67,14 @@ function rowClass(value: ViewerInspectionValue, highlighted: boolean) {
     return "bg-[color:var(--danger-bg)]";
   }
 
-  if (highlighted) {
-    return "bg-[color:var(--warning-bg)]";
+  if (tone) {
+    return diffToneRowBg[tone];
   }
 
   return "bg-[color:var(--surface-soft)]";
 }
 
-function valueClass(value: ViewerInspectionValue, highlighted: boolean) {
+function valueClass(value: ViewerInspectionValue, tone: PropertyDiffTone | null) {
   if (value.validation?.result === "ok") {
     return "text-[color:var(--success-fg)]";
   }
@@ -57,17 +87,20 @@ function valueClass(value: ViewerInspectionValue, highlighted: boolean) {
     return "text-[color:var(--danger-fg)]";
   }
 
-  if (highlighted) {
-    return "text-[color:var(--warning-fg)]";
+  if (tone) {
+    return diffToneRowFg[tone];
   }
 
   return "text-[color:var(--foreground)]";
 }
 
-function ChangedBadge({ count }: { count?: number }) {
+export function DiffBadge({ tone, count }: { tone: PropertyDiffTone; count?: number }) {
   return (
-    <span className="inline-flex shrink-0 items-center rounded-full border border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--warning-fg)]">
-      {count !== undefined ? `${count} ` : ""}changed
+    <span
+      className={`inline-flex shrink-0 items-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${diffToneBadge[tone]}`}
+    >
+      {count !== undefined ? `${count} ` : ""}
+      {diffToneLabel[tone]}
     </span>
   );
 }
@@ -199,12 +232,12 @@ function ValidationDetailsPopup({
 function InspectionValueRow({
   label,
   value,
-  highlighted = false,
+  tone = null,
   onOpenDetails,
 }: {
   label: string;
   value: ViewerInspectionValue;
-  highlighted?: boolean;
+  tone?: PropertyDiffTone | null;
   onOpenDetails: (payload: Omit<ValidationPopupPayload, "selectionKey">) => void;
 }) {
   const failedClauseCount = value.validation?.clauseFailures.length ?? 0;
@@ -212,18 +245,18 @@ function InspectionValueRow({
 
   return (
     <div
-      className={`grid gap-1.5 px-2.5 py-1.5 md:grid-cols-[minmax(0,9rem)_minmax(0,1fr)] md:items-start md:gap-x-3 ${rowClass(value, highlighted)}`}
+      className={`grid gap-1.5 px-2.5 py-1.5 md:grid-cols-[minmax(0,9rem)_minmax(0,1fr)] md:items-start md:gap-x-3 ${rowClass(value, tone)}`}
     >
       <div className="min-w-0 break-words text-xs font-semibold tracking-[0.08em] [overflow-wrap:anywhere] text-[color:var(--muted-ink)]">
         {label}
       </div>
       <div className="flex min-w-0 flex-wrap items-start gap-2 md:flex-nowrap md:justify-between">
         <div
-          className={`min-w-0 flex-1 break-words text-sm leading-6 [overflow-wrap:anywhere] ${valueClass(value, highlighted)}`}
+          className={`min-w-0 flex-1 break-words text-sm leading-6 [overflow-wrap:anywhere] ${valueClass(value, tone)}`}
         >
           {value.text}
         </div>
-        {highlighted ? <ChangedBadge /> : null}
+        {tone ? <DiffBadge tone={tone} /> : null}
         {failedClauseCount > 0 && validation ? (
           <ValidationDetailsButton
             title={failedClauseCount === 1 ? "View 1 failed clause" : `View ${failedClauseCount} failed clauses`}
@@ -243,8 +276,15 @@ function InspectionValueRow({
   );
 }
 
-function isRowHighlighted(row: ViewerInspectionRow, highlightTargets?: ReadonlySet<string> | null) {
-  return Boolean(row.target && highlightTargets?.has(inspectionTargetKey(row.target)));
+function rowDiffTone(
+  row: ViewerInspectionRow,
+  highlightTargets?: ReadonlyMap<string, PropertyDiffTone> | null,
+): PropertyDiffTone | null {
+  if (!row.target || !highlightTargets) {
+    return null;
+  }
+
+  return highlightTargets.get(inspectionTargetKey(row.target)) ?? null;
 }
 
 function InspectionRowView({
@@ -253,14 +293,14 @@ function InspectionRowView({
   onOpenDetails,
 }: {
   row: ViewerInspectionRow;
-  highlightTargets?: ReadonlySet<string> | null;
+  highlightTargets?: ReadonlyMap<string, PropertyDiffTone> | null;
   onOpenDetails: (payload: Omit<ValidationPopupPayload, "selectionKey">) => void;
 }) {
   return (
     <InspectionValueRow
       label={row.label}
       value={row.value}
-      highlighted={isRowHighlighted(row, highlightTargets)}
+      tone={rowDiffTone(row, highlightTargets)}
       onOpenDetails={onOpenDetails}
     />
   );
@@ -272,12 +312,18 @@ function PropertySetGroup({
   onOpenDetails,
 }: {
   group: ViewerInspectionGroup;
-  highlightTargets?: ReadonlySet<string> | null;
+  highlightTargets?: ReadonlyMap<string, PropertyDiffTone> | null;
   onOpenDetails: (payload: Omit<ValidationPopupPayload, "selectionKey">) => void;
 }) {
-  const changedCount = highlightTargets
-    ? group.rows.filter((row) => isRowHighlighted(row, highlightTargets)).length
-    : 0;
+  const toneCounts: Record<PropertyDiffTone, number> = { modified: 0, added: 0, removed: 0 };
+  if (highlightTargets) {
+    for (const row of group.rows) {
+      const tone = rowDiffTone(row, highlightTargets);
+      if (tone) {
+        toneCounts[tone] += 1;
+      }
+    }
+  }
 
   return (
     <section className="overflow-hidden rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)]">
@@ -292,7 +338,13 @@ function PropertySetGroup({
             </div>
           ) : null}
         </div>
-        {changedCount > 0 ? <ChangedBadge count={changedCount} /> : null}
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+          {(["modified", "added", "removed"] as const).map((tone) =>
+            toneCounts[tone] > 0 ? (
+              <DiffBadge key={tone} tone={tone} count={toneCounts[tone]} />
+            ) : null,
+          )}
+        </div>
       </div>
 
       {group.rows.length > 0 ? (
@@ -418,7 +470,7 @@ function InspectionContent({
   onOpenDetails,
 }: {
   inspection: ViewerElementInspection;
-  highlightTargets?: ReadonlySet<string> | null;
+  highlightTargets?: ReadonlyMap<string, PropertyDiffTone> | null;
   onOpenDetails: (payload: Omit<ValidationPopupPayload, "selectionKey">) => void;
 }) {
   return (
@@ -481,8 +533,8 @@ type PropertiesPanelProps = {
   compact?: boolean;
   /** Rendered on the right side of the "Properties" header row. */
   headerAccessory?: React.ReactNode;
-  /** Rows whose target key (see `inspectionTargetKey`) is listed here render as changed. */
-  highlightTargets?: ReadonlySet<string> | null;
+  /** Rows keyed by `inspectionTargetKey` render with the mapped diff tone. */
+  highlightTargets?: ReadonlyMap<string, PropertyDiffTone> | null;
   details: ViewerSelectionDetails;
 };
 

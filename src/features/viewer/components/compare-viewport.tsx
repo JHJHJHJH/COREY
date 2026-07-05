@@ -13,14 +13,14 @@ export type CompareCameraControls = NonNullable<OBC.OrthoPerspectiveCamera["cont
 /**
  * What a compare pane paints on top of the raw model:
  * - "diff": ambient delta colors (changed + this side's added-or-removed list)
- * - "focus": everything ghosted; `focusLocalId` re-highlighted when the focused
- *   element exists in this version (null = fully ghosted pane, e.g. the base
- *   pane while an added element is focused)
+ * - "focus": everything ghosted; `focusLocalId` re-highlighted in its diff-tone
+ *   color when the focused element exists in this version (null = fully ghosted
+ *   pane, e.g. the base pane while an added element is focused)
  */
 export type CompareViewportVisualState =
   | { mode: "none" }
   | { mode: "diff"; changedIds: number[]; deltaIds: number[]; deltaTone: "added" | "removed" }
-  | { mode: "focus"; focusLocalId: number | null };
+  | { mode: "focus"; focusLocalId: number | null; tone?: "added" | "removed" | "modified" };
 
 export interface CompareViewportHandle {
   loadModel(bytes: Uint8Array, modelId: string, onProgress?: (percent: number) => void): Promise<void>;
@@ -60,14 +60,17 @@ const ghostMaterial = {
   renderedFaces: FRAGS.RenderedFaces.ONE,
   depthWrite: false,
 } satisfies FRAGS.MaterialDefinition;
+// Fallback focus color when the focused element has no diff tone.
 const focusMaterial = {
   color: new THREE.Color("#0a5cff"),
   opacity: 1,
   transparent: false,
   renderedFaces: FRAGS.RenderedFaces.ONE,
 } satisfies FRAGS.MaterialDefinition;
+// Diff tones: orange = modified, green = added, red = removed. Keep in sync
+// with the section dots in visual-compare-overlay.tsx.
 const changedMaterial = {
-  color: new THREE.Color("#d29a2f"),
+  color: new THREE.Color("#e07b2a"),
   opacity: 1,
   transparent: false,
   renderedFaces: FRAGS.RenderedFaces.ONE,
@@ -79,7 +82,7 @@ const addedMaterial = {
   renderedFaces: FRAGS.RenderedFaces.ONE,
 } satisfies FRAGS.MaterialDefinition;
 const removedMaterial = {
-  color: new THREE.Color("#bb5a36"),
+  color: new THREE.Color("#d64545"),
   opacity: 1,
   transparent: false,
   renderedFaces: FRAGS.RenderedFaces.ONE,
@@ -259,7 +262,15 @@ export const CompareViewport = forwardRef<CompareViewportHandle, CompareViewport
           if (state.mode === "focus") {
             await model.highlight(undefined, ghostMaterial);
             if (state.focusLocalId !== null) {
-              await model.highlight([state.focusLocalId], focusMaterial);
+              const toneMaterial =
+                state.tone === "added"
+                  ? addedMaterial
+                  : state.tone === "removed"
+                    ? removedMaterial
+                    : state.tone === "modified"
+                      ? changedMaterial
+                      : focusMaterial;
+              await model.highlight([state.focusLocalId], toneMaterial);
             }
           } else if (state.mode === "diff") {
             if (state.changedIds.length > 0) {

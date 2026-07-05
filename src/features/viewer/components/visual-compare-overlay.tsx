@@ -20,11 +20,16 @@ import {
   type CompareViewportHandle,
   type CompareViewportVisualState,
 } from "@/features/viewer/components/compare-viewport";
-import { PropertiesPanel } from "@/features/viewer/components/properties-panel";
+import {
+  DiffBadge,
+  PropertiesPanel,
+  type PropertyDiffTone,
+} from "@/features/viewer/components/properties-panel";
 import { buildSelectionInspection } from "@/features/viewer/lib/ifc-data";
 import type {
   ModelCompareChangedElement,
   ModelCompareElementRef,
+  ModelCompareFieldChange,
   ViewerSelection,
   ViewerSelectionDetails,
   VisualCompareRequest,
@@ -64,6 +69,31 @@ type SidePanelState = {
 const SIDE_PANEL_MIN_WIDTH = 240;
 const SIDE_PANEL_MAX_WIDTH = 640;
 const SIDE_PANEL_DEFAULT: SidePanelState = { collapsed: false, width: 340 };
+
+/** A field with no base value was added in the target; no target value = removed. */
+function fieldDiffTone(field: ModelCompareFieldChange): PropertyDiffTone {
+  if (field.base === null) {
+    return "added";
+  }
+  if (field.target === null) {
+    return "removed";
+  }
+  return "modified";
+}
+
+/** Element-level diff status: changed rows carry a field diff, otherwise the missing side decides. */
+function elementDiffTone(element: ModelCompareElementRef): PropertyDiffTone {
+  if ("fields" in element) {
+    return "modified";
+  }
+  return element.baseExpressId === null ? "added" : "removed";
+}
+
+const fieldToneText: Record<PropertyDiffTone, string> = {
+  added: "text-[color:var(--success-fg)]",
+  removed: "text-[color:var(--danger-fg)]",
+  modified: "text-[color:var(--warning-fg)]",
+};
 
 async function fetchVersionBytes(modelId: string, version: number): Promise<Uint8Array> {
   const response = await fetch(
@@ -301,7 +331,11 @@ export function VisualCompareOverlay({ request, theme, onClose }: VisualCompareO
     }
 
     const baseState: CompareViewportVisualState = focusedElement
-      ? { mode: "focus", focusLocalId: focusedElement.baseExpressId }
+      ? {
+          mode: "focus",
+          focusLocalId: focusedElement.baseExpressId,
+          tone: elementDiffTone(focusedElement),
+        }
       : diffColorsEnabled
         ? {
             mode: "diff",
@@ -311,7 +345,11 @@ export function VisualCompareOverlay({ request, theme, onClose }: VisualCompareO
           }
         : { mode: "none" };
     const targetState: CompareViewportVisualState = focusedElement
-      ? { mode: "focus", focusLocalId: focusedElement.targetExpressId }
+      ? {
+          mode: "focus",
+          focusLocalId: focusedElement.targetExpressId,
+          tone: elementDiffTone(focusedElement),
+        }
       : diffColorsEnabled
         ? {
             mode: "diff",
@@ -415,10 +453,12 @@ export function VisualCompareOverlay({ request, theme, onClose }: VisualCompareO
   const sections = useMemo(
     () =>
       [
+        // Dot colors match the 3D diff materials in compare-viewport.tsx:
+        // orange = modified, green = added, red = removed.
         {
           key: "changed" as const,
           title: "Changed",
-          tone: "bg-[#d29a2f]",
+          tone: "bg-[#e07b2a]",
           count: result.summary.changedCount,
           entries: result.changed as ModelCompareElementRef[],
         },
@@ -432,7 +472,7 @@ export function VisualCompareOverlay({ request, theme, onClose }: VisualCompareO
         {
           key: "removed" as const,
           title: "Removed",
-          tone: "bg-[#bb5a36]",
+          tone: "bg-[#d64545]",
           count: result.summary.removedCount,
           entries: result.removed,
         },
@@ -440,16 +480,25 @@ export function VisualCompareOverlay({ request, theme, onClose }: VisualCompareO
     [result],
   );
 
-  // Changed-field keys of the focused element, used to mark the matching rows
-  // in the properties panel. Added/removed elements have no field diff.
+  // Changed-field keys of the focused element mapped to their diff tone, used
+  // to mark the matching rows in the properties panel. Added/removed elements
+  // have no field diff.
   const highlightTargets = useMemo(() => {
     if (!focusedElement || !("fields" in focusedElement)) {
       return null;
     }
 
     const changed = focusedElement as ModelCompareChangedElement;
-    return new Set(changed.fields.map((field) => field.field.toLowerCase()));
+    const targets = new Map<string, PropertyDiffTone>();
+    for (const field of changed.fields) {
+      targets.set(field.field.toLowerCase(), fieldDiffTone(field));
+    }
+    return targets;
   }, [focusedElement]);
+
+  // Element-level status of the focused row, shown as a chip in the
+  // properties panel header.
+  const focusedTone = focusedElement ? elementDiffTone(focusedElement) : null;
 
   const beginPanelResize =
     (panel: "diff" | "props") => (event: React.PointerEvent<HTMLDivElement>) => {
@@ -728,6 +777,10 @@ export function VisualCompareOverlay({ request, theme, onClose }: VisualCompareO
                                   : "border-transparent hover:bg-[color:var(--surface-strong)]"
                               }`}
                             >
+                              <span
+                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${section.tone}`}
+                                aria-hidden
+                              />
                               <span className="min-w-0 flex-1 truncate">
                                 <span className="font-medium">
                                   {element.name ?? element.globalId}
@@ -747,7 +800,11 @@ export function VisualCompareOverlay({ request, theme, onClose }: VisualCompareO
                               <ul className="mb-1 mt-0.5 flex flex-col gap-1 border-l border-[color:var(--viewer-border)] py-1 pl-3 ml-2">
                                 {changed.fields.map((field) => (
                                   <li key={field.field} className="text-[11px] leading-snug">
-                                    <span className="font-semibold">{field.label}</span>
+                                    <span
+                                      className={`font-semibold ${fieldToneText[fieldDiffTone(field)]}`}
+                                    >
+                                      {field.label}
+                                    </span>
                                     <span className="ml-1.5 text-[color:var(--muted-ink)] line-through">
                                       {field.base?.text ?? "—"}
                                     </span>
@@ -796,6 +853,7 @@ export function VisualCompareOverlay({ request, theme, onClose }: VisualCompareO
                 highlightTargets={highlightTargets}
                 headerAccessory={
                   <div className="flex items-center gap-1.5">
+                    {focusedTone ? <DiffBadge tone={focusedTone} /> : null}
                     {propertySideTabs}
                     <button
                       type="button"
