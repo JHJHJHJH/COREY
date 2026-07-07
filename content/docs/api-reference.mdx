@@ -8,7 +8,8 @@ without these routes.
 
 ## Health
 
-- `GET /api/health`: app status and backend configuration summary
+- `GET /api/health`: app status, upload limit, and whether S3-backed model
+  storage is available
 
 ## Models
 
@@ -17,6 +18,8 @@ without these routes.
 - `GET /api/models/[id]`: read model metadata
 - `GET /api/models/[id]/file`: download model bytes
 - `POST /api/models/[id]/writeback`: export edited IFC bytes for a server model
+
+Model routes return `503` when S3-compatible storage is not configured.
 
 ## Drafts
 

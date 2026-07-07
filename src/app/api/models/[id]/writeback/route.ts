@@ -1,7 +1,9 @@
 import { buildEditedIfcBytes } from "@/features/viewer/lib/ifc-writeback-core";
 import type { ViewerDataTableData, ViewerDataTableIssue } from "@/features/viewer/types";
 import { getUserIdOrResponse } from "@/server/identity";
+import { getModelStorageUnavailableResponse } from "@/server/model-storage-status";
 import { getModelStore } from "@/server/model-store";
+import { addVersionWithChangeSummary } from "@/server/model-version-upload";
 
 type ModelWritebackRouteContext = {
   params: Promise<{ id: string }>;
@@ -20,10 +22,15 @@ export async function POST(request: Request, { params }: ModelWritebackRouteCont
     const userId = getUserIdOrResponse(request);
     if (userId instanceof Response) return userId;
 
+    const storageUnavailable = getModelStorageUnavailableResponse();
+    if (storageUnavailable) return storageUnavailable;
+
     const { id } = await params;
     const body = (await request.json()) as {
       data?: ViewerDataTableData;
       fileName?: string;
+      saveAsVersion?: boolean;
+      label?: string;
     };
 
     if (!body.data) {
@@ -53,6 +60,32 @@ export async function POST(request: Request, { params }: ModelWritebackRouteCont
         },
         { status: 400 },
       );
+    }
+
+    // Save-as-version keeps the edited bytes server-side instead of round-
+    // tripping them through the browser as a download.
+    if (body.saveAsVersion) {
+      const label =
+        typeof body.label === "string" && body.label.trim().length > 0
+          ? body.label.trim()
+          : null;
+      const version = await addVersionWithChangeSummary({
+        modelId: id,
+        ownerId: userId,
+        bytes: result.bytes,
+        label,
+      });
+
+      if (!version) {
+        return Response.json({ error: "Model not found." }, { status: 404 });
+      }
+
+      return Response.json({
+        version,
+        appliedCount: result.appliedCount,
+        message: result.message,
+        issues: result.issues,
+      });
     }
 
     const fileName = attachmentFileName(body.fileName ?? `${metadata.name}.edited.ifc`);

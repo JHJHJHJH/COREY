@@ -7,7 +7,7 @@ import {
   type BucketLocationConstraint,
   type CreateBucketCommandInput,
 } from "@aws-sdk/client-s3";
-import { getS3Env, isS3StorageConfigured, type S3Env } from "@/server/env";
+import { getOptionalS3Env, getS3Env, isS3StorageConfigured, type S3Env } from "@/server/env";
 
 let cachedClient: S3Client | null = null;
 let bucketEnsurePromise: Promise<S3BucketEnsureResult> | null = null;
@@ -91,8 +91,19 @@ export function getS3Bucket() {
   return getS3Env().s3Bucket;
 }
 
+export function isS3ModelStorageConfigured() {
+  return isS3StorageConfigured(getOptionalS3Env());
+}
+
+/// Legacy key for models uploaded before versioning; version-1 rows backfilled
+/// by the add_model_versions migration point here. New code should read the
+/// key stored on the version row instead of calling this.
 export function modelObjectKey(modelId: string): string {
   return `${modelId}.ifc`;
+}
+
+export function modelVersionObjectKey(modelId: string, versionNumber: number): string {
+  return `${modelId}/v${versionNumber}.ifc`;
 }
 
 export async function ensureS3BucketExists(): Promise<S3BucketEnsureResult> {
@@ -101,8 +112,8 @@ export async function ensureS3BucketExists(): Promise<S3BucketEnsureResult> {
   }
 
   bucketEnsurePromise = (async (): Promise<S3BucketEnsureResult> => {
-    const env = getS3Env();
-    if (!isS3StorageConfigured(env)) {
+    const env = getOptionalS3Env();
+    if (!env || !isS3StorageConfigured(env)) {
       return { status: "skipped" };
     }
 

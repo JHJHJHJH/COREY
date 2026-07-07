@@ -53,7 +53,11 @@ use familiar Excel workflows to fix repeated data gaps.
 
 ## 🚀 Easy Setup (Recommended)
 
-The simplest way to run COREY is with **Docker** — one command, nothing else to install.
+Deploy COREY on Railway in one click:
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/corey?referralCode=SEF788&utm_medium=integration&utm_source=template&utm_campaign=generic)
+
+For a local run, the simplest setup is **Docker** — one command, nothing else to install.
 
 **Before you start:** install [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 and make sure it's running.
@@ -134,10 +138,10 @@ Postgres-backed routes, or when object storage is provided separately:
 docker compose --env-file .env -f docker/docker-compose.release.yml up --build
 ```
 
-This stack starts the app, Postgres, and migrations only. It sets placeholder S3
-values so the app and health check can start, but server-backed model
-upload/download still requires real S3-compatible storage. To avoid a local port
-conflict, set `APP_PORT` for the host binding:
+This stack starts the app, Postgres, and migrations only. When S3 is omitted,
+the health check stays green and the local-first viewer works, but server-backed
+model upload/download is disabled until real S3-compatible storage is provided.
+To avoid a local port conflict, set `APP_PORT` for the host binding:
 
 ```bash
 APP_PORT=4010 docker compose --env-file .env -f docker/docker-compose.release.yml up --build
@@ -148,14 +152,20 @@ APP_PORT=4010 docker compose --env-file .env -f docker/docker-compose.release.ym
 <details>
 <summary><strong>Configuration (environment variables)</strong></summary>
 
-Copy `.env.example` to `.env` for local development. Required backend variables:
+Copy `.env.example` to `.env` for local development. Required backend variable:
 
 - `DATABASE_URL`
+
+Optional S3-compatible model storage variables:
+
 - `S3_ENDPOINT`
 - `S3_REGION`
 - `S3_ACCESS_KEY`
 - `S3_SECRET_KEY`
 - `S3_BUCKET`
+
+Other optional backend variables:
+
 - `COREY_MAX_MODEL_BYTES`
 - `COREY_USER_HEADER` (optional, default `x-forwarded-user`)
 - `COREY_DEFAULT_USER` (optional, default `local`)

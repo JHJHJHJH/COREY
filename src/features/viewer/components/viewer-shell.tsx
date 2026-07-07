@@ -7,7 +7,10 @@ import {
   FileOutput,
   FileSpreadsheet,
   FolderOpen,
+  GitCompareArrows,
+  History,
   Import,
+  Menu,
   Moon,
   PanelLeftOpen,
   PanelRightOpen,
@@ -78,10 +81,14 @@ import {
 } from "@/features/viewer/lib/ifc-data";
 import { LocalFileModelSource, RemoteModelSource } from "@/features/viewer/lib/model-source";
 import { isServerStorageAvailable, uploadModelToServer } from "@/features/viewer/lib/model-api";
+import { saveWritebackAsVersion } from "@/features/viewer/lib/model-compare-api";
 import { ServerModelsMenu } from "@/features/viewer/components/server-models-menu";
+import { ModelComparePanel } from "@/features/viewer/components/model-compare-panel";
+import { VisualCompareOverlay } from "@/features/viewer/components/visual-compare-overlay";
 import { buildViewerValidationClauseTableViews } from "@/features/viewer/lib/validation-clauses";
 import { exportEditedIfc } from "@/features/viewer/lib/ifc-writeback";
 import type {
+  ModelCompareElementRef,
   ModelMetadata,
   ModelSourceResult,
   ViewerCategorySummary,
@@ -100,6 +107,7 @@ import type {
   ViewerValidationRunResult,
   ViewerTreeNode,
   ViewerViewportHandle,
+  VisualCompareRequest,
 } from "@/features/viewer/types";
 
 const initialStatus: ViewerStatus = {
@@ -521,6 +529,8 @@ type HeaderEditsControlProps = {
   draftEditCount: number;
   busy?: boolean;
   onExportIfc: () => void;
+  /** Stores the edited IFC as the next server version; only for server-backed models. */
+  onSaveAsVersion?: () => void;
   onDiscard: () => void;
 };
 
@@ -531,6 +541,7 @@ function HeaderEditsControl({
   draftEditCount,
   busy = false,
   onExportIfc,
+  onSaveAsVersion,
   onDiscard,
 }: HeaderEditsControlProps) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -627,15 +638,31 @@ function HeaderEditsControl({
               </div>
             </div>
           ) : (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => setConfirmingDiscard(true)}
-              className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--danger-bg)] hover:text-[color:var(--danger-fg)]"
-            >
-              <Trash2 className="h-4 w-4 shrink-0" />
-              <span>Discard all edits</span>
-            </button>
+            <>
+              {onSaveAsVersion ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    onSaveAsVersion();
+                    closeMenu();
+                  }}
+                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]"
+                >
+                  <History className="h-4 w-4 shrink-0" />
+                  <span>Save as new version</span>
+                </button>
+              ) : null}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => setConfirmingDiscard(true)}
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--danger-bg)] hover:text-[color:var(--danger-fg)]"
+              >
+                <Trash2 className="h-4 w-4 shrink-0" />
+                <span>Discard all edits</span>
+              </button>
+            </>
           )}
         </div>
       ) : null}
@@ -765,7 +792,7 @@ function DrawerResizeHandle({
         aria-label={toggleLabel}
         title={toggleLabel}
         onClick={onToggle}
-        className={`absolute top-3 flex h-9 w-9 cursor-pointer items-center justify-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)] ${togglePositionClass} ${
+        className={`absolute top-3 hidden h-9 w-9 cursor-pointer items-center justify-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)] lg:flex ${togglePositionClass} ${
           collapsed
             ? "text-[color:var(--foreground)] hover:text-[color:var(--accent)]"
             : "text-[color:var(--muted-ink)] hover:text-[color:var(--foreground)]"
@@ -780,6 +807,7 @@ function DrawerResizeHandle({
 type ViewerDrawerProps = {
   side: DrawerSide;
   open: boolean;
+  mobileOpen: boolean;
   width: number;
   drawerRef: React.RefObject<HTMLDivElement | null>;
   mobileZIndexClass: string;
@@ -794,6 +822,7 @@ type ViewerDrawerProps = {
 function ViewerDrawer({
   side,
   open,
+  mobileOpen,
   width,
   drawerRef,
   mobileZIndexClass,
@@ -810,7 +839,7 @@ function ViewerDrawer({
     : side === "left"
       ? "-translate-x-4 opacity-0"
       : "translate-x-4 opacity-0";
-  const mobileMotionClass = open
+  const mobileMotionClass = mobileOpen
     ? "translate-x-0 opacity-100"
     : side === "left"
       ? "-translate-x-full opacity-0"
@@ -844,7 +873,7 @@ function ViewerDrawer({
   const mobileDrawer = (
     <div
       className={`absolute inset-y-0 ${mobileDrawerSideClass} ${mobileZIndexClass} w-[min(85vw,24rem)] max-w-full transform-gpu shadow-[var(--viewer-shadow)] transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:hidden ${
-        open ? "pointer-events-auto" : "pointer-events-none"
+        mobileOpen ? "pointer-events-auto" : "pointer-events-none"
       } ${mobileMotionClass}`}
     >
       {renderPanel()}
@@ -897,6 +926,8 @@ export function ViewerShell() {
     message: string;
     sticky?: boolean;
   } | null>(null);
+  const [compareModel, setCompareModel] = useState<{ modelId: string; name: string } | null>(null);
+  const [visualCompare, setVisualCompare] = useState<VisualCompareRequest | null>(null);
   const [serverStorageStatus, setServerStorageStatus] =
     useState<ServerStorageStatus>("checking");
   const validationWorkerRef = useRef<Worker | null>(null);
@@ -955,6 +986,21 @@ export function ViewerShell() {
   const [viewerThemeLoaded, setViewerThemeLoaded] = useState(false);
   const [showTree, setShowTree] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [mobileDrawer, setMobileDrawer] = useState<DrawerSide | null>(null);
+  useEffect(() => {
+    if (!mobileNavOpen && mobileDrawer === null) {
+      return;
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobileNavOpen(false);
+        setMobileDrawer(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [mobileNavOpen, mobileDrawer]);
   const [showDataTable, setShowDataTable] = useState(false);
   const [showDataTableInWindow, setShowDataTableInWindow] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
@@ -2520,6 +2566,73 @@ export function ViewerShell() {
     setDataTableActionStatus(result);
   }, [effectiveDataTableData, metadata]);
 
+  const handleSaveAsNewVersion = useCallback(async () => {
+    if (!effectiveDataTableData || !metadata?.serverModelId) {
+      setDataTableActionStatus({
+        phase: "error",
+        message: "Load a server-stored model before saving a new version.",
+        issues: [],
+      });
+      return;
+    }
+
+    setDataTableActionStatus({
+      phase: "running",
+      message: "Saving the edited IFC as a new version...",
+      issues: [],
+    });
+
+    try {
+      const result = await saveWritebackAsVersion({
+        modelId: metadata.serverModelId,
+        data: effectiveDataTableData,
+        label: "Saved from data-table edits",
+      });
+      setDataTableActionStatus({
+        phase: "success",
+        message: result.message,
+        issues: result.issues,
+      });
+      setServerNotice({
+        tone: "success",
+        message: `Saved version ${result.version.versionNumber} of ${metadata.name} to the server.`,
+      });
+    } catch (error) {
+      setDataTableActionStatus({
+        phase: "error",
+        message:
+          error instanceof Error ? error.message : "Saving the edited IFC as a version failed.",
+        issues: [],
+      });
+    }
+  }, [effectiveDataTableData, metadata]);
+
+  const handleCompareElementSelect = useCallback(
+    (element: ModelCompareElementRef) => {
+      const localId =
+        effectiveDataTableData?.rows.find((row) => {
+          const cell = row.cells.globalId;
+          return (
+            cell?.state === "present" &&
+            (cell.raw === element.globalId || cell.text === element.globalId)
+          );
+        })?.localId ??
+        element.targetExpressId ??
+        element.baseExpressId;
+
+      if (localId === null || localId === undefined) {
+        setServerNotice({
+          tone: "info",
+          message: "This element is not present in the loaded model.",
+        });
+        return;
+      }
+
+      void viewportRef.current?.selectNode(localId);
+    },
+    [effectiveDataTableData],
+  );
+
   const startDrawerResize = (side: DrawerSide) => (event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
 
@@ -2754,7 +2867,16 @@ export function ViewerShell() {
                     COREY
                   </h1>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Open menu"
+                  aria-expanded={mobileNavOpen}
+                  onClick={() => setMobileNavOpen(true)}
+                  className="ml-auto inline-flex h-10 w-10 items-center justify-center rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] text-[color:var(--foreground)] shadow-sm transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)] lg:hidden"
+                >
+                  <Menu className="h-5 w-5" />
+                </button>
+                <div className="hidden flex-wrap items-center gap-2 lg:flex">
                   <button
                     type="button"
                     onClick={openFilePicker}
@@ -2770,19 +2892,22 @@ export function ViewerShell() {
                     onLoadModel={(modelId) => {
                       void loadModelById(modelId);
                     }}
+                    onCompareModel={(model) => {
+                      setCompareModel({ modelId: model.modelId, name: model.name });
+                    }}
                   />
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-              <input
-                ref={inputRef}
-                type="file"
-                accept=".ifc,application/octet-stream"
-                onChange={handleFileChange}
-                className="hidden"
-              />
+            <input
+              ref={inputRef}
+              type="file"
+              accept=".ifc,application/octet-stream"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <div className="hidden flex-wrap items-center gap-2 lg:flex xl:justify-end">
               <button
                 type="button"
                 onClick={() => setShowRulesModal(true)}
@@ -2791,6 +2916,18 @@ export function ViewerShell() {
                 <ClipboardCheck className="h-4 w-4 shrink-0" />
                 <span>Clauses</span>
               </button>
+              {metadata?.serverModelId ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCompareModel({ modelId: metadata.serverModelId!, name: metadata.name });
+                  }}
+                  className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-4 text-sm font-semibold text-[color:var(--foreground)] shadow-sm transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)]"
+                >
+                  <GitCompareArrows className="h-4 w-4 shrink-0" />
+                  <span>Compare</span>
+                </button>
+              ) : null}
               {hasModel && draftEditCount > 0 ? (
                 <HeaderEditsControl
                   draftEditCount={draftEditCount}
@@ -2798,11 +2935,23 @@ export function ViewerShell() {
                   onExportIfc={() => {
                     void handleExportEditedIfc();
                   }}
+                  onSaveAsVersion={
+                    metadata?.serverModelId
+                      ? () => {
+                          void handleSaveAsNewVersion();
+                        }
+                      : undefined
+                  }
                   onDiscard={handleClearImportedEdits}
                 />
               ) : null}
               <Link
                 href="/docs"
+                prefetch={false}
+                onClick={(event) => {
+                  event.preventDefault();
+                  window.location.assign("/docs");
+                }}
                 className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-4 text-sm font-semibold text-[color:var(--foreground)] no-underline shadow-sm transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)]"
               >
                 <BookOpenText className="h-4 w-4 shrink-0" />
@@ -2814,6 +2963,131 @@ export function ViewerShell() {
         </div>
       </header>
 
+      {mobileNavOpen ? (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            type="button"
+            aria-label="Close menu"
+            onClick={() => setMobileNavOpen(false)}
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          />
+          <div className="absolute inset-y-0 right-0 flex w-[min(85vw,20rem)] max-w-full flex-col gap-2 overflow-y-auto border-l border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] p-4 shadow-[var(--viewer-shadow)]">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-sm font-semibold text-[color:var(--muted-ink)]">Menu</span>
+              <button
+                type="button"
+                aria-label="Close menu"
+                onClick={() => setMobileNavOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-[var(--r-control)] text-[color:var(--muted-ink)] transition hover:text-[color:var(--foreground)]"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setMobileNavOpen(false);
+                openFilePicker();
+              }}
+              className="inline-flex h-10 w-full items-center justify-start gap-2 rounded-[var(--r-control)] bg-[color:var(--accent)] px-4 text-sm font-semibold text-[color:var(--accent-ink)] shadow-sm transition hover:bg-[color:var(--accent-strong)]"
+            >
+              <OpenFileIcon className="h-4 w-4 shrink-0" />
+              <span>{openFileLabel}</span>
+            </button>
+            <ServerModelsMenu
+              theme={viewerTheme}
+              disabled={!serverStorageAvailable}
+              disabledReason={filesDisabledReason}
+              onLoadModel={(modelId) => {
+                setMobileNavOpen(false);
+                void loadModelById(modelId);
+              }}
+              onCompareModel={(model) => {
+                setMobileNavOpen(false);
+                setCompareModel({ modelId: model.modelId, name: model.name });
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setMobileNavOpen(false);
+                setShowRulesModal(true);
+              }}
+              className="inline-flex h-10 w-full items-center justify-start gap-2 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-4 text-sm font-semibold text-[color:var(--foreground)] shadow-sm transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)]"
+            >
+              <ClipboardCheck className="h-4 w-4 shrink-0" />
+              <span>Clauses</span>
+            </button>
+            {metadata?.serverModelId ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileNavOpen(false);
+                  setCompareModel({ modelId: metadata.serverModelId!, name: metadata.name });
+                }}
+                className="inline-flex h-10 w-full items-center justify-start gap-2 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-4 text-sm font-semibold text-[color:var(--foreground)] shadow-sm transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)]"
+              >
+                <GitCompareArrows className="h-4 w-4 shrink-0" />
+                <span>Compare versions</span>
+              </button>
+            ) : null}
+            {hasModel && draftEditCount > 0 ? (
+              <HeaderEditsControl
+                draftEditCount={draftEditCount}
+                busy={dataTableActionStatus.phase === "running"}
+                onExportIfc={() => {
+                  void handleExportEditedIfc();
+                }}
+                onSaveAsVersion={
+                  metadata?.serverModelId
+                    ? () => {
+                        void handleSaveAsNewVersion();
+                      }
+                    : undefined
+                }
+                onDiscard={handleClearImportedEdits}
+              />
+            ) : null}
+            <Link
+              href="/docs"
+              prefetch={false}
+              onClick={(event) => {
+                event.preventDefault();
+                setMobileNavOpen(false);
+                window.location.assign("/docs");
+              }}
+              className="inline-flex h-10 w-full items-center justify-start gap-2 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-4 text-sm font-semibold text-[color:var(--foreground)] no-underline shadow-sm transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)]"
+            >
+              <BookOpenText className="h-4 w-4 shrink-0" />
+              <span>Docs</span>
+            </Link>
+            <div className="my-1 h-px bg-[color:var(--viewer-border)]" />
+            <button
+              type="button"
+              onClick={() => {
+                setMobileNavOpen(false);
+                setMobileDrawer("left");
+              }}
+              className="inline-flex h-10 w-full items-center justify-start gap-2 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-4 text-sm font-semibold text-[color:var(--foreground)] shadow-sm transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)]"
+            >
+              <PanelLeftOpen className="h-4 w-4 shrink-0" />
+              <span>Model tree</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMobileNavOpen(false);
+                setMobileDrawer("right");
+              }}
+              className="inline-flex h-10 w-full items-center justify-start gap-2 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-4 text-sm font-semibold text-[color:var(--foreground)] shadow-sm transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)]"
+            >
+              <PanelRightOpen className="h-4 w-4 shrink-0" />
+              <span>Properties</span>
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex min-h-0 w-full flex-1 flex-col">
         <main className="flex min-h-0 flex-1">
           <div
@@ -2821,9 +3095,18 @@ export function ViewerShell() {
             className="corey-blueprint relative -mt-px flex min-h-0 flex-1 flex-col overflow-hidden rounded-b-[var(--r-panel)] border border-t-0 border-[color:var(--viewer-border)] shadow-[var(--viewer-shadow)]"
           >
             <div className="relative min-h-0 flex flex-1 overflow-hidden">
+              {mobileDrawer ? (
+                <button
+                  type="button"
+                  aria-label="Close panel"
+                  onClick={() => setMobileDrawer(null)}
+                  className="absolute inset-0 z-20 bg-black/50 backdrop-blur-sm lg:hidden"
+                />
+              ) : null}
               <ViewerDrawer
                 side="left"
                 open={showTree}
+                mobileOpen={mobileDrawer === "left"}
                 width={treeDrawerWidth}
                 drawerRef={treeDrawerRef}
                 mobileZIndexClass="z-30"
@@ -2909,6 +3192,9 @@ export function ViewerShell() {
                         disabledReason={filesDisabledReason}
                         onLoadModel={(modelId) => {
                           void loadModelById(modelId);
+                        }}
+                        onCompareModel={(model) => {
+                          setCompareModel({ modelId: model.modelId, name: model.name });
                         }}
                       />
                     }
@@ -3004,6 +3290,7 @@ export function ViewerShell() {
               <ViewerDrawer
                 side="right"
                 open={showProperties}
+                mobileOpen={mobileDrawer === "right"}
                 width={propertiesDrawerWidth}
                 drawerRef={propertiesDrawerRef}
                 mobileZIndexClass="z-40"
@@ -3080,6 +3367,35 @@ export function ViewerShell() {
         </div>
       ) : null}
       {showRulesModal ? <RulesModal onClose={() => setShowRulesModal(false)} /> : null}
+      {compareModel ? (
+        <ModelComparePanel
+          model={compareModel}
+          theme={viewerTheme}
+          clauses={config.clauses}
+          canSelectElements={
+            status.phase === "loaded" && metadata?.serverModelId === compareModel.modelId
+          }
+          onSelectElement={handleCompareElementSelect}
+          onOpenVisualCompare={(request) =>
+            setVisualCompare({
+              modelId: compareModel.modelId,
+              name: compareModel.name,
+              ...request,
+            })
+          }
+          onClose={() => {
+            setCompareModel(null);
+            setVisualCompare(null);
+          }}
+        />
+      ) : null}
+      {visualCompare ? (
+        <VisualCompareOverlay
+          request={visualCompare}
+          theme={viewerTheme}
+          onClose={() => setVisualCompare(null)}
+        />
+      ) : null}
     </div>
   );
 }

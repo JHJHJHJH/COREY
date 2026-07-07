@@ -24,6 +24,33 @@ import type {
 type NameMap = Map<number, string>;
 type CategoryMap = Map<number, string | null>;
 
+/**
+ * `getItemsData` config that loads an element's built-in attributes plus its
+ * property sets (traversed via IsDefinedBy) — the shape expected by
+ * `buildSelectionInspection`.
+ */
+/**
+ * Canonical key for an inspection-row target, matching the lowercased
+ * `attribute:{name}` / `property:{group}::{label}` convention used by
+ * validation targetIds and `ModelCompareFieldChange.field`.
+ */
+export function inspectionTargetKey(target: ViewerValidationTarget): string {
+  return (
+    target.kind === "attribute"
+      ? `attribute:${target.name}`
+      : `property:${target.group}::${target.label}`
+  ).toLowerCase();
+}
+
+export const elementInspectionDataConfig = {
+  attributesDefault: true,
+  relations: {
+    IsDefinedBy: { attributes: true, relations: true },
+    HasAssociations: { attributes: true, relations: false },
+  },
+  relationsDefault: { attributes: false, relations: false },
+} satisfies Partial<ItemsDataConfig>;
+
 const PROPERTY_VALUE_FALLBACK_EXCLUSIONS = new Set([
   "type",
   "Name",

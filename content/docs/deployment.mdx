@@ -13,6 +13,12 @@ pnpm start
 The build uses `next build --webpack` and generates Fumadocs source files before
 building.
 
+## One-Click Deploy
+
+Deploy COREY on Railway:
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/corey?referralCode=SEF788&utm_medium=integration&utm_source=template&utm_campaign=generic)
+
 ## Docker
 
 Build the runner image:
@@ -33,6 +39,11 @@ docker run --rm -p 4000:4000 \
   -e S3_BUCKET="corey-models" \
   corey:local
 ```
+
+For a local-first deployment without server model storage, provide
+`DATABASE_URL` only. `/api/health` will still return `status: "ok"` with
+`modelStorageAvailable: false`; the viewer continues to load local IFC files
+from the browser, while server-backed upload/download is disabled.
 
 ## Docker Compose
 

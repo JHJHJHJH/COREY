@@ -2,27 +2,32 @@ const DEFAULT_MAX_MODEL_BYTES = 250 * 1024 * 1024;
 const DEFAULT_USER_HEADER = "x-forwarded-user";
 const DEFAULT_USER_ID = "local";
 const TRUTHY_VALUES = new Set(["1", "true", "yes", "on"]);
+const S3_ENV_NAMES = ["S3_ENDPOINT", "S3_ACCESS_KEY", "S3_SECRET_KEY", "S3_BUCKET"] as const;
 
 export type BackendEnv = {
   databaseUrl: string;
+  s3: S3Env | null;
+  maxModelBytes: number;
+};
+
+export type S3Env = {
   s3Endpoint: string;
   s3Region: string;
   s3AccessKey: string;
   s3SecretKey: string;
   s3Bucket: string;
-  maxModelBytes: number;
 };
-
-export type S3Env = Pick<
-  BackendEnv,
-  "s3Endpoint" | "s3Region" | "s3AccessKey" | "s3SecretKey" | "s3Bucket"
->;
 
 const DISABLED_S3_VALUES = new Set(["disabled", "false", "none", "off"]);
 
+function readOptionalEnv(name: string) {
+  const value = process.env[name]?.trim();
+  return value && value.length > 0 ? value : null;
+}
+
 function readRequiredEnv(name: string) {
-  const value = process.env[name];
-  if (!value || value.trim().length === 0) {
+  const value = readOptionalEnv(name);
+  if (!value) {
     throw new Error(`${name} is not set. See .env.example.`);
   }
 
@@ -46,7 +51,7 @@ function readPositiveIntegerEnv(name: string, defaultValue: number) {
 export function getBackendEnv(): BackendEnv {
   return {
     databaseUrl: getDatabaseUrl(),
-    ...getS3Env(),
+    s3: getOptionalS3Env(),
     maxModelBytes: readPositiveIntegerEnv("COREY_MAX_MODEL_BYTES", DEFAULT_MAX_MODEL_BYTES),
   };
 }
@@ -56,12 +61,44 @@ export function getDatabaseUrl() {
 }
 
 export function getS3Env(): S3Env {
+  const env = getOptionalS3Env();
+  if (!env) {
+    throw new Error(
+      "S3 storage is not configured. Set S3_ENDPOINT, S3_ACCESS_KEY, S3_SECRET_KEY, and S3_BUCKET to enable server-backed model files.",
+    );
+  }
+
+  return env;
+}
+
+export function getOptionalS3Env(): S3Env | null {
+  const s3Endpoint = readOptionalEnv("S3_ENDPOINT");
+  if (!s3Endpoint || isDisabledS3Value(s3Endpoint)) {
+    return null;
+  }
+
+  const values = {
+    S3_ENDPOINT: s3Endpoint,
+    S3_ACCESS_KEY: readOptionalEnv("S3_ACCESS_KEY"),
+    S3_SECRET_KEY: readOptionalEnv("S3_SECRET_KEY"),
+    S3_BUCKET: readOptionalEnv("S3_BUCKET"),
+  };
+
+  if (Object.values(values).some((value) => value !== null && isDisabledS3Value(value))) {
+    return null;
+  }
+
+  const missing = S3_ENV_NAMES.filter((name) => values[name] === null);
+  if (missing.length > 0) {
+    throw new Error(`S3 storage configuration is incomplete. Missing: ${missing.join(", ")}.`);
+  }
+
   return {
-    s3Endpoint: readRequiredEnv("S3_ENDPOINT"),
-    s3Region: process.env.S3_REGION || "ap-southeast-1",
-    s3AccessKey: readRequiredEnv("S3_ACCESS_KEY"),
-    s3SecretKey: readRequiredEnv("S3_SECRET_KEY"),
-    s3Bucket: readRequiredEnv("S3_BUCKET"),
+    s3Endpoint: values.S3_ENDPOINT!,
+    s3Region: readOptionalEnv("S3_REGION") ?? "ap-southeast-1",
+    s3AccessKey: values.S3_ACCESS_KEY!,
+    s3SecretKey: values.S3_SECRET_KEY!,
+    s3Bucket: values.S3_BUCKET!,
   };
 }
 
@@ -70,7 +107,11 @@ function isDisabledS3Value(value: string) {
   return DISABLED_S3_VALUES.has(normalized) || normalized.includes("disabled.invalid");
 }
 
-export function isS3StorageConfigured(env: S3Env): boolean {
+export function isS3StorageConfigured(env: S3Env | null | undefined): boolean {
+  if (!env) {
+    return false;
+  }
+
   return ![
     env.s3Endpoint,
     env.s3AccessKey,

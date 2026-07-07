@@ -2,6 +2,7 @@
 
 import { CircleAlert, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { inspectionTargetKey } from "@/features/viewer/lib/ifc-data";
 import type {
   ViewerElementInspection,
   ViewerInspectionGroup,
@@ -23,7 +24,37 @@ type ValidationPopupPayload = {
   result: ViewerValidationMatch["result"] | ViewerValidationSummary["result"];
 };
 
-function rowClass(value: ViewerInspectionValue) {
+/** Version-diff status of a row: red = removed, green = added, orange = modified. */
+export type PropertyDiffTone = "added" | "removed" | "modified";
+
+const diffToneRowBg: Record<PropertyDiffTone, string> = {
+  added: "bg-[color:var(--success-bg)]",
+  removed: "bg-[color:var(--danger-bg)]",
+  modified: "bg-[color:var(--warning-bg)]",
+};
+
+const diffToneRowFg: Record<PropertyDiffTone, string> = {
+  added: "text-[color:var(--success-fg)]",
+  removed: "text-[color:var(--danger-fg)]",
+  modified: "text-[color:var(--warning-fg)]",
+};
+
+const diffToneBadge: Record<PropertyDiffTone, string> = {
+  added:
+    "border-[color:var(--success-border)] bg-[color:var(--success-bg)] text-[color:var(--success-fg)]",
+  removed:
+    "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]",
+  modified:
+    "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]",
+};
+
+const diffToneLabel: Record<PropertyDiffTone, string> = {
+  added: "added",
+  removed: "removed",
+  modified: "changed",
+};
+
+function rowClass(value: ViewerInspectionValue, tone: PropertyDiffTone | null) {
   if (value.validation?.result === "ok") {
     return "bg-[color:var(--success-bg)]";
   }
@@ -36,10 +67,14 @@ function rowClass(value: ViewerInspectionValue) {
     return "bg-[color:var(--danger-bg)]";
   }
 
+  if (tone) {
+    return diffToneRowBg[tone];
+  }
+
   return "bg-[color:var(--surface-soft)]";
 }
 
-function valueClass(value: ViewerInspectionValue) {
+function valueClass(value: ViewerInspectionValue, tone: PropertyDiffTone | null) {
   if (value.validation?.result === "ok") {
     return "text-[color:var(--success-fg)]";
   }
@@ -52,7 +87,22 @@ function valueClass(value: ViewerInspectionValue) {
     return "text-[color:var(--danger-fg)]";
   }
 
+  if (tone) {
+    return diffToneRowFg[tone];
+  }
+
   return "text-[color:var(--foreground)]";
+}
+
+export function DiffBadge({ tone, count }: { tone: PropertyDiffTone; count?: number }) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${diffToneBadge[tone]}`}
+    >
+      {count !== undefined ? `${count} ` : ""}
+      {diffToneLabel[tone]}
+    </span>
+  );
 }
 
 function summaryFlagClass(result: ViewerValidationMatch["result"]) {
@@ -182,10 +232,12 @@ function ValidationDetailsPopup({
 function InspectionValueRow({
   label,
   value,
+  tone = null,
   onOpenDetails,
 }: {
   label: string;
   value: ViewerInspectionValue;
+  tone?: PropertyDiffTone | null;
   onOpenDetails: (payload: Omit<ValidationPopupPayload, "selectionKey">) => void;
 }) {
   const failedClauseCount = value.validation?.clauseFailures.length ?? 0;
@@ -193,17 +245,18 @@ function InspectionValueRow({
 
   return (
     <div
-      className={`grid gap-1.5 px-2.5 py-1.5 md:grid-cols-[minmax(0,9rem)_minmax(0,1fr)] md:items-start md:gap-x-3 ${rowClass(value)}`}
+      className={`grid gap-1.5 px-2.5 py-1.5 md:grid-cols-[minmax(0,9rem)_minmax(0,1fr)] md:items-start md:gap-x-3 ${rowClass(value, tone)}`}
     >
       <div className="min-w-0 break-words text-xs font-semibold tracking-[0.08em] [overflow-wrap:anywhere] text-[color:var(--muted-ink)]">
         {label}
       </div>
       <div className="flex min-w-0 flex-wrap items-start gap-2 md:flex-nowrap md:justify-between">
         <div
-          className={`min-w-0 flex-1 break-words text-sm leading-6 [overflow-wrap:anywhere] ${valueClass(value)}`}
+          className={`min-w-0 flex-1 break-words text-sm leading-6 [overflow-wrap:anywhere] ${valueClass(value, tone)}`}
         >
           {value.text}
         </div>
+        {tone ? <DiffBadge tone={tone} /> : null}
         {failedClauseCount > 0 && validation ? (
           <ValidationDetailsButton
             title={failedClauseCount === 1 ? "View 1 failed clause" : `View ${failedClauseCount} failed clauses`}
@@ -223,40 +276,86 @@ function InspectionValueRow({
   );
 }
 
+function rowDiffTone(
+  row: ViewerInspectionRow,
+  highlightTargets?: ReadonlyMap<string, PropertyDiffTone> | null,
+): PropertyDiffTone | null {
+  if (!row.target || !highlightTargets) {
+    return null;
+  }
+
+  return highlightTargets.get(inspectionTargetKey(row.target)) ?? null;
+}
+
 function InspectionRowView({
   row,
+  highlightTargets,
   onOpenDetails,
 }: {
   row: ViewerInspectionRow;
+  highlightTargets?: ReadonlyMap<string, PropertyDiffTone> | null;
   onOpenDetails: (payload: Omit<ValidationPopupPayload, "selectionKey">) => void;
 }) {
-  return <InspectionValueRow label={row.label} value={row.value} onOpenDetails={onOpenDetails} />;
+  return (
+    <InspectionValueRow
+      label={row.label}
+      value={row.value}
+      tone={rowDiffTone(row, highlightTargets)}
+      onOpenDetails={onOpenDetails}
+    />
+  );
 }
 
 function PropertySetGroup({
   group,
+  highlightTargets,
   onOpenDetails,
 }: {
   group: ViewerInspectionGroup;
+  highlightTargets?: ReadonlyMap<string, PropertyDiffTone> | null;
   onOpenDetails: (payload: Omit<ValidationPopupPayload, "selectionKey">) => void;
 }) {
+  const toneCounts: Record<PropertyDiffTone, number> = { modified: 0, added: 0, removed: 0 };
+  if (highlightTargets) {
+    for (const row of group.rows) {
+      const tone = rowDiffTone(row, highlightTargets);
+      if (tone) {
+        toneCounts[tone] += 1;
+      }
+    }
+  }
+
   return (
     <section className="overflow-hidden rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)]">
-      <div className="border-b border-[color:var(--viewer-border)] px-2.5 py-2">
-        <h3 className="break-words text-sm font-semibold text-[color:var(--foreground)]">
-          {group.title}
-        </h3>
-        {group.subtitle ? (
-          <div className="mt-1 text-[11px] tracking-[0.08em] text-[color:var(--muted-ink)]">
-            {group.subtitle}
-          </div>
-        ) : null}
+      <div className="flex items-start justify-between gap-2 border-b border-[color:var(--viewer-border)] px-2.5 py-2">
+        <div className="min-w-0">
+          <h3 className="break-words text-sm font-semibold text-[color:var(--foreground)]">
+            {group.title}
+          </h3>
+          {group.subtitle ? (
+            <div className="mt-1 text-[11px] tracking-[0.08em] text-[color:var(--muted-ink)]">
+              {group.subtitle}
+            </div>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+          {(["modified", "added", "removed"] as const).map((tone) =>
+            toneCounts[tone] > 0 ? (
+              <DiffBadge key={tone} tone={tone} count={toneCounts[tone]} />
+            ) : null,
+          )}
+        </div>
       </div>
 
       {group.rows.length > 0 ? (
         <div className="divide-y divide-[color:var(--viewer-border)]">
           {group.rows.map((row) => (
-            <InspectionRowView key={row.key} row={row} onOpenDetails={onOpenDetails} />
+            <InspectionRowView
+              key={row.key}
+              row={row}
+              highlightTargets={highlightTargets}
+              onOpenDetails={onOpenDetails}
+            />
           ))}
         </div>
       ) : (
@@ -367,9 +466,11 @@ function ValidationSummaryBanner({
 
 function InspectionContent({
   inspection,
+  highlightTargets,
   onOpenDetails,
 }: {
   inspection: ViewerElementInspection;
+  highlightTargets?: ReadonlyMap<string, PropertyDiffTone> | null;
   onOpenDetails: (payload: Omit<ValidationPopupPayload, "selectionKey">) => void;
 }) {
   return (
@@ -389,7 +490,12 @@ function InspectionContent({
         <div className="overflow-hidden rounded-xl border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)]">
           <div className="divide-y divide-[color:var(--viewer-border)]">
             {inspection.summaryRows.map((row) => (
-              <InspectionRowView key={row.key} row={row} onOpenDetails={onOpenDetails} />
+              <InspectionRowView
+                key={row.key}
+                row={row}
+                highlightTargets={highlightTargets}
+                onOpenDetails={onOpenDetails}
+              />
             ))}
           </div>
         </div>
@@ -403,7 +509,12 @@ function InspectionContent({
         {inspection.propertySets.length > 0 ? (
           <div className="space-y-2">
             {inspection.propertySets.map((group) => (
-              <PropertySetGroup key={group.key} group={group} onOpenDetails={onOpenDetails} />
+              <PropertySetGroup
+                key={group.key}
+                group={group}
+                highlightTargets={highlightTargets}
+                onOpenDetails={onOpenDetails}
+              />
             ))}
           </div>
         ) : (
@@ -418,10 +529,22 @@ function InspectionContent({
 
 type PropertiesPanelProps = {
   embedded?: boolean;
+  /** Slimmer header without the shell's floating-button inset (e.g. compare overlay sidebar). */
+  compact?: boolean;
+  /** Rendered on the right side of the "Properties" header row. */
+  headerAccessory?: React.ReactNode;
+  /** Rows keyed by `inspectionTargetKey` render with the mapped diff tone. */
+  highlightTargets?: ReadonlyMap<string, PropertyDiffTone> | null;
   details: ViewerSelectionDetails;
 };
 
-export function PropertiesPanel({ embedded = false, details }: PropertiesPanelProps) {
+export function PropertiesPanel({
+  embedded = false,
+  compact = false,
+  headerAccessory,
+  highlightTargets,
+  details,
+}: PropertiesPanelProps) {
   const selectionKey = details.selection
     ? `${details.selection.modelId}:${details.selection.localId}`
     : "none";
@@ -465,7 +588,7 @@ export function PropertiesPanel({ embedded = false, details }: PropertiesPanelPr
   return (
     <aside
       className={`flex h-full min-h-0 flex-col overflow-hidden ${
-        embedded
+        embedded || compact
           ? "relative bg-[color:var(--panel-bg)]/92"
           : "relative rounded-[1.75rem] border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] shadow-[var(--viewer-shadow)]"
       }`}
@@ -480,11 +603,18 @@ export function PropertiesPanel({ embedded = false, details }: PropertiesPanelPr
       ) : null}
 
       <div
-        className={`border-b border-[color:var(--viewer-border)] px-3 py-3 ${
-          embedded ? "pl-12" : ""
-        }`}
+        className={`flex items-center justify-between gap-2 border-b border-[color:var(--viewer-border)] px-3 ${
+          compact ? "py-2" : "py-3"
+        } ${embedded && !compact ? "pl-12" : ""}`}
       >
-        <h1 className="text-lg font-semibold text-[color:var(--foreground)]">Properties</h1>
+        <h1
+          className={`font-semibold text-[color:var(--foreground)] ${
+            compact ? "text-xs" : "text-lg"
+          }`}
+        >
+          Properties
+        </h1>
+        {headerAccessory}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
@@ -493,7 +623,11 @@ export function PropertiesPanel({ embedded = false, details }: PropertiesPanelPr
         ) : details.loading && !details.inspection ? (
           <LoadingState selection={details.selection} />
         ) : details.inspection ? (
-          <InspectionContent inspection={details.inspection} onOpenDetails={openValidationPopup} />
+          <InspectionContent
+            inspection={details.inspection}
+            highlightTargets={highlightTargets}
+            onOpenDetails={openValidationPopup}
+          />
         ) : (
           <UnavailableState selection={details.selection} />
         )}
