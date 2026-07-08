@@ -47,7 +47,14 @@ use familiar Excel workflows to fix repeated data gaps.
 | 📊 | Review model data in tables, with **Excel import/export** |
 | ✏️ | Batch update IFC data through an Excel round trip |
 | ✅ | Run **rule-based checks** and highlight validation issues |
-| 🗄️ | *(Optional)* Save models to your own server with a database & file storage |
+
+### With self-hosted storage
+
+| | Feature |
+|---|---|
+| 🗄️ | Save models to your own server with a database & file storage |
+| 🕓 | Keep a **version history** per model and save edits as new versions |
+| 🔀 | **Compare versions** — see added/removed/changed elements, side by side in 3D |
 
 ---
 

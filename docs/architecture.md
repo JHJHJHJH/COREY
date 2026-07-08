@@ -14,6 +14,13 @@ The backend stores model metadata in Postgres and model bytes in S3-compatible
 object storage. Server-backed models use stable model ids for drafts, rule
 templates, Excel compute, and IFC writeback.
 
+Each server model keeps a numbered version history (`ModelVersionRecord`, one
+S3 object per version); `GET .../file` always serves the latest version.
+Uploading a version computes a change summary against the previous one, and
+any two versions can be diffed server-side (`src/server/model-compare.ts` +
+`ifc-compare-core.ts`) — the viewer renders the result in a compare panel and
+a side-by-side 3D overlay.
+
 ## Main Boundaries
 
 - `ViewerShell`: top-level React state and user workflow orchestration
