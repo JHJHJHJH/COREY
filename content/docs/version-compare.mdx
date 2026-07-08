@@ -1,0 +1,145 @@
+---
+title: Versions & Compare
+description: Keep a version history of server-stored models and compare any two versions in tables and side-by-side 3D.
+---
+
+import { Steps, Step } from "fumadocs-ui/components/steps";
+
+When a model is stored on the server, COREY keeps a numbered version history for
+it. Each new upload becomes the next version, and any two versions can be
+compared — element by element, field by field, and side by side in 3D.
+
+This is how you answer questions like "what changed between the model we
+reviewed last week and the one submitted today?" and "did the resubmission
+actually fix the failed checks?"
+
+<Callout type="info">
+Versions and compare need the optional self-hosted backend, because the
+versions live on the server. Local-only files don't have a version history —
+see [Local Setup](./getting-started) if your team hasn't set up storage yet.
+</Callout>
+
+## Version history
+
+Open the **Files** menu to see your server-stored models. Each model has a
+version history you can expand:
+
+- Every version shows its number (v1, v2, …), an optional label, file size,
+  upload date, and a **change summary** — how many elements were added,
+  removed, or changed compared to the previous version.
+- Download any version as an IFC file.
+- Select versions with the checkboxes to delete old ones. A model always keeps
+  at least one version — to remove the last one, delete the model itself.
+
+### Adding a new version
+
+There are two ways to create a version:
+
+1. **Upload new version** in the model's version history — pick a newer IFC
+   export of the same model, optionally with a label.
+2. **Save as new version** after an Excel round trip — instead of downloading
+   the edited IFC, save it straight to the server as the next version. See
+   [Excel Round Trip](./excel-roundtrip).
+
+Either way COREY computes the change summary automatically, so the history
+reads like a change log.
+
+## Comparing two versions
+
+<Steps>
+
+<Step>
+
+### Open the compare dialog
+
+In the **Files** menu, expand the model's version history and click
+**Compare versions**. (The button appears once the model has at least two
+versions.)
+
+</Step>
+
+<Step>
+
+### Pick base and target
+
+Choose the **Base (before)** and **Target (after)** versions, then click
+**Compare**. Base is your reference point — usually the older version — and the
+results describe what the target did relative to it.
+
+</Step>
+
+<Step>
+
+### Read the differences
+
+The results are grouped into three lists:
+
+| Group | Meaning |
+|---|---|
+| **Changed** | Elements present in both versions whose data differs. Expand a row to see exactly which fields changed, with before and after values. |
+| **Added** | Elements that exist only in the target version. |
+| **Removed** | Elements that exist only in the base version. |
+
+Elements are matched by their IFC GlobalId, so renames and reordering don't
+show up as false adds/removes.
+
+</Step>
+
+<Step>
+
+### Check the validation diff
+
+If you have clauses configured, COREY re-runs them against both versions and
+shows how the results moved:
+
+- **Resolved failures** — failing in the base, passing in the target. This is
+  the list that tells you a resubmission worked.
+- **New failures** — introduced by the target version.
+- **Still failing** — unresolved in both.
+
+With no clauses configured, the validation diff is skipped and you get the
+structural diff only.
+
+</Step>
+
+<Step>
+
+### Open the visual compare
+
+Click **Open the compared versions side by side in 3D** to see both versions
+in two camera-synced viewports — orbit or zoom in one pane and the other
+follows.
+
+Differences are color-coded consistently across the 3D view, the differences
+list, and the properties panel:
+
+- 🟢 **green** — added elements
+- 🔴 **red** — removed elements
+- 🟠 **orange** — modified elements
+
+Click a row in the **Differences** panel to focus that element in both panes,
+and use the **Properties** panel to see its changed fields highlighted in the
+same colors. Press <kbd>Escape</kbd> to close the overlay.
+
+</Step>
+
+</Steps>
+
+## Good habits
+
+- Upload resubmissions as new versions of the same model instead of creating a
+  new model — that's what makes the change summary and compare possible.
+- Use labels ("Tender issue", "Post-review fix") so versions are recognisable
+  later.
+- After an Excel round trip, save the result as a new version and compare it
+  against the original to double-check exactly what your edits touched.
+- Compare with your clauses configured whenever you can — "Resolved failures"
+  is the fastest way to confirm a fix.
+
+## Related guides
+
+<Cards>
+  <Card title="Excel Round Trip" href="./excel-roundtrip" description="Bulk-edit model data, then save the result as a new version." />
+  <Card title="Clauses & Checks" href="./clauses" description="Configure the checks that power the validation diff." />
+  <Card title="Workflow" href="./workflow" description="See where versioning fits in a full review cycle." />
+</Cards>
