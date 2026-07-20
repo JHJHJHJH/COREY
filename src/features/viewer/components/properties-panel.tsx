@@ -229,19 +229,55 @@ function ValidationDetailsPopup({
   );
 }
 
+export type PropertyPanelEditState = {
+  value: string;
+  editable: boolean;
+  reason: string | null;
+};
+
+type InspectionRowEdit = {
+  value: string;
+  onCommit: (raw: string) => void;
+};
+
 function InspectionValueRow({
   label,
   value,
   tone = null,
+  edit,
   onOpenDetails,
 }: {
   label: string;
   value: ViewerInspectionValue;
   tone?: PropertyDiffTone | null;
+  edit?: InspectionRowEdit;
   onOpenDetails: (payload: Omit<ValidationPopupPayload, "selectionKey">) => void;
 }) {
   const failedClauseCount = value.validation?.clauseFailures.length ?? 0;
   const validation = value.validation;
+  const [editing, setEditing] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const cancelEditRef = useRef(false);
+
+  useEffect(() => {
+    if (!editing) {
+      return;
+    }
+
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, [editing]);
+
+  const finishEditing = (raw: string) => {
+    if (cancelEditRef.current) {
+      cancelEditRef.current = false;
+      setEditing(false);
+      return;
+    }
+
+    setEditing(false);
+    edit?.onCommit(raw);
+  };
 
   return (
     <div
@@ -252,9 +288,45 @@ function InspectionValueRow({
       </div>
       <div className="flex min-w-0 flex-wrap items-start gap-2 md:flex-nowrap md:justify-between">
         <div
-          className={`min-w-0 flex-1 break-words text-sm leading-6 [overflow-wrap:anywhere] ${valueClass(value, tone)}`}
+          className={`min-w-0 flex-1 break-words text-sm leading-6 [overflow-wrap:anywhere] ${valueClass(value, tone)} ${
+            edit && !editing
+              ? "cursor-text rounded px-1 -mx-1 outline-none transition hover:bg-[color:var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]"
+              : ""
+          }`}
+          title={edit ? "Double-click to edit. Changes save to the model draft when you leave the field." : undefined}
+          onDoubleClick={
+            edit
+              ? () => {
+                  cancelEditRef.current = false;
+                  setEditing(true);
+                }
+              : undefined
+          }
         >
-          {value.text}
+          {editing && edit ? (
+            <input
+              ref={inputRef}
+              type="text"
+              defaultValue={edit.value}
+              aria-label={`Edit ${label}`}
+              onBlur={(event) => finishEditing(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  event.currentTarget.blur();
+                }
+
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  cancelEditRef.current = true;
+                  event.currentTarget.blur();
+                }
+              }}
+              className="w-full rounded border border-[color:var(--accent)] bg-[color:var(--panel-bg)] px-1.5 py-0.5 text-sm leading-5 text-[color:var(--foreground)] outline-none ring-2 ring-[color:var(--accent)]/20"
+            />
+          ) : (
+            value.text
+          )}
         </div>
         {tone ? <DiffBadge tone={tone} /> : null}
         {failedClauseCount > 0 && validation ? (
@@ -290,17 +362,31 @@ function rowDiffTone(
 function InspectionRowView({
   row,
   highlightTargets,
+  getEditState,
+  onEdit,
   onOpenDetails,
 }: {
   row: ViewerInspectionRow;
   highlightTargets?: ReadonlyMap<string, PropertyDiffTone> | null;
+  getEditState?: (row: ViewerInspectionRow) => PropertyPanelEditState | null;
+  onEdit?: (row: ViewerInspectionRow, raw: string) => void;
   onOpenDetails: (payload: Omit<ValidationPopupPayload, "selectionKey">) => void;
 }) {
+  const editState = getEditState?.(row) ?? null;
+
   return (
     <InspectionValueRow
       label={row.label}
       value={row.value}
       tone={rowDiffTone(row, highlightTargets)}
+      edit={
+        editState?.editable && onEdit
+          ? {
+              value: editState.value,
+              onCommit: (raw) => onEdit(row, raw),
+            }
+          : undefined
+      }
       onOpenDetails={onOpenDetails}
     />
   );
@@ -309,10 +395,14 @@ function InspectionRowView({
 function PropertySetGroup({
   group,
   highlightTargets,
+  getEditState,
+  onEdit,
   onOpenDetails,
 }: {
   group: ViewerInspectionGroup;
   highlightTargets?: ReadonlyMap<string, PropertyDiffTone> | null;
+  getEditState?: (row: ViewerInspectionRow) => PropertyPanelEditState | null;
+  onEdit?: (row: ViewerInspectionRow, raw: string) => void;
   onOpenDetails: (payload: Omit<ValidationPopupPayload, "selectionKey">) => void;
 }) {
   const toneCounts: Record<PropertyDiffTone, number> = { modified: 0, added: 0, removed: 0 };
@@ -354,6 +444,8 @@ function PropertySetGroup({
               key={row.key}
               row={row}
               highlightTargets={highlightTargets}
+              getEditState={getEditState}
+              onEdit={onEdit}
               onOpenDetails={onOpenDetails}
             />
           ))}
@@ -467,10 +559,14 @@ function ValidationSummaryBanner({
 function InspectionContent({
   inspection,
   highlightTargets,
+  getEditState,
+  onEdit,
   onOpenDetails,
 }: {
   inspection: ViewerElementInspection;
   highlightTargets?: ReadonlyMap<string, PropertyDiffTone> | null;
+  getEditState?: (row: ViewerInspectionRow) => PropertyPanelEditState | null;
+  onEdit?: (row: ViewerInspectionRow, raw: string) => void;
   onOpenDetails: (payload: Omit<ValidationPopupPayload, "selectionKey">) => void;
 }) {
   return (
@@ -494,6 +590,8 @@ function InspectionContent({
                 key={row.key}
                 row={row}
                 highlightTargets={highlightTargets}
+                getEditState={getEditState}
+                onEdit={onEdit}
                 onOpenDetails={onOpenDetails}
               />
             ))}
@@ -513,6 +611,8 @@ function InspectionContent({
                 key={group.key}
                 group={group}
                 highlightTargets={highlightTargets}
+                getEditState={getEditState}
+                onEdit={onEdit}
                 onOpenDetails={onOpenDetails}
               />
             ))}
@@ -535,6 +635,10 @@ type PropertiesPanelProps = {
   headerAccessory?: React.ReactNode;
   /** Rows keyed by `inspectionTargetKey` render with the mapped diff tone. */
   highlightTargets?: ReadonlyMap<string, PropertyDiffTone> | null;
+  /** Resolves whether an inspected IFC field maps to an editable table cell. */
+  getEditState?: (row: ViewerInspectionRow) => PropertyPanelEditState | null;
+  /** Commits a property-panel edit to the shared data-table draft. */
+  onEdit?: (row: ViewerInspectionRow, raw: string) => void;
   details: ViewerSelectionDetails;
 };
 
@@ -543,6 +647,8 @@ export function PropertiesPanel({
   compact = false,
   headerAccessory,
   highlightTargets,
+  getEditState,
+  onEdit,
   details,
 }: PropertiesPanelProps) {
   const selectionKey = details.selection
@@ -626,6 +732,8 @@ export function PropertiesPanel({
           <InspectionContent
             inspection={details.inspection}
             highlightTargets={highlightTargets}
+            getEditState={getEditState}
+            onEdit={onEdit}
             onOpenDetails={openValidationPopup}
           />
         ) : (

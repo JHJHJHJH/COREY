@@ -31,6 +31,18 @@ Click any element — a wall, door, beam, and so on — to see its details:
 
 This is the quickest way to answer "what is this, and what information does it carry?"
 
+### Correct a field while inspecting
+
+For editable IFC attributes and property-set values, double-click the value in the
+**Properties** panel, type the correction, then click away or press Enter. COREY
+saves the change as a **draft** automatically; it does not overwrite the IFC file
+at that point. Read-only identity and derived fields remain unchanged.
+
+When a model has pending changes, COREY shows a **Draft** label beside **Export
+IFC** with the number of edits. Use **Export IFC** to download a corrected file,
+or, for a server-stored model, choose **Save as new version** to write the edited
+bytes as the next version on the server.
+
 ## Focus on what matters
 
 When a model is busy, these tools help you concentrate on a subset of it:
