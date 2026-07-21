@@ -47,7 +47,10 @@ import { DataTablePanel } from "@/features/viewer/components/data-table-panel";
 import { DetachedWindow } from "@/features/viewer/components/detached-window";
 import { ModelTreePanel } from "@/features/viewer/components/model-tree-panel";
 import { IfcViewport } from "@/features/viewer/components/ifc-viewport";
-import { PropertiesPanel } from "@/features/viewer/components/properties-panel";
+import {
+  PropertiesPanel,
+  type PropertyPanelEditState,
+} from "@/features/viewer/components/properties-panel";
 import { ViewerToolbar } from "@/features/viewer/components/viewer-toolbar";
 import {
   applyViewerDataTableDraft,
@@ -98,6 +101,7 @@ import type {
   ViewerDataTableExportStatus,
   ViewerDataTableImportReport,
   ViewerDataTableState,
+  ViewerInspectionRow,
   ViewerSelectionDetails,
   ViewerSessionState,
   ViewerStatus,
@@ -192,6 +196,35 @@ function areValidationHighlightsEqual(
     areValidationElementMapsEqual(left.warn, right.warn) &&
     areValidationElementMapsEqual(left.error, right.error)
   );
+}
+
+type ResolvedPropertyPanelEdit = PropertyPanelEditState & {
+  rowKey: string;
+  columnKey: string;
+};
+
+function matchesPropertyPanelTarget(
+  row: ViewerInspectionRow,
+  binding: NonNullable<ViewerDataTableState["data"]>["columns"][number]["binding"],
+) {
+  if (!row.target || !binding || row.target.kind !== binding.kind) {
+    return false;
+  }
+
+  if (row.target.kind === "attribute" && binding.kind === "attribute") {
+    return row.target.name.trim().toLowerCase() === binding.name.trim().toLowerCase();
+  }
+
+  return (
+    row.target.kind === "property" &&
+    binding.kind === "property" &&
+    row.target.group === binding.group &&
+    row.target.label === binding.label
+  );
+}
+
+function propertyPanelInputValue(row: ViewerInspectionRow) {
+  return row.value.state === "present" ? String(row.value.raw ?? row.value.text) : "";
 }
 
 const initialDataTableActionStatus: ViewerDataTableExportStatus = {
@@ -578,7 +611,13 @@ function HeaderEditsControl({
   }, [closeMenu, menuOpen]);
 
   return (
-    <div ref={containerRef} className="relative inline-flex">
+    <div ref={containerRef} className="relative inline-flex items-center gap-2">
+      <span
+        className="inline-flex h-8 items-center rounded-full border border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] px-2.5 text-xs font-semibold text-[color:var(--warning-fg)]"
+        title={`${draftEditCount} pending ${draftEditCount === 1 ? "edit" : "edits"}. Export or save a new version to write an IFC file.`}
+      >
+        Draft · {draftEditCount} {draftEditCount === 1 ? "edit" : "edits"}
+      </span>
       <div className="inline-flex h-10 items-center overflow-hidden rounded-[var(--r-control)] border border-[color:var(--success-border)] shadow-sm">
         <button
           type="button"
@@ -1095,6 +1134,33 @@ export function ViewerShell() {
       ),
     }),
     [deferredClauses, effectiveDataTableData, selectionDetails],
+  );
+  const resolvePropertyPanelEdit = useCallback(
+    (inspectionRow: ViewerInspectionRow): ResolvedPropertyPanelEdit | null => {
+      const inspection = validatedSelectionDetails.inspection;
+      if (!inspection || !effectiveDataTableData) {
+        return null;
+      }
+
+      const dataRow = effectiveDataTableData.rows.find(
+        (row) => row.modelId === inspection.modelId && row.localId === inspection.localId,
+      );
+      const column = effectiveDataTableData.columns.find((candidate) =>
+        matchesPropertyPanelTarget(inspectionRow, candidate.binding),
+      );
+      if (!dataRow || !column) {
+        return null;
+      }
+
+      return {
+        rowKey: dataRow.key,
+        columnKey: column.key,
+        value: propertyPanelInputValue(inspectionRow),
+        editable: column.editable,
+        reason: column.editableReason,
+      };
+    },
+    [effectiveDataTableData, validatedSelectionDetails.inspection],
   );
   const validationClauseTableViews = useMemo<ViewerValidationClauseTableView[]>(
     () =>
@@ -2366,6 +2432,22 @@ export function ViewerShell() {
     ],
   );
 
+  const handlePropertyPanelEdit = useCallback(
+    (row: ViewerInspectionRow, raw: string) => {
+      const edit = resolvePropertyPanelEdit(row);
+      if (!edit?.editable) {
+        return;
+      }
+
+      handleDataTableCellEdit({
+        rowKey: edit.rowKey,
+        columnKey: edit.columnKey,
+        raw,
+      });
+    },
+    [handleDataTableCellEdit, resolvePropertyPanelEdit],
+  );
+
   const handleDataTableImport = async (file: File) => {
     if (!metadata?.sourceId || !dataTableState.data || !effectiveDataTableData) {
       startTransition(() => {
@@ -3300,7 +3382,12 @@ export function ViewerShell() {
                 onPointerDown={startDrawerResize("right")}
                 onToggle={() => setShowProperties((value) => !value)}
                 renderPanel={() => (
-                  <PropertiesPanel embedded details={validatedSelectionDetails} />
+                  <PropertiesPanel
+                    embedded
+                    details={validatedSelectionDetails}
+                    getEditState={resolvePropertyPanelEdit}
+                    onEdit={handlePropertyPanelEdit}
+                  />
                 )}
               />
             </div>
