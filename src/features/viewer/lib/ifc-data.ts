@@ -46,6 +46,7 @@ export const elementInspectionDataConfig = {
   attributesDefault: true,
   relations: {
     IsDefinedBy: { attributes: true, relations: true },
+    IsTypedBy: { attributes: true, relations: true },
     HasAssociations: { attributes: true, relations: false },
   },
   relationsDefault: { attributes: false, relations: false },
@@ -194,6 +195,54 @@ function readFirstText(data: ItemData, keys: string[]) {
 function readRelation(data: ItemData, key: string) {
   const value = data[key];
   return Array.isArray(value) ? value : [];
+}
+
+type ResolvedInspectionAttribute = {
+  exists: boolean;
+  value: unknown;
+};
+
+function hasPresentInspectionValue(value: unknown) {
+  return buildInspectionValue(true, value).state === "present";
+}
+
+/**
+ * IFC2X3 exposes type assignments through IsDefinedBy, whereas IFC4 uses
+ * IsTypedBy. In both cases, the relationship points to the type via
+ * RelatingType.
+ */
+function resolvePredefinedType(data: ItemData): ResolvedInspectionAttribute | null {
+  const direct = {
+    exists: hasAttribute(data, "PredefinedType"),
+    value: readAttribute(data, "PredefinedType"),
+  };
+
+  if (direct.exists && hasPresentInspectionValue(direct.value)) {
+    return direct;
+  }
+
+  let relatedFallback: ResolvedInspectionAttribute | null = null;
+  for (const relationName of ["IsTypedBy", "IsDefinedBy"]) {
+    for (const relation of readRelation(data, relationName)) {
+      for (const relatedType of readRelation(relation, "RelatingType")) {
+        if (!hasAttribute(relatedType, "PredefinedType")) {
+          continue;
+        }
+
+        const resolved = {
+          exists: true,
+          value: readAttribute(relatedType, "PredefinedType"),
+        };
+        if (hasPresentInspectionValue(resolved.value)) {
+          return resolved;
+        }
+
+        relatedFallback ??= resolved;
+      }
+    }
+  }
+
+  return direct.exists ? direct : relatedFallback;
 }
 
 function humanizeKey(value: string) {
@@ -594,10 +643,11 @@ export function buildSelectionInspection(
     (selection.label.trim().length > 0 ? selection.label : null) ??
     selection.category ??
     `#${selection.localId}`;
+  const predefinedType = resolvePredefinedType(data);
   const summaryRows = [
     buildRow(
       "type",
-      "type",
+      "IfcEntityType",
       hasIfcCategory(data),
       readIfcCategory(data),
       "MISSING IFC type",
@@ -605,7 +655,7 @@ export function buildSelectionInspection(
     ),
     buildRow(
       "GlobalId",
-      "GlobalId",
+      "GUID",
       hasIfcGuid(data),
       readIfcGuid(data),
       "MISSING GlobalId",
@@ -635,6 +685,18 @@ export function buildSelectionInspection(
       "MISSING object type",
       { kind: "attribute", name: "ObjectType" },
     ),
+    ...(predefinedType
+      ? [
+          buildRow(
+            "PredefinedType",
+            "PredefinedType",
+            predefinedType.exists,
+            predefinedType.value,
+            "MISSING predefined type",
+            { kind: "attribute", name: "PredefinedType" },
+          ),
+        ]
+      : []),
   ];
   const propertySets = buildPropertyGroups(data);
   const issueCount =
