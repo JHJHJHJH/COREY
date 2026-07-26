@@ -11,7 +11,8 @@ pnpm start
 ```
 
 The build uses `next build --webpack` and generates Fumadocs source files before
-building.
+building. It also bundles the optional MCP companion to
+`dist/mcp/corey-mcp.cjs`.
 
 ## One-Click Deploy
 
@@ -55,11 +56,31 @@ docker compose --env-file .env -f docker/docker-compose.deploy.yml up --build
 
 The app healthcheck calls `/api/health`.
 
+### Optional MCP service
+
+Set `COREY_MCP_BRIDGE_URL`, a shared 32+ character
+`COREY_MCP_BRIDGE_SECRET`, `COREY_MCP_ALLOWED_ORIGINS`,
+`COREY_MCP_PUBLIC_URL`, `COREY_APP_PUBLIC_URL`, and the administrator IDs in
+`COREY_MCP_ADMIN_USERS`. Then start the optional Compose profile:
+
+```bash
+docker compose --env-file .env -f docker/docker-compose.deploy.yml \
+  --profile mcp up --build
+```
+
+The MCP endpoint is `/mcp` on port `4001`; connected browser tabs use
+`/bridge`. After deployment, an administrator enables MCP and generates the
+show-once API key from the **MCP** dialog in COREY. Claude web/Desktop discovers
+the companion's OAuth endpoints automatically. Public deployments must route
+both through TLS and must not expose the internal COREY user header or
+`COREY_MCP_INTERNAL_URL` to untrusted clients.
+
 ## Release Checklist
 
 ```bash
 pnpm verify
-docker compose --env-file .env -f docker/docker-compose.deploy.yml build app
+pnpm mcp:test
+docker compose --env-file .env -f docker/docker-compose.deploy.yml build app mcp
 ```
 
 Version tags publish GHCR images through the release workflow.

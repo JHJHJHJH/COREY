@@ -93,3 +93,65 @@ model DraftRecord {
 
   @@map("draft_records")
 }
+
+/// Deployment-wide MCP access state. The singleton row uses id "deployment".
+/// API key material is never stored in plaintext.
+model McpDeploymentConfig {
+  id              String   @id
+  enabled         Boolean  @default(false)
+  apiKeyHash      String?  @unique
+  apiKeyHint      String?
+  apiKeyRotatedAt DateTime?
+  updatedAt       DateTime @updatedAt
+
+  @@map("mcp_deployment_configs")
+}
+
+/// Dynamically registered public OAuth clients for hosted MCP consumers.
+model McpOAuthClient {
+  id             String                  @id
+  metadata       Json
+  createdAt      DateTime                @default(now())
+  authorizations McpOAuthAuthorization[]
+  tokens         McpOAuthToken[]
+
+  @@map("mcp_oauth_clients")
+}
+
+/// Short-lived OAuth consent requests and one-time authorization codes.
+model McpOAuthAuthorization {
+  id            String         @id @default(uuid())
+  clientId      String
+  redirectUri   String
+  state         String?
+  scopes        Json
+  codeChallenge String
+  resource      String?
+  codeHash      String?        @unique
+  approvedAt    DateTime?
+  consumedAt    DateTime?
+  expiresAt     DateTime
+  createdAt     DateTime       @default(now())
+  client        McpOAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, expiresAt])
+  @@map("mcp_oauth_authorizations")
+}
+
+/// OAuth access and rotating refresh credentials. Both token values are hashed.
+model McpOAuthToken {
+  id               String         @id @default(uuid())
+  clientId         String
+  accessTokenHash  String         @unique
+  refreshTokenHash String         @unique
+  scopes           Json
+  resource         String?
+  accessExpiresAt  DateTime
+  refreshExpiresAt DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime       @default(now())
+  client           McpOAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, refreshExpiresAt])
+  @@map("mcp_oauth_tokens")
+}

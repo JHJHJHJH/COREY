@@ -71,3 +71,25 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 4000) + '/api/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
 CMD ["node", "server.js"]
+
+FROM node:22-slim AS mcp-runner
+
+ENV NODE_ENV=production
+ENV COREY_MCP_BIND=0.0.0.0
+ENV COREY_MCP_PORT=4001
+
+WORKDIR /app
+
+# The MCP bundle contains its protocol/runtime dependencies. web-ifc stays
+# external so its adjacent Node WASM asset remains discoverable at runtime.
+COPY --chown=node:node --from=builder /app/dist/mcp ./dist/mcp
+COPY --chown=node:node --from=builder /app/node_modules/web-ifc ./node_modules/web-ifc
+
+USER node
+
+EXPOSE 4001
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:' + (process.env.COREY_MCP_PORT || 4001) + '/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+
+CMD ["node", "dist/mcp/corey-mcp.cjs"]

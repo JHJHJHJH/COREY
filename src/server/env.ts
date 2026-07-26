@@ -141,6 +141,13 @@ export function getDefaultUserId() {
   return value && value.length > 0 ? value : DEFAULT_USER_ID;
 }
 
+export function getMcpAdminUserIds() {
+  const configured = process.env.COREY_MCP_ADMIN_USERS;
+  return (configured?.split(",") ?? [getDefaultUserId()])
+    .map((value) => value.trim().toLowerCase().replace(/[^a-z0-9._@-]/g, "").slice(0, 200))
+    .filter(Boolean);
+}
+
 // When true, requests without an identity header are rejected (401) instead of
 // falling back to the default user.
 export function isUserRequired() {

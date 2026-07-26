@@ -27,6 +27,26 @@ templates, Excel compute, and IFC writeback.
 - `src/features/rules/*`: validation clause UI, provider, worker, and shared evaluator
 - `src/server/*`: Prisma, S3, model, draft, and rule-template stores
 - `src/app/api/*`: supported self-hosted API routes
+- `src/mcp/*`: companion HTTP MCP service, stored-model adapter, and browser-session broker
+- `src/features/viewer/mcp/*`: shared MCP contracts, bounded query/edit engine, and browser bridge
+
+## MCP Companion
+
+The optional MCP process owns Streamable HTTP transport, OAuth discovery, and a
+WebSocket bridge. Deployment-wide enablement, hashed API credentials, OAuth
+clients, and rotating tokens live in Postgres and are managed from the
+administrator MCP dialog. The companion introspects credentials through a
+shared-secret internal app API, so disable and rotation take effect without a
+restart.
+
+Active-tab commands execute against normalized React state in the browser, so
+local IFC bytes remain in the tab. Stored targets use the same owner-scoped
+model, draft, and rules APIs as the web app and build a bounded headless WebIFC
+index of the latest model version.
+
+MCP targets are always explicit: either a connected viewer session id or a
+stored model id. Elements use stable IFC `GlobalId` values at the public
+boundary. Draft edits are atomic, optimistic, and reversible.
 
 ## Design Rules
 

@@ -3,6 +3,7 @@ import type {
   ModelCompareElementRef,
   ModelCompareFieldChange,
   ViewerInspectionValueState,
+  ViewerDataTableEditableValueKind,
   ViewerValidationClause,
   ViewerValidationRow,
   ViewerValidationValue,
@@ -30,8 +31,10 @@ import {
  */
 
 export type IfcSnapshotValue = {
+  raw: unknown;
   text: string;
   state: ViewerInspectionValueState;
+  valueKind: ViewerDataTableEditableValueKind | null;
 };
 
 export type IfcElementSnapshot = {
@@ -97,24 +100,37 @@ function formatSimpleValue(value: unknown): string {
  */
 function toSnapshotValue(value: unknown): IfcSnapshotValue {
   const normalized = readWrappedValue(value);
+  const valueKind =
+    typeof normalized === "string"
+      ? "string"
+      : typeof normalized === "number"
+        ? "number"
+        : typeof normalized === "boolean"
+          ? "boolean"
+          : null;
 
   if (normalized === undefined) {
-    return { text: "Undefined", state: "undefined" };
+    return { raw: undefined, text: "Undefined", state: "undefined", valueKind };
   }
 
   if (normalized === null) {
-    return { text: "Null", state: "null" };
+    return { raw: null, text: "Null", state: "null", valueKind };
   }
 
   if (typeof normalized === "string" && normalized.trim().length === 0) {
-    return { text: "Empty string", state: "empty" };
+    return { raw: normalized, text: "Empty string", state: "empty", valueKind };
   }
 
   if (Array.isArray(normalized) && normalized.length === 0) {
-    return { text: "Empty list", state: "empty" };
+    return { raw: normalized, text: "Empty list", state: "empty", valueKind };
   }
 
-  return { text: formatSimpleValue(normalized), state: "present" };
+  return {
+    raw: normalized,
+    text: formatSimpleValue(normalized),
+    state: "present",
+    valueKind,
+  };
 }
 
 function readStringValue(value: unknown): string | null {
@@ -323,6 +339,10 @@ function snapshotValuesEqual(a: IfcSnapshotValue | null, b: IfcSnapshotValue | n
   return a.text === b.text && a.state === b.state;
 }
 
+function toCompareValue(value: IfcSnapshotValue | null) {
+  return value ? { text: value.text, state: value.state } : null;
+}
+
 function diffElementFields(
   base: IfcElementSnapshot,
   target: IfcElementSnapshot,
@@ -346,7 +366,12 @@ function diffElementFields(
     const baseValue = base.attributes[key] ?? null;
     const targetValue = target.attributes[key] ?? null;
     if (!snapshotValuesEqual(baseValue, targetValue)) {
-      fields.push({ field: `attribute:${key}`, label: key, base: baseValue, target: targetValue });
+      fields.push({
+        field: `attribute:${key}`,
+        label: key,
+        base: toCompareValue(baseValue),
+        target: toCompareValue(targetValue),
+      });
     }
   }
 
@@ -358,7 +383,12 @@ function diffElementFields(
     const baseValue = base.properties[key] ?? null;
     const targetValue = target.properties[key] ?? null;
     if (!snapshotValuesEqual(baseValue, targetValue)) {
-      fields.push({ field: `property:${key}`, label: key, base: baseValue, target: targetValue });
+      fields.push({
+        field: `property:${key}`,
+        label: key,
+        base: toCompareValue(baseValue),
+        target: toCompareValue(targetValue),
+      });
     }
   }
 

@@ -157,6 +157,42 @@ APP_PORT=4010 docker compose --env-file .env -f docker/docker-compose.release.ym
 </details>
 
 <details>
+<summary><strong>MCP server for LLM review</strong></summary>
+
+COREY includes an optional MCP companion that can query the latest stored models
+and connected viewer tabs, navigate the 3D view, and apply optimistic reversible
+draft edits. It never exports or writes IFC bytes.
+
+Configure the app and companion with the same 32+ character
+`COREY_MCP_BRIDGE_SECRET`, public URLs, and browser origin:
+
+```bash
+export COREY_MCP_BRIDGE_URL=ws://localhost:4001/bridge
+export COREY_MCP_BRIDGE_SECRET=replace-with-at-least-32-random-characters
+export COREY_MCP_ALLOWED_ORIGINS=http://localhost:4000
+export COREY_MCP_PUBLIC_URL=http://localhost:4001/mcp
+export COREY_APP_PUBLIC_URL=http://localhost:4000
+export COREY_MCP_ADMIN_USERS=local
+```
+
+Start the MCP companion:
+
+```bash
+pnpm mcp:http
+```
+
+Open COREY, select **MCP**, enable deployment access, and copy the generated API
+key and client instructions. API keys are stored only as hashes and a refreshed
+key immediately replaces the previous key. Codex connects with the generated
+bearer-key configuration; Claude web/Desktop uses the built-in OAuth flow.
+
+In Docker Compose, enable the optional service with `--profile mcp`. Claude
+hosted connectors require a publicly reachable HTTPS endpoint. Use TLS
+(`wss://` and `https://`) and a reverse proxy on public networks.
+
+</details>
+
+<details>
 <summary><strong>Configuration (environment variables)</strong></summary>
 
 Copy `.env.example` to `.env` for local development. Required backend variable:
@@ -177,6 +213,10 @@ Other optional backend variables:
 - `COREY_USER_HEADER` (optional, default `x-forwarded-user`)
 - `COREY_DEFAULT_USER` (optional, default `local`)
 - `COREY_REQUIRE_USER` (optional, default `false`)
+- `COREY_MCP_BRIDGE_URL` and `COREY_MCP_BRIDGE_SECRET`
+- `COREY_MCP_PUBLIC_URL`, `COREY_APP_PUBLIC_URL`, and `COREY_MCP_INTERNAL_URL`
+- `COREY_MCP_ADMIN_USERS` (comma-separated user IDs; defaults to `COREY_DEFAULT_USER`)
+- `COREY_MCP_ALLOWED_ORIGINS`, `COREY_MCP_PORT`, and `COREY_MCP_INDEX_CACHE_ENTRIES`
 
 The backend is intended for self-hosted deployments. Put a reverse proxy in front
 of it on public networks, and configure payload limits, TLS, authentication, and

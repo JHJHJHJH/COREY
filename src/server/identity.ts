@@ -6,8 +6,14 @@ import { getDefaultUserId, getUserHeaderName, isUserRequired } from "@/server/en
 const UNSAFE_USER_ID = /[^a-z0-9._@-]/g;
 const MAX_USER_ID_LENGTH = 200;
 
-function normalizeUserId(raw: string): string {
+export function normalizeUserId(raw: string): string {
   return raw.trim().toLowerCase().replace(UNSAFE_USER_ID, "").slice(0, MAX_USER_ID_LENGTH);
+}
+
+export function getUserIdFromHeaderValue(headerValue: string | null): string | null {
+  const userId = headerValue ? normalizeUserId(headerValue) : "";
+  if (userId) return userId;
+  return isUserRequired() ? null : getDefaultUserId();
 }
 
 /**
@@ -23,19 +29,12 @@ function normalizeUserId(raw: string): string {
  *   if (userId instanceof Response) return userId;
  */
 export function getUserIdOrResponse(request: Request): string | Response {
-  const headerValue = request.headers.get(getUserHeaderName());
-  const userId = headerValue ? normalizeUserId(headerValue) : "";
-
-  if (userId.length > 0) {
-    return userId;
-  }
-
-  if (isUserRequired()) {
+  const userId = getUserIdFromHeaderValue(request.headers.get(getUserHeaderName()));
+  if (!userId) {
     return Response.json(
       { error: "A user identity header is required for this deployment." },
       { status: 401 },
     );
   }
-
-  return getDefaultUserId();
+  return userId;
 }

@@ -88,8 +88,22 @@ import { saveWritebackAsVersion } from "@/features/viewer/lib/model-compare-api"
 import { ServerModelsMenu } from "@/features/viewer/components/server-models-menu";
 import { ModelComparePanel } from "@/features/viewer/components/model-compare-panel";
 import { VisualCompareOverlay } from "@/features/viewer/components/visual-compare-overlay";
+import { McpSettingsControl } from "@/features/viewer/components/mcp-settings-control";
 import { buildViewerValidationClauseTableViews } from "@/features/viewer/lib/validation-clauses";
 import { exportEditedIfc } from "@/features/viewer/lib/ifc-writeback";
+import {
+  getMcpElements,
+  listMcpFields,
+  prepareMcpDraftEdits,
+  queryMcpElements,
+  queryValidationIssues,
+  validationSummary,
+} from "@/features/viewer/mcp/query";
+import { useCoreyMcpBridge } from "@/features/viewer/mcp/use-corey-mcp-bridge";
+import type {
+  CoreyMcpDraftEditRequest,
+  CoreyMcpElementQuery,
+} from "@/features/viewer/mcp/contracts";
 import type {
   ModelCompareElementRef,
   ModelMetadata,
@@ -1043,6 +1057,7 @@ export function ViewerShell() {
   const [showDataTable, setShowDataTable] = useState(false);
   const [showDataTableInWindow, setShowDataTableInWindow] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
+  const [mcpConfigurationRevision, setMcpConfigurationRevision] = useState(0);
   const [treeDrawerWidth, setTreeDrawerWidth] = useState(DEFAULT_TREE_DRAWER_WIDTH);
   const [propertiesDrawerWidth, setPropertiesDrawerWidth] = useState(
     DEFAULT_PROPERTIES_DRAWER_WIDTH,
@@ -2789,6 +2804,216 @@ export function ViewerShell() {
     setShowDataTableInWindow(false);
   }, []);
 
+  const mcpRevision = useMemo(
+    () =>
+      [
+        metadata?.sourceId ?? "no-model",
+        dataTableState.phase,
+        dataTableState.data?.rows.length ?? 0,
+        dataTableDraft?.updatedAt ?? "no-draft",
+        validationResult?.results.length ?? 0,
+        validationState.phase,
+      ].join(":"),
+    [
+      dataTableDraft?.updatedAt,
+      dataTableState.data?.rows.length,
+      dataTableState.phase,
+      metadata?.sourceId,
+      validationResult?.results.length,
+      validationState.phase,
+    ],
+  );
+
+  const resolveMcpLocalIds = useCallback(
+    (params: { globalIds?: string[]; ifcType?: string }) => {
+      const rows = effectiveDataTableData?.rows ?? [];
+      if (params.globalIds?.length) {
+        const wanted = new Set(params.globalIds);
+        return rows
+          .filter((row) => {
+            const cell = row.cells.globalId;
+            const globalId =
+              cell?.state === "present"
+                ? typeof cell.raw === "string"
+                  ? cell.raw
+                  : cell.text
+                : null;
+            return globalId ? wanted.has(globalId) : false;
+          })
+          .map((row) => row.localId);
+      }
+      if (params.ifcType) {
+        const wanted = params.ifcType.toUpperCase();
+        return rows
+          .filter((row) => (row.ifcType ?? "").toUpperCase() === wanted)
+          .map((row) => row.localId);
+      }
+      return [];
+    },
+    [effectiveDataTableData?.rows],
+  );
+
+  const selectedMcpGlobalIds = useMemo(() => {
+    const localId = session.selected?.localId;
+    if (localId === undefined) return [];
+    const row = effectiveDataTableData?.rows.find((candidate) => candidate.localId === localId);
+    const cell = row?.cells.globalId;
+    if (!cell || cell.state !== "present") return [];
+    const globalId = typeof cell.raw === "string" ? cell.raw : cell.text;
+    return globalId ? [globalId] : [];
+  }, [effectiveDataTableData?.rows, session.selected?.localId]);
+
+  const mcpDescriptor = useMemo(
+    () => ({
+      phase: status.phase,
+      model: metadata
+        ? {
+            name: metadata.name,
+            sourceId: metadata.sourceId ?? null,
+            serverModelId: metadata.serverModelId ?? null,
+            rowCount: effectiveDataTableData?.rows.length ?? 0,
+            columnCount: effectiveDataTableData?.columns.length ?? 0,
+            draftEditCount,
+          }
+        : null,
+      selectedGlobalIds: selectedMcpGlobalIds,
+      hiddenItemCount: session.hiddenItemCount,
+      revision: Date.now(),
+    }),
+    [
+      draftEditCount,
+      effectiveDataTableData?.columns.length,
+      effectiveDataTableData?.rows.length,
+      metadata,
+      selectedMcpGlobalIds,
+      session.hiddenItemCount,
+      status.phase,
+    ],
+  );
+
+  const mcpBridge = useCoreyMcpBridge({
+    configurationRevision: mcpConfigurationRevision,
+    descriptor: mcpDescriptor,
+    handlers: {
+      get_model_summary: async () => {
+        const data = effectiveDataTableData;
+        const ifcTypeCounts: Record<string, number> = {};
+        for (const row of data?.rows ?? []) {
+          const ifcType = row.ifcType ?? "UNKNOWN";
+          ifcTypeCounts[ifcType] = (ifcTypeCounts[ifcType] ?? 0) + 1;
+        }
+        return {
+          model: metadata,
+          indexing: dataTableState.phase,
+          rowCount: data?.rows.length ?? 0,
+          columnCount: data?.columns.length ?? 0,
+          ifcTypeCounts,
+          fields: data ? listMcpFields(data) : [],
+          draftEditCount,
+          validation: validationSummary(validationResult, data?.rows.length ?? 0),
+          viewer: {
+            status,
+            selectedGlobalIds: selectedMcpGlobalIds,
+            hiddenItemCount: session.hiddenItemCount,
+          },
+          revision: mcpRevision,
+        };
+      },
+      query_elements: async (params) => {
+        if (!effectiveDataTableData) throw new Error("The model is not indexed yet.");
+        return queryMcpElements({
+          data: effectiveDataTableData,
+          validation: validationResult,
+          query: (params.query ?? {}) as CoreyMcpElementQuery,
+          revision: mcpRevision,
+        });
+      },
+      get_elements: async (params) => {
+        if (!effectiveDataTableData) throw new Error("The model is not indexed yet.");
+        return getMcpElements({
+          data: effectiveDataTableData,
+          validation: validationResult,
+          globalIds: params.globalIds as string[],
+        });
+      },
+      get_validation_summary: async () =>
+        validationSummary(validationResult, effectiveDataTableData?.rows.length ?? 0),
+      query_validation_issues: async (params) => {
+        if (!effectiveDataTableData) throw new Error("The model is not indexed yet.");
+        return queryValidationIssues({
+          data: effectiveDataTableData,
+          result: validationResult,
+          revision: mcpRevision,
+          ...(params as {
+            severities?: Array<"warn" | "error">;
+            clauseIds?: string[];
+            ifcTypes?: string[];
+            cursor?: string;
+            limit?: number;
+          }),
+        });
+      },
+      apply_draft_edits: async (params) => {
+        if (!metadata?.sourceId || !dataTableState.data) {
+          throw new Error("The model is not indexed yet.");
+        }
+        const prepared = prepareMcpDraftEdits({
+          sourceId: metadata.sourceId,
+          baseData: dataTableState.data,
+          currentDraft: dataTableDraft,
+          edits: params.edits as CoreyMcpDraftEditRequest[],
+        });
+        commitDataTableDraft(prepared.draft, { writeThrough: true });
+        setDataTableActionStatus({
+          phase: "success",
+          message: `Applied ${prepared.applied.length} MCP draft edits.`,
+          issues: [],
+        });
+        return {
+          applied: prepared.applied,
+          draftEditCount: prepared.draft?.edits.length ?? 0,
+        };
+      },
+      update_view: async (params) => {
+        const localIds = resolveMcpLocalIds(params);
+        if (
+          !["show_all", "fit_model"].includes(params.action) &&
+          localIds.length === 0
+        ) {
+          throw new Error("No matching elements were found for the view action.");
+        }
+        if (params.action === "select") {
+          await viewportRef.current?.selectElements(localIds);
+        } else if (params.action === "focus") {
+          if (localIds.length > 0) await viewportRef.current?.selectElements(localIds);
+          await viewportRef.current?.focusSelection();
+        } else if (params.action === "hide") {
+          await viewportRef.current?.hideElements(localIds);
+        } else if (params.action === "isolate") {
+          await viewportRef.current?.isolateElements(localIds);
+        } else if (params.action === "show_all") {
+          await viewportRef.current?.showAll();
+        } else {
+          await viewportRef.current?.fitModel();
+        }
+        if (dataTableVisibleRowKeysInView) syncDataTableToView();
+        return { action: params.action, matchedElementCount: localIds.length };
+      },
+      open_stored_model: async (params) => {
+        await loadModelById(params.modelId);
+        return { accepted: true, modelId: params.modelId };
+      },
+      refresh_draft: async (params) => {
+        if (metadata?.serverModelId !== params.modelId) return { refreshed: false };
+        const serverDraft = await readServerViewerDataTableDraft(params.modelId);
+        if (serverDraft) writePersistedViewerDataTableDraft(serverDraft);
+        else clearPersistedViewerDataTableDraft(params.modelId);
+        commitDataTableDraft(serverDraft);
+        return { refreshed: true, draftEditCount: serverDraft?.edits.length ?? 0 };
+      },
+    },
+  });
+
   useEffect(() => {
     setDataTableVisibleRowKeysInView(null);
   }, [metadata?.sourceId]);
@@ -2998,6 +3223,12 @@ export function ViewerShell() {
                 <ClipboardCheck className="h-4 w-4 shrink-0" />
                 <span>Clauses</span>
               </button>
+              <McpSettingsControl
+                theme={viewerTheme}
+                onSettingsChange={() => {
+                  setMcpConfigurationRevision((revision) => revision + 1);
+                }}
+              />
               {metadata?.serverModelId ? (
                 <button
                   type="button"
@@ -3100,6 +3331,13 @@ export function ViewerShell() {
               <ClipboardCheck className="h-4 w-4 shrink-0" />
               <span>Clauses</span>
             </button>
+            <McpSettingsControl
+              theme={viewerTheme}
+              variant="mobile"
+              onSettingsChange={() => {
+                setMcpConfigurationRevision((revision) => revision + 1);
+              }}
+            />
             {metadata?.serverModelId ? (
               <button
                 type="button"
@@ -3240,19 +3478,36 @@ export function ViewerShell() {
                     </div>
                   }
                   trailing={
-                    <button
-                      type="button"
-                      onClick={toggleViewerTheme}
-                      aria-label={viewerTheme === "dark" ? "Use light theme" : "Use dark theme"}
-                      title={viewerTheme === "dark" ? "Use light theme" : "Use dark theme"}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)] transition hover:text-[color:var(--foreground)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--accent)]"
-                    >
-                      {viewerTheme === "dark" ? (
-                        <Sun className="h-3.5 w-3.5" />
-                      ) : (
-                        <Moon className="h-3.5 w-3.5" />
-                      )}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <span
+                        title={`MCP bridge: ${mcpBridge.state}`}
+                        className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.08em] text-[color:var(--muted-ink)]"
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${
+                            mcpBridge.state === "connected"
+                              ? "bg-[color:var(--success-fg)]"
+                              : mcpBridge.state === "error"
+                                ? "bg-[color:var(--danger-fg)]"
+                                : "bg-[color:var(--muted-ink)]"
+                          }`}
+                        />
+                        MCP
+                      </span>
+                      <button
+                        type="button"
+                        onClick={toggleViewerTheme}
+                        aria-label={viewerTheme === "dark" ? "Use light theme" : "Use dark theme"}
+                        title={viewerTheme === "dark" ? "Use light theme" : "Use dark theme"}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--muted-ink)] transition hover:text-[color:var(--foreground)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--accent)]"
+                      >
+                        {viewerTheme === "dark" ? (
+                          <Sun className="h-3.5 w-3.5" />
+                        ) : (
+                          <Moon className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    </div>
                   }
                 />
 
