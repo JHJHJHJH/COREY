@@ -39,6 +39,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Test MCP
+        run: pnpm mcp:test
+
       - name: Lint
         run: pnpm lint
 
@@ -52,10 +55,19 @@ jobs:
         run: pnpm audit --prod
 
   docker:
+    name: Build ${{ matrix.image }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: corey
+            target: runner
+          - image: corey-mcp
+            target: mcp-runner
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Build runner image
-        run: docker build --target runner -t corey:ci .
+      - name: Build runtime image
+        run: docker build --target "${{ matrix.target }}" -t "${{ matrix.image }}:ci" .

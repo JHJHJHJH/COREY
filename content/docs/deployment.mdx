@@ -75,6 +75,57 @@ the companion's OAuth endpoints automatically. Public deployments must route
 both through TLS and must not expose the internal COREY user header or
 `COREY_MCP_INTERNAL_URL` to untrusted clients.
 
+### Railway MCP image
+
+The official Railway template provides the COREY app, PostgreSQL, and model
+storage. Add MCP as a separate Docker Image service named `MCP`, and pin both
+runtime services to the same release version:
+
+```text
+COREY  ghcr.io/jhjhjhjh/corey:0.1.0
+MCP    ghcr.io/jhjhjhjh/corey-mcp:0.1.0
+```
+
+Set the MCP service port to `4001`, generate a public domain targeting that
+port, and configure `/health` as its healthcheck. Configure the COREY service
+with port `4000`, healthcheck `/api/health`, and pre-deploy command
+`npx prisma migrate deploy`.
+
+Create a shared, randomly generated `COREY_MCP_BRIDGE_SECRET` of at least 32
+characters and expose it to both services. With the template service names
+`COREY` and `MCP`, configure the MCP service:
+
+```dotenv
+PORT=4001
+COREY_MCP_PORT=4001
+COREY_MCP_BIND=::
+COREY_BASE_URL=http://${{COREY.RAILWAY_PRIVATE_DOMAIN}}:4000
+COREY_MCP_BRIDGE_SECRET=${{shared.COREY_MCP_BRIDGE_SECRET}}
+COREY_MCP_ALLOWED_ORIGINS=https://${{COREY.RAILWAY_PUBLIC_DOMAIN}}
+COREY_MCP_PUBLIC_URL=https://${{MCP.RAILWAY_PUBLIC_DOMAIN}}/mcp
+COREY_APP_PUBLIC_URL=https://${{COREY.RAILWAY_PUBLIC_DOMAIN}}
+COREY_USER_HEADER=x-forwarded-user
+COREY_MCP_INDEX_CACHE_ENTRIES=3
+```
+
+Then add these variables to the COREY service:
+
+```dotenv
+PORT=4000
+HOSTNAME=::
+COREY_MCP_BRIDGE_URL=wss://${{MCP.RAILWAY_PUBLIC_DOMAIN}}/bridge
+COREY_MCP_BRIDGE_SECRET=${{shared.COREY_MCP_BRIDGE_SECRET}}
+COREY_MCP_PUBLIC_URL=https://${{MCP.RAILWAY_PUBLIC_DOMAIN}}/mcp
+COREY_APP_PUBLIC_URL=https://${{COREY.RAILWAY_PUBLIC_DOMAIN}}
+COREY_MCP_INTERNAL_URL=http://${{MCP.RAILWAY_PRIVATE_DOMAIN}}:4001
+COREY_MCP_ADMIN_USERS=local
+```
+
+After both services deploy, verify `https://<mcp-domain>/health`, open the
+**MCP** dialog in COREY, enable access, and generate the show-once API key.
+The public GHCR image contains no deployment credentials; keep all secrets in
+Railway variables.
+
 ## Release Checklist
 
 ```bash
@@ -83,4 +134,5 @@ pnpm mcp:test
 docker compose --env-file .env -f docker/docker-compose.deploy.yml build app mcp
 ```
 
-Version tags publish GHCR images through the release workflow.
+Version tags publish matching `corey` and `corey-mcp` GHCR images through the
+release workflow.

@@ -15,6 +15,7 @@ This refreshes the locally built images used by the deploy stack:
 
 ```text
 corey-app:latest
+corey-mcp:latest
 corey-migrate:latest
 ```
 
@@ -84,6 +85,13 @@ pnpm lint
 pnpm build
 ```
 
-GitHub Actions publishes GHCR images from version tags. Prefer the release
-process in `docs/releasing.md` instead of manually pushing local images unless a
-manual registry update is explicitly required.
+GitHub Actions publishes matching app and MCP images from version tags:
+
+```text
+ghcr.io/jhjhjhjh/corey:<version>
+ghcr.io/jhjhjhjh/corey-mcp:<version>
+```
+
+Deploy the same immutable version for both services. Prefer the release process
+in `docs/releasing.md` instead of manually pushing local images unless a manual
+registry update is explicitly required.

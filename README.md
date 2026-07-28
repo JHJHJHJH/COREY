@@ -190,6 +190,11 @@ In Docker Compose, enable the optional service with `--profile mcp`. Claude
 hosted connectors require a publicly reachable HTTPS endpoint. Use TLS
 (`wss://` and `https://`) and a reverse proxy on public networks.
 
+Versioned releases publish the companion separately as
+`ghcr.io/jhjhjhjh/corey-mcp:<version>`. Keep its version aligned with
+`ghcr.io/jhjhjhjh/corey:<version>`; see the deployment guide for Railway
+variables and health checks.
+
 </details>
 
 <details>
