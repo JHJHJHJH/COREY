@@ -1,0 +1,143 @@
+---
+title: MCP Companion
+description: Let MCP-capable LLMs review stored models and explicitly connected COREY tabs.
+---
+
+COREY’s MCP companion is a local, single-user stdio server packaged as a
+separate Docker image. An MCP client starts the container and communicates over
+stdin/stdout. Port `4001` is only for the authenticated live-browser bridge.
+
+## What It Can Do
+
+- List the latest version of server-stored models and explicitly connected tabs
+- Summarize IFC types, available fields, validation, hierarchy, and model bounds
+- Search and paginate elements by text, IFC type, field values, validation, or spatial ancestor
+- Read normalized attributes, property sets, validation failures, and spatial paths
+- Read coordinated element AABBs (not raw meshes)
+- Select, focus, hide, isolate, show all, or fit a connected viewer
+- Apply atomic, conflict-checked, reversible data-table draft edits
+- Load a stored model into a connected tab
+
+There are no MCP tools for upload, deletion, raw model bytes, raw mesh transfer,
+IFC export/writeback, or creating a model version.
+
+## Build And Configure
+
+Build the companion:
+
+```bash
+docker build --target mcp-stdio-runner -t corey-mcp:local .
+```
+
+Generate a secret:
+
+```bash
+openssl rand -hex 32
+```
+
+Copy `.env.example` to `.env`, put the generated value in
+`COREY_MCP_BRIDGE_SECRET`, and keep these local defaults:
+
+```dotenv
+COREY_MCP_BRIDGE_URL=ws://localhost:4001/bridge
+COREY_BASE_URL=http://host.docker.internal:4000
+COREY_MCP_ALLOWED_ORIGINS=http://localhost:4000
+```
+
+Restart COREY after changing its environment. The MCP button is disabled until
+both the bridge URL and a secret of at least 32 characters are configured.
+
+For another host name, port, or HTTPS deployment, set the browser-reachable
+bridge URL (use `wss://` with HTTPS), the container-reachable COREY base URL,
+and a comma-separated exact list of browser origins.
+
+## MCP Client Configuration
+
+Use an absolute path for `--env-file`. A typical MCP client configuration is:
+
+```json
+{
+  "mcpServers": {
+    "corey": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "--init",
+        "--add-host=host.docker.internal:host-gateway",
+        "-p",
+        "127.0.0.1:4001:4001",
+        "--env-file",
+        "/absolute/path/to/bca-ifc/.env",
+        "corey-mcp:local"
+      ]
+    }
+  }
+}
+```
+
+Only one locally spawned companion should bind port `4001` at a time. The
+container writes protocol messages only to stdout and operational messages to
+stderr, as required by stdio clients.
+
+For the development Compose stack, the equivalent MCP client configuration is:
+
+```json
+{
+  "mcpServers": {
+    "corey": {
+      "command": "docker",
+      "args": [
+        "compose",
+        "--env-file",
+        "/absolute/path/to/bca-ifc/.env",
+        "-f",
+        "/absolute/path/to/bca-ifc/docker/docker-compose.dev.yml",
+        "run",
+        "--rm",
+        "-T",
+        "--service-ports",
+        "mcp"
+      ]
+    }
+  }
+}
+```
+
+The `mcp` service is profile-gated so normal `docker compose up` does not start
+an idle stdio process. The MCP client owns its lifecycle through `compose run`.
+
+## Connect A Browser Tab
+
+Open COREY and click **MCP** in the header. A connected-state dot confirms that
+the tab has authenticated with the companion. Consent is tab-scoped and is
+never inferred from another tab.
+
+The LLM should call `corey_list_targets` first and pass an explicit `session` or
+`stored` target to every model operation. Disconnect the tab with the same MCP
+button when live access is no longer needed.
+
+## Draft Safety And Limits
+
+Draft edits require the current value and state expected by the caller. COREY
+checks all requested edits before applying any of them, so a stale value rejects
+the complete batch. Changes remain ordinary data-table drafts: users can
+inspect, discard, export, or deliberately save them as a new version through
+the existing UI.
+
+Element queries return at most 100 rows per page, element/geometry detail calls
+accept at most 25 GlobalIds, and a draft call accepts at most 50 scalar edits.
+Pagination cursors are bound to the model revision and fail if the model changes.
+
+## Security
+
+The app signs five-minute bridge tokens with
+`COREY_MCP_BRIDGE_SECRET`; the secret itself is server-only. The companion
+checks exact WebSocket origins, associates every tab and stored-model request
+with `COREY_USER_ID` (default `local`), caps message size, times out commands,
+and drops stale connections with heartbeats.
+
+Keep the bridge bound to loopback when using it locally. On a public network,
+use TLS, configure exact allowed origins, and align `COREY_USER_ID` and
+`COREY_USER_HEADER` with the identity injected by your trusted reverse proxy.

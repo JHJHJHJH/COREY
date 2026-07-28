@@ -2,6 +2,7 @@
 
 import {
   BookOpenText,
+  Cable,
   ChevronDown,
   ClipboardCheck,
   FileOutput,
@@ -90,6 +91,26 @@ import { ModelComparePanel } from "@/features/viewer/components/model-compare-pa
 import { VisualCompareOverlay } from "@/features/viewer/components/visual-compare-overlay";
 import { buildViewerValidationClauseTableViews } from "@/features/viewer/lib/validation-clauses";
 import { exportEditedIfc } from "@/features/viewer/lib/ifc-writeback";
+import { geometryResult } from "@/features/viewer/mcp/geometry";
+import {
+  getMcpElements,
+  listMcpFields,
+  prepareMcpDraftEdits,
+  queryMcpElements,
+  queryValidationIssues,
+  validationSummary,
+} from "@/features/viewer/mcp/query";
+import {
+  buildMcpSpatialIndexFromViewerTree,
+  getMcpSpatialPath,
+  listMcpSpatialChildren,
+} from "@/features/viewer/mcp/spatial";
+import { useCoreyMcpBridge } from "@/features/viewer/mcp/use-corey-mcp-bridge";
+import type {
+  CoreyMcpBounds,
+  CoreyMcpDraftEditRequest,
+  CoreyMcpElementQuery,
+} from "@/features/viewer/mcp/contracts";
 import type {
   ModelCompareElementRef,
   ModelMetadata,
@@ -150,6 +171,8 @@ const MAX_DATA_TABLE_DIALOG_HEIGHT = Number.POSITIVE_INFINITY;
 const DATA_TABLE_DIALOG_MARGIN = 12;
 const VALIDATION_API_ROW_THRESHOLD = 1000;
 const VIEWER_THEME_STORAGE_KEY = "corey.viewer.theme";
+const MCP_TAB_CONSENT_STORAGE_KEY = "corey.mcp.tab-connected";
+const MCP_MAX_SUMMARY_FIELDS = 250;
 
 const validationWorkerUrl = new URL("../../rules/workers/validation-worker.ts", import.meta.url);
 const source = new LocalFileModelSource();
@@ -1023,6 +1046,7 @@ export function ViewerShell() {
   const [selectedValidationClauseId, setSelectedValidationClauseId] = useState("");
   const [viewerTheme, setViewerTheme] = useState<ViewerTheme>("light");
   const [viewerThemeLoaded, setViewerThemeLoaded] = useState(false);
+  const [mcpEnabled, setMcpEnabled] = useState(false);
   const [showTree, setShowTree] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -1330,6 +1354,10 @@ export function ViewerShell() {
       setViewerTheme(persistedTheme);
     }
     setViewerThemeLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    setMcpEnabled(window.sessionStorage.getItem(MCP_TAB_CONSENT_STORAGE_KEY) === "true");
   }, []);
 
   useEffect(() => {
@@ -2253,11 +2281,13 @@ export function ViewerShell() {
 
       try {
         await loadModelFromSource(await remoteSource.read({ kind: "remote", modelId }));
+        return true;
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
         startTransition(() => {
           setStatus({ phase: "error", message: `Failed to load server model: ${message}` });
         });
+        return false;
       }
     },
     [loadModelFromSource],
@@ -2789,6 +2819,280 @@ export function ViewerShell() {
     setShowDataTableInWindow(false);
   }, []);
 
+  const mcpRevision = useMemo(
+    () =>
+      [
+        metadata?.sourceId ?? "no-model",
+        dataTableState.phase,
+        dataTableState.data?.rows.length ?? 0,
+        dataTableDraft?.updatedAt ?? "no-draft",
+        validationResult?.results.length ?? 0,
+        validationState.phase,
+      ].join(":"),
+    [
+      dataTableDraft?.updatedAt,
+      dataTableState.data?.rows.length,
+      dataTableState.phase,
+      metadata?.sourceId,
+      validationResult?.results.length,
+      validationState.phase,
+    ],
+  );
+
+  const mcpSpatialIndex = useMemo(
+    () =>
+      effectiveDataTableData
+        ? buildMcpSpatialIndexFromViewerTree(tree, effectiveDataTableData)
+        : null,
+    [effectiveDataTableData, tree],
+  );
+
+  const resolveMcpLocalIds = useCallback(
+    (params: { globalIds?: string[]; ifcType?: string }) => {
+      const rows = effectiveDataTableData?.rows ?? [];
+      if (params.globalIds?.length) {
+        const wanted = new Set(params.globalIds);
+        return rows
+          .filter((row) => {
+            const cell = row.cells.globalId;
+            const globalId =
+              cell?.state === "present"
+                ? typeof cell.raw === "string"
+                  ? cell.raw
+                  : cell.text
+                : null;
+            return globalId ? wanted.has(globalId) : false;
+          })
+          .map((row) => row.localId);
+      }
+      if (params.ifcType) {
+        const wanted = params.ifcType.toUpperCase();
+        return rows
+          .filter((row) => (row.ifcType ?? "").toUpperCase() === wanted)
+          .map((row) => row.localId);
+      }
+      return [];
+    },
+    [effectiveDataTableData?.rows],
+  );
+
+  const selectedMcpGlobalIds = useMemo(() => {
+    const localId = session.selected?.localId;
+    if (localId === undefined) return [];
+    const row = effectiveDataTableData?.rows.find((candidate) => candidate.localId === localId);
+    const cell = row?.cells.globalId;
+    if (!cell || cell.state !== "present") return [];
+    const globalId = typeof cell.raw === "string" ? cell.raw : cell.text;
+    return globalId ? [globalId] : [];
+  }, [effectiveDataTableData?.rows, session.selected?.localId]);
+
+  const mcpDescriptor = useMemo(
+    () => ({
+      phase: status.phase,
+      model: metadata
+        ? {
+            name: metadata.name,
+            sourceId: metadata.sourceId ?? null,
+            serverModelId: metadata.serverModelId ?? null,
+            rowCount: effectiveDataTableData?.rows.length ?? 0,
+            columnCount: effectiveDataTableData?.columns.length ?? 0,
+            draftEditCount,
+          }
+        : null,
+      selectedGlobalIds: selectedMcpGlobalIds,
+      hiddenItemCount: session.hiddenItemCount,
+      revision: mcpRevision,
+    }),
+    [
+      draftEditCount,
+      effectiveDataTableData?.columns.length,
+      effectiveDataTableData?.rows.length,
+      mcpRevision,
+      metadata,
+      selectedMcpGlobalIds,
+      session.hiddenItemCount,
+      status.phase,
+    ],
+  );
+
+  const mcpBridge = useCoreyMcpBridge({
+    enabled: mcpEnabled,
+    descriptor: mcpDescriptor,
+    handlers: {
+      get_model_summary: () => {
+        const data = effectiveDataTableData;
+        const fields = data ? listMcpFields(data) : [];
+        const ifcTypeCounts: Record<string, number> = {};
+        for (const row of data?.rows ?? []) {
+          const ifcType = row.ifcType ?? "UNKNOWN";
+          ifcTypeCounts[ifcType] = (ifcTypeCounts[ifcType] ?? 0) + 1;
+        }
+        return {
+          model: metadata,
+          indexing: dataTableState.phase,
+          rowCount: data?.rows.length ?? 0,
+          columnCount: data?.columns.length ?? 0,
+          ifcTypeCounts,
+          fieldCount: fields.length,
+          fields: fields.slice(0, MCP_MAX_SUMMARY_FIELDS),
+          fieldsTruncated: fields.length > MCP_MAX_SUMMARY_FIELDS,
+          spatialRootCount: mcpSpatialIndex?.roots.length ?? 0,
+          geometry: {
+            coordinateFrame: "corey-coordinated",
+            unit: "m",
+            modelBounds: viewportRef.current?.getModelBounds() ?? null,
+          },
+          draftEditCount,
+          validation: validationSummary(validationResult, data?.rows.length ?? 0),
+          viewer: {
+            status,
+            selectedGlobalIds: selectedMcpGlobalIds,
+            hiddenItemCount: session.hiddenItemCount,
+          },
+          revision: mcpRevision,
+        };
+      },
+      query_elements: (params) => {
+        if (!effectiveDataTableData) throw new Error("The model is not indexed yet.");
+        return queryMcpElements({
+          data: effectiveDataTableData,
+          validation: validationResult,
+          spatial: mcpSpatialIndex,
+          query: (params.query ?? {}) as CoreyMcpElementQuery,
+          revision: mcpRevision,
+        });
+      },
+      get_elements: (params) => {
+        if (!effectiveDataTableData) throw new Error("The model is not indexed yet.");
+        const result = getMcpElements({
+          data: effectiveDataTableData,
+          validation: validationResult,
+          globalIds: params.globalIds,
+        });
+        return {
+          items: result.items.map((item) =>
+            item.found && item.globalId && mcpSpatialIndex
+              ? {
+                  ...item,
+                  spatialPath: getMcpSpatialPath(mcpSpatialIndex, item.globalId),
+                }
+              : item,
+          ),
+        };
+      },
+      list_spatial_children: (params) => {
+        if (!mcpSpatialIndex) throw new Error("The model hierarchy is not indexed yet.");
+        return listMcpSpatialChildren({
+          spatial: mcpSpatialIndex,
+          revision: mcpRevision,
+          ...params,
+        });
+      },
+      get_geometry: async (params) => {
+        if (!effectiveDataTableData) throw new Error("The model is not indexed yet.");
+        const rowsByGlobalId = new Map(
+          effectiveDataTableData.rows.flatMap((row) => {
+            const cell = row.cells.globalId;
+            if (!cell || cell.state !== "present") return [];
+            const globalId = typeof cell.raw === "string" ? cell.raw : cell.text;
+            return globalId ? ([[globalId, row.localId]] as const) : [];
+          }),
+        );
+        const localIds = params.globalIds.flatMap((globalId) => {
+          const localId = rowsByGlobalId.get(globalId);
+          return localId === undefined ? [] : [localId];
+        });
+        const boundsByLocalId =
+          (await viewportRef.current?.getElementBounds(localIds)) ?? {};
+        const boundsByGlobalId = new Map<string, CoreyMcpBounds>();
+        for (const globalId of params.globalIds) {
+          const localId = rowsByGlobalId.get(globalId);
+          const bounds = localId === undefined ? null : boundsByLocalId[localId];
+          if (bounds) boundsByGlobalId.set(globalId, bounds);
+        }
+        return geometryResult(params.globalIds, boundsByGlobalId);
+      },
+      get_validation_summary: () =>
+        validationSummary(validationResult, effectiveDataTableData?.rows.length ?? 0),
+      query_validation_issues: (params) => {
+        if (!effectiveDataTableData) throw new Error("The model is not indexed yet.");
+        return queryValidationIssues({
+          data: effectiveDataTableData,
+          result: validationResult,
+          revision: mcpRevision,
+          ...params,
+        });
+      },
+      apply_draft_edits: (params) => {
+        if (!metadata?.sourceId || !dataTableState.data) {
+          throw new Error("The model is not indexed yet.");
+        }
+        const prepared = prepareMcpDraftEdits({
+          sourceId: metadata.sourceId,
+          baseData: dataTableState.data,
+          currentDraft: dataTableDraft,
+          edits: params.edits as CoreyMcpDraftEditRequest[],
+        });
+        commitDataTableDraft(prepared.draft, { writeThrough: true });
+        setDataTableActionStatus({
+          phase: "success",
+          message: `Applied ${prepared.applied.length} MCP draft edits.`,
+          issues: [],
+        });
+        return {
+          applied: prepared.applied,
+          draftEditCount: prepared.draft?.edits.length ?? 0,
+        };
+      },
+      update_view: async (params) => {
+        const localIds = resolveMcpLocalIds(params);
+        if (!["show_all", "fit_model"].includes(params.action) && localIds.length === 0) {
+          throw new Error("No matching elements were found for the view action.");
+        }
+        if (params.action === "select") {
+          await viewportRef.current?.selectElements(localIds);
+        } else if (params.action === "focus") {
+          await viewportRef.current?.selectElements(localIds);
+          await viewportRef.current?.focusSelection();
+        } else if (params.action === "hide") {
+          await viewportRef.current?.hideElements(localIds);
+        } else if (params.action === "isolate") {
+          await viewportRef.current?.isolateElements(localIds);
+        } else if (params.action === "show_all") {
+          await viewportRef.current?.showAll();
+        } else {
+          await viewportRef.current?.fitModel();
+        }
+        if (dataTableVisibleRowKeysInView) syncDataTableToView();
+        return { action: params.action, matchedElementCount: localIds.length };
+      },
+      open_stored_model: async (params) => {
+        const loaded = await loadModelById(params.modelId);
+        if (!loaded) throw new Error("The stored model could not be loaded in this tab.");
+        return { loaded: true, modelId: params.modelId };
+      },
+      refresh_draft: async (params) => {
+        if (metadata?.serverModelId !== params.modelId) return { refreshed: false };
+        const serverDraft = await readServerViewerDataTableDraft(params.modelId);
+        if (serverDraft) writePersistedViewerDataTableDraft(serverDraft);
+        else clearPersistedViewerDataTableDraft(params.modelId);
+        commitDataTableDraft(serverDraft);
+        return {
+          refreshed: true,
+          draftEditCount: serverDraft?.edits.length ?? 0,
+        };
+      },
+    },
+  });
+
+  const toggleMcpConnection = useCallback(() => {
+    setMcpEnabled((current) => {
+      const next = !current;
+      window.sessionStorage.setItem(MCP_TAB_CONSENT_STORAGE_KEY, String(next));
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     setDataTableVisibleRowKeysInView(null);
   }, [metadata?.sourceId]);
@@ -2998,6 +3302,37 @@ export function ViewerShell() {
                 <ClipboardCheck className="h-4 w-4 shrink-0" />
                 <span>Clauses</span>
               </button>
+              <button
+                type="button"
+                onClick={toggleMcpConnection}
+                aria-pressed={mcpEnabled}
+                disabled={mcpBridge.configured === false && !mcpEnabled}
+                title={
+                  mcpEnabled
+                    ? `Disconnect this tab from MCP (${mcpBridge.state})`
+                    : mcpBridge.configured === false
+                      ? "MCP bridge is not configured"
+                      : "Connect this tab to MCP"
+                }
+                className={`inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--r-control)] border px-4 text-sm font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                  mcpBridge.state === "connected"
+                    ? "border-[color:var(--success-border)] bg-[color:var(--success-bg)] text-[color:var(--success-fg)]"
+                    : "border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] text-[color:var(--foreground)] hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)]"
+                }`}
+              >
+                <Cable className="h-4 w-4 shrink-0" />
+                <span>MCP</span>
+                <span
+                  aria-hidden="true"
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    mcpBridge.state === "connected"
+                      ? "bg-[color:var(--success-fg)]"
+                      : mcpBridge.state === "error"
+                        ? "bg-[color:var(--danger-fg)]"
+                        : "bg-[color:var(--muted-ink)]"
+                  }`}
+                />
+              </button>
               {metadata?.serverModelId ? (
                 <button
                   type="button"
@@ -3099,6 +3434,23 @@ export function ViewerShell() {
             >
               <ClipboardCheck className="h-4 w-4 shrink-0" />
               <span>Clauses</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                toggleMcpConnection();
+                setMobileNavOpen(false);
+              }}
+              aria-pressed={mcpEnabled}
+              disabled={mcpBridge.configured === false && !mcpEnabled}
+              className={`inline-flex h-10 w-full items-center justify-start gap-2 rounded-[var(--r-control)] border px-4 text-sm font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                mcpBridge.state === "connected"
+                  ? "border-[color:var(--success-border)] bg-[color:var(--success-bg)] text-[color:var(--success-fg)]"
+                  : "border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] text-[color:var(--foreground)] hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)]"
+              }`}
+            >
+              <Cable className="h-4 w-4 shrink-0" />
+              <span>{mcpEnabled ? "Disconnect this tab from MCP" : "Connect this tab to MCP"}</span>
             </button>
             {metadata?.serverModelId ? (
               <button

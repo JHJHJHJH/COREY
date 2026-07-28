@@ -10,6 +10,7 @@
 .turbo
 .vercel
 Dockerfile*
+dist
 node_modules
 npm-debug.log*
 out

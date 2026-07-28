@@ -25,6 +25,26 @@ export type IfcPropertySetLine = {
   expressID?: number;
 };
 
+export type IfcPlacedGeometry = {
+  geometryExpressID: number;
+  flatTransformation: number[];
+};
+
+export type IfcFlatMesh = {
+  expressID: number;
+  geometries: {
+    size: () => number;
+    get: (index: number) => IfcPlacedGeometry;
+  };
+  delete?: () => void;
+};
+
+export type IfcGeometry = {
+  GetVertexData: () => number;
+  GetVertexDataSize: () => number;
+  delete?: () => void;
+};
+
 export type IfcApiInstance = {
   properties: {
     getPropertySets: (
@@ -36,7 +56,7 @@ export type IfcApiInstance = {
   };
   SetWasmPath: (path: string, absolute?: boolean) => void;
   Init: () => Promise<void>;
-  OpenModel: (bytes: Uint8Array) => number;
+  OpenModel: (bytes: Uint8Array, settings?: { COORDINATE_TO_ORIGIN?: boolean }) => number;
   GetLine: (modelId: number, expressId: number, flatten?: boolean, inverse?: boolean) => unknown;
   GetLineIDsWithType: (
     modelId: number,
@@ -46,6 +66,12 @@ export type IfcApiInstance = {
   GetLineType: (modelId: number, expressId: number) => number;
   GetNameFromTypeCode: (type: number) => string;
   GetTypeCodeFromName: (typeName: string) => number;
+  StreamAllMeshes: (
+    modelId: number,
+    callback: (mesh: IfcFlatMesh, index: number, total: number) => void,
+  ) => void;
+  GetGeometry: (modelId: number, geometryExpressId: number) => IfcGeometry;
+  GetVertexArray: (pointer: number, size: number) => Float32Array;
   CreateIfcEntity: (modelId: number, type: number, ...args: unknown[]) => unknown;
   CreateIfcType: (modelId: number, type: number, value: unknown) => unknown;
   CreateIFCGloballyUniqueId: (modelId: number) => unknown;

@@ -14,6 +14,7 @@ permissions:
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/corey
+  MCP_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/corey-mcp
 
 jobs:
   image:
@@ -40,6 +41,17 @@ jobs:
             type=ref,event=branch
             type=raw,value=latest
 
+      - name: Extract MCP metadata
+        id: meta-mcp
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.MCP_IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=ref,event=branch
+            type=raw,value=latest
+
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -51,5 +63,16 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          provenance: true
+          sbom: true
+
+      - name: Build and push MCP stdio companion
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: mcp-stdio-runner
+          push: true
+          tags: ${{ steps.meta-mcp.outputs.tags }}
+          labels: ${{ steps.meta-mcp.outputs.labels }}
           provenance: true
           sbom: true

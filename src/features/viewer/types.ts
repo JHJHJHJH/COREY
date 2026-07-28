@@ -515,17 +515,36 @@ export interface ViewerStatus {
   message: string;
 }
 
+export interface ViewerVector3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface ViewerBounds {
+  min: ViewerVector3;
+  max: ViewerVector3;
+  center: ViewerVector3;
+  size: ViewerVector3;
+}
+
 export interface ViewerViewportHandle {
   loadIfc(source: ModelSourceResult): Promise<void>;
   clearModel(): Promise<void>;
   selectNode(localId: number): Promise<void>;
+  selectElements(localIds: number[]): Promise<void>;
+  getElementBounds(localIds: number[]): Promise<Record<number, ViewerBounds | null>>;
+  getModelBounds(): ViewerBounds | null;
   getHiddenElements(): ViewerElementIdMap | null;
   showAll(): Promise<void>;
   hideSelection(): Promise<void>;
+  hideElements(localIds: number[]): Promise<void>;
   isolateSelection(): Promise<void>;
+  isolateElements(localIds: number[]): Promise<void>;
   isolateCategory(category: string): Promise<void>;
   hideCategory(category: string): Promise<void>;
   focusSelection(): Promise<void>;
+  fitModel(): Promise<void>;
   clearMeasurements(): void;
   clearSections(): void;
   setTool(tool: ViewerTool): void;

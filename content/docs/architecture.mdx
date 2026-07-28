@@ -25,6 +25,8 @@ templates, Excel compute, and IFC writeback.
 - `src/features/viewer/lib/model-source.ts`: local and remote model-loading abstraction
 - `src/features/viewer/lib/ifc-data.ts`: tree, selection, category, table, and formatting helpers
 - `src/features/rules/*`: validation clause UI, provider, worker, and shared evaluator
+- `src/features/viewer/mcp/*`: shared bounded query, hierarchy, geometry, and draft-edit contracts
+- `src/mcp/*`: Dockerized MCP stdio server, stored-model index, tools, and browser bridge
 - `src/server/*`: Prisma, S3, model, draft, and rule-template stores
 - `src/app/api/*`: supported self-hosted API routes
 
@@ -35,3 +37,15 @@ templates, Excel compute, and IFC writeback.
 - Keep ordinary React state in `ViewerShell`.
 - Preserve the `ModelSource` abstraction for local and remote model sources.
 - Preserve the single-model assumption unless multi-model workflows are explicitly designed.
+
+## MCP Companion
+
+The MCP server is a client-spawned stdio process, not another hosted COREY API.
+It calls the existing self-hosted API for stored models and owns a small
+authenticated WebSocket bridge for browser tabs. A tab is invisible until its
+user clicks the MCP control. The app issues a short-lived, user-bound bridge
+token; the shared bridge secret never reaches browser JavaScript.
+
+Read operations are bounded and paginated. Write access is limited to
+conflict-checked data-table drafts and reversible viewer actions. The companion
+does not expose upload, delete, raw mesh, IFC export, or version-creation tools.

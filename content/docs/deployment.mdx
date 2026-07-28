@@ -25,6 +25,7 @@ Build the runner image:
 
 ```bash
 docker build --target runner -t corey:local .
+docker build --target mcp-stdio-runner -t corey-mcp:local .
 ```
 
 Run the image with backend environment variables:
@@ -55,11 +56,19 @@ docker compose --env-file .env -f docker/docker-compose.deploy.yml up --build
 
 The app healthcheck calls `/api/health`.
 
+The MCP companion is intentionally not a Compose service: the MCP client owns
+its stdio lifecycle and starts it with `docker run -i`. Set
+`COREY_MCP_BRIDGE_URL` and `COREY_MCP_BRIDGE_SECRET` on the app, then pass the
+same secret plus `COREY_BASE_URL` and `COREY_MCP_ALLOWED_ORIGINS` to the
+companion. See [MCP Companion](/docs/mcp).
+
 ## Release Checklist
 
 ```bash
 pnpm verify
 docker compose --env-file .env -f docker/docker-compose.deploy.yml build app
+docker build --target mcp-stdio-runner -t corey-mcp:local .
 ```
 
-Version tags publish GHCR images through the release workflow.
+Version tags publish `corey` and `corey-mcp` GHCR images through the release
+workflow.

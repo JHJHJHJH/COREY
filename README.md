@@ -94,6 +94,46 @@ That's it. The first run takes a few minutes to download and build; later runs a
 
 ---
 
+## 🤖 Connect an LLM with MCP
+
+COREY includes a Dockerized MCP stdio companion. It lets an MCP-capable LLM
+inspect the latest server-stored models, query IFC properties and validation,
+walk spatial hierarchy, read element bounds, make reversible draft edits, and
+control viewer selection/visibility in tabs you explicitly connect.
+
+Generate a secret, put it in `COREY_MCP_BRIDGE_SECRET` in `.env`, and restart
+the app. Then build the companion:
+
+```bash
+docker build --target mcp-stdio-runner -t corey-mcp:local .
+```
+
+Configure your MCP client to spawn this command (use an absolute `.env` path):
+
+```bash
+docker run --rm -i --init \
+  --add-host=host.docker.internal:host-gateway \
+  -p 127.0.0.1:4001:4001 \
+  --env-file /absolute/path/to/bca-ifc/.env \
+  corey-mcp:local
+```
+
+When using `docker/docker-compose.dev.yml`, MCP clients can instead spawn:
+
+```bash
+docker compose --env-file /absolute/path/to/bca-ifc/.env \
+  -f /absolute/path/to/bca-ifc/docker/docker-compose.dev.yml \
+  run --rm -T --service-ports mcp
+```
+
+Open COREY and click **MCP** to connect only that browser tab. The opt-in is
+stored in tab-scoped session storage; closing or disconnecting the tab removes
+it from the LLM’s available live targets. See the [MCP companion
+guide](https://coreyifc.com/docs/mcp) for client JSON, tools, limits, and
+security settings.
+
+---
+
 ## 🧑‍💻 For Developers
 
 <details>
@@ -177,6 +217,8 @@ Other optional backend variables:
 - `COREY_USER_HEADER` (optional, default `x-forwarded-user`)
 - `COREY_DEFAULT_USER` (optional, default `local`)
 - `COREY_REQUIRE_USER` (optional, default `false`)
+- `COREY_MCP_BRIDGE_URL` and `COREY_MCP_BRIDGE_SECRET` (enable live-tab MCP)
+- `COREY_BASE_URL` and `COREY_MCP_ALLOWED_ORIGINS` (MCP companion connectivity)
 
 The backend is intended for self-hosted deployments. Put a reverse proxy in front
 of it on public networks, and configure payload limits, TLS, authentication, and

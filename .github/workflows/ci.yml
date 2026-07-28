@@ -59,3 +59,6 @@ jobs:
 
       - name: Build runner image
         run: docker build --target runner -t corey:ci .
+
+      - name: Build MCP stdio image
+        run: docker build --target mcp-stdio-runner -t corey-mcp:ci .
