@@ -461,7 +461,11 @@ export function diffIfcElementSnapshots(
   };
 }
 
-const MISSING_SNAPSHOT_VALUE: ViewerValidationValue = { text: "MISSING", state: "missing" };
+const MISSING_SNAPSHOT_VALUE: ViewerValidationValue = {
+  text: "MISSING",
+  state: "missing",
+  valueKind: null,
+};
 
 function resolveSnapshotTargetValue(
   element: IfcElementSnapshot,
@@ -469,11 +473,11 @@ function resolveSnapshotTargetValue(
   propertiesByLowercaseKey: Map<string, IfcSnapshotValue>,
 ): ViewerValidationValue {
   if (targetId === "attribute:type") {
-    return { text: element.ifcType, state: "present" };
+    return { text: element.ifcType, state: "present", valueKind: "string" };
   }
 
   if (targetId === "attribute:globalid") {
-    return { text: element.globalId, state: "present" };
+    return { text: element.globalId, state: "present", valueKind: "string" };
   }
 
   if (targetId.startsWith("attribute:")) {

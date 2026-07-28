@@ -47,7 +47,7 @@ A target is either:
 
 ### Check: what to require
 
-COREY offers five kinds of check:
+COREY offers six kinds of check:
 
 | Check | Passes when… | Use it for… |
 |---|---|---|
@@ -56,11 +56,12 @@ COREY offers five kinds of check:
 | **Number range** | the number is within a minimum and/or maximum | dimensions, ratings, counts |
 | **Pattern** | the value matches a text pattern | IDs, codes, or naming standards |
 | **Boolean** | the value means true or false as expected | flags such as load-bearing or external |
+| **Type** | the native value is a string, number, or boolean | catching incorrectly authored property types |
 
 <Callout type="info">
 Any check automatically fails if the value is missing or empty — so "Allowed
-values", "Number range", "Pattern", and "Boolean" also guarantee the field is
-present.
+values", "Number range", "Pattern", "Boolean", and "Type" also guarantee the
+field is present.
 </Callout>
 
 ### Severity: how loud to be

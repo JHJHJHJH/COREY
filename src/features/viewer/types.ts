@@ -8,6 +8,8 @@ export type ViewerValidationFailureSeverity = "warn" | "error";
 
 export type ViewerValidationResult = "ok" | "warn" | "error";
 
+export type ViewerValidationValueKind = "string" | "number" | "boolean";
+
 export type ViewerValidationTarget =
   | {
       kind: "attribute";
@@ -40,6 +42,10 @@ export type ViewerValidationCheck =
   | {
       kind: "boolean";
       expected: boolean;
+    }
+  | {
+      kind: "type";
+      expectedType: ViewerValidationValueKind;
     };
 
 export interface ViewerValidationRule {
@@ -111,6 +117,7 @@ export interface ViewerValidationSummary {
 export interface ViewerValidationValue {
   text: string;
   state: ViewerInspectionValueState;
+  valueKind: ViewerValidationValueKind | null;
 }
 
 export interface ViewerValidationRow {
@@ -326,7 +333,7 @@ export interface ViewerInspectionValue {
   validation: ViewerValidationMatch | null;
 }
 
-export type ViewerDataTableEditableValueKind = "string" | "number" | "boolean";
+export type ViewerDataTableEditableValueKind = ViewerValidationValueKind;
 
 export type ViewerDataTableColumnBinding =
   | {

@@ -124,6 +124,9 @@
         },
         {
           "$ref": "#/$defs/booleanCheck"
+        },
+        {
+          "$ref": "#/$defs/typeCheck"
         }
       ]
     },
@@ -200,6 +203,21 @@
         },
         "expected": {
           "type": "boolean"
+        }
+      }
+    },
+    "typeCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "expectedType"],
+      "properties": {
+        "kind": {
+          "const": "type"
+        },
+        "expectedType": {
+          "type": "string",
+          "enum": ["string", "number", "boolean"],
+          "description": "Native scalar value kind required by the rule. Matching does not coerce text into numbers or booleans."
         }
       }
     }

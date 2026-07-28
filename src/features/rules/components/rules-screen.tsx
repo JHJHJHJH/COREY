@@ -140,6 +140,10 @@ function nextCheckForKind(kind: ViewerValidationCheck["kind"]): ViewerValidation
     return { kind: "boolean", expected: true };
   }
 
+  if (kind === "type") {
+    return { kind: "type", expectedType: "string" };
+  }
+
   return { kind: "numberRange", min: null, max: null };
 }
 
@@ -166,6 +170,9 @@ function describeConstraint(check: ViewerValidationCheck) {
   }
   if (check.kind === "boolean") {
     return `boolean ${check.expected ? "true" : "false"}`;
+  }
+  if (check.kind === "type") {
+    return `type ${check.expectedType}`;
   }
   return `range ${numberValue(check.min)} ${numberValue(check.max)}`;
 }
@@ -444,6 +451,7 @@ function ConstraintCell({
         <option value="numberRange">Range</option>
         <option value="pattern">Pattern</option>
         <option value="boolean">Boolean</option>
+        <option value="type">Type</option>
       </select>
       {check.kind === "empty" ? (
         <span className="px-1 text-xs text-[color:var(--muted-ink)]">value present</span>
@@ -468,6 +476,28 @@ function ConstraintCell({
         >
           <option value="true">TRUE</option>
           <option value="false">FALSE</option>
+        </select>
+      ) : check.kind === "type" ? (
+        <select
+          value={check.expectedType}
+          onChange={(event) =>
+            onChange({
+              ...rule,
+              check: {
+                kind: "type",
+                expectedType: event.target.value as Extract<
+                  ViewerValidationCheck,
+                  { kind: "type" }
+                >["expectedType"],
+              },
+            })
+          }
+          className={`${cellInputClassName(true)} uppercase`}
+          aria-label="Expected value type"
+        >
+          <option value="string">STRING</option>
+          <option value="number">NUMBER</option>
+          <option value="boolean">BOOLEAN</option>
         </select>
       ) : (
         <div className="flex min-w-0 flex-1 items-center gap-1">
@@ -1004,6 +1034,7 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
             <option value="numberRange">Range</option>
             <option value="pattern">Pattern</option>
             <option value="boolean">Boolean</option>
+            <option value="type">Type</option>
           </select>
 
           {isFlat || hasActiveFilters ? (

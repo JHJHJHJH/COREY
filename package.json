@@ -35,7 +35,7 @@
     "check:assets": "node scripts/check-runtime-assets.mjs",
     "mcp:build": "tsup",
     "mcp:http": "tsx src/mcp/cli.ts",
-    "mcp:test": "tsx --test src/features/viewer/mcp/*.test.ts src/server/*.test.ts src/mcp/*.test.ts",
+    "mcp:test": "tsx --test src/features/rules/lib/*.test.ts src/features/viewer/mcp/*.test.ts src/server/*.test.ts src/mcp/*.test.ts",
     "audit:prod": "pnpm audit --prod",
     "verify": "pnpm docs:generate && pnpm mcp:test && pnpm lint && pnpm check:assets && pnpm build && pnpm audit:prod",
     "postinstall": "prisma generate && fumadocs-mdx",

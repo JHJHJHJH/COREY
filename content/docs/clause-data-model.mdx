@@ -96,9 +96,13 @@ All check kinds fail when the value is missing, empty, null, or undefined.
 | `numberRange` | `kind`, `min`, `max` | The value can be read as a finite number and is within the provided bound or bounds. |
 | `pattern` | `kind`, `pattern`, `caseInsensitive` | The value matches the JavaScript regular expression pattern against the whole value. |
 | `boolean` | `kind`, `expected` | The value can be read as a boolean and equals the expected value. |
+| `type` | `kind`, `expectedType` | The native scalar kind is exactly `string`, `number`, or `boolean`. |
 
 Boolean checks understand common IFC/table values such as `true`, `false`, `1`,
 `0`, `yes`, `no`, `y`, `n`, `.t.`, `.f.`, `t`, and `f`.
+
+Type checks do not coerce display text. For example, `"42"` is a string rather
+than a number, and `"true"` is a string rather than a boolean.
 
 ## Runnable rules
 

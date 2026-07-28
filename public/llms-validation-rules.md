@@ -116,12 +116,25 @@ Boolean:
 }
 ```
 
+Native value type:
+
+```json
+{
+  "kind": "type",
+  "expectedType": "string"
+}
+```
+
+`expectedType` must be `string`, `number`, or `boolean`.
+
 ## Evaluation rules
 
 - Missing, empty, null, or undefined values fail every check kind.
 - Enum comparison trims values and ignores case.
 - Boolean checks accept `true`, `1`, `yes`, `y`, `.t.`, `t`, `false`, `0`,
   `no`, `n`, `.f.`, and `f`, case-insensitively.
+- Type checks use the native scalar kind without coercion. Text `"42"` is a
+  string, not a number, and text `"true"` is a string, not a boolean.
 - IFC type and target matching are case-insensitive.
 - `GlobalId`, `GUID`, and `_guid` refer to the same attribute target.
 - If an element fails several rules, `error` outranks `warn`.

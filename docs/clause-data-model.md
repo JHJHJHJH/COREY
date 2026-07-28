@@ -156,6 +156,20 @@ Boolean:
 Boolean values are parsed from `true`, `1`, `yes`, `y`, `.t.`, `t`, `false`,
 `0`, `no`, `n`, `.f.`, and `f`, case-insensitively.
 
+Native value type:
+
+```json
+{
+  "kind": "type",
+  "expectedType": "number"
+}
+```
+
+`expectedType` is `string`, `number`, or `boolean`. Matching is strict and uses
+the native scalar kind recorded while reading the IFC value. A string such as
+`"42"` does not pass a `number` type check, and a string such as `"true"` does
+not pass a `boolean` type check.
+
 ## Runnable rules
 
 The persisted config shape can contain incomplete draft rows from the rule
@@ -171,8 +185,8 @@ A rule is runnable when:
 - number range checks have `min` or `max`.
 - pattern checks have non-blank valid JavaScript regex source.
 
-Boolean and required-value checks need no extra fields beyond their required
-shape.
+Boolean, type, and required-value checks need no extra fields beyond their
+required shape.
 
 ## Evaluation payloads
 
@@ -191,11 +205,13 @@ shape.
       "values": {
         "attribute:globalid": {
           "text": "0F4...example",
-          "state": "present"
+          "state": "present",
+          "valueKind": "string"
         },
         "property:pset_wallcommon::firerating": {
           "text": "2HR",
-          "state": "present"
+          "state": "present",
+          "valueKind": "string"
         }
       }
     }
@@ -209,7 +225,9 @@ Row value keys are validation target ids:
 - property: `property:${normalizedPropertySet}::${normalizedPropertyLabel}`
 
 Inspection value states are `present`, `missing`, `empty`, `null`, and
-`undefined`.
+`undefined`. `valueKind` is `string`, `number`, `boolean`, or `null`. Existing
+evaluation payloads without `valueKind` remain accepted, but a type check fails
+when the value kind is unknown.
 
 The result shape is:
 

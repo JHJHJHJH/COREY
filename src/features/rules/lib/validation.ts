@@ -23,6 +23,7 @@ import type {
   ViewerValidationSummary,
   ViewerValidationTarget,
   ViewerValidationValue,
+  ViewerValidationValueKind,
 } from "@/features/viewer/types";
 
 export const VIEWER_VALIDATION_CONFIG_VERSION = 2 as const;
@@ -53,6 +54,12 @@ const VALID_INSPECTION_STATES: ReadonlySet<ViewerInspectionValueState> = new Set
   "empty",
   "null",
   "undefined",
+]);
+
+const VALIDATION_VALUE_KINDS: ReadonlySet<ViewerValidationValueKind> = new Set([
+  "string",
+  "number",
+  "boolean",
 ]);
 
 type CompiledViewerValidationRule = {
@@ -134,6 +141,36 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function normalizeValidationRawValue(value: unknown): unknown {
+  if (
+    isRecord(value) &&
+    "value" in value &&
+    Object.keys(value).every((key) => key === "value" || key === "type")
+  ) {
+    return normalizeValidationRawValue(value.value);
+  }
+
+  return value;
+}
+
+function inferViewerValidationValueKind(value: unknown): ViewerValidationValueKind | null {
+  const normalized = normalizeValidationRawValue(value);
+
+  if (typeof normalized === "string") {
+    return "string";
+  }
+
+  if (typeof normalized === "number" && Number.isFinite(normalized)) {
+    return "number";
+  }
+
+  if (typeof normalized === "boolean") {
+    return "boolean";
+  }
+
+  return null;
+}
+
 function coerceFiniteNumber(value: unknown) {
   if (value === null || value === undefined || value === "") {
     return null;
@@ -179,6 +216,7 @@ function missingValidationValue(): ViewerValidationValue {
   return {
     text: "MISSING",
     state: "missing",
+    valueKind: null,
   };
 }
 
@@ -194,6 +232,9 @@ function sanitizeValidationValue(value: unknown): ViewerValidationValue {
   return {
     text: typeof value.text === "string" ? value.text : "MISSING",
     state,
+    valueKind: VALIDATION_VALUE_KINDS.has(value.valueKind as ViewerValidationValueKind)
+      ? (value.valueKind as ViewerValidationValueKind)
+      : null,
   };
 }
 
@@ -368,6 +409,15 @@ function sanitizeCheck(check: unknown): ViewerValidationCheck {
     };
   }
 
+  if (check.kind === "type") {
+    return {
+      kind: "type",
+      expectedType: VALIDATION_VALUE_KINDS.has(check.expectedType as ViewerValidationValueKind)
+        ? (check.expectedType as ViewerValidationValueKind)
+        : "string",
+    };
+  }
+
   throw new Error(`Unsupported rule check kind: ${String(check.kind)}`);
 }
 
@@ -499,6 +549,10 @@ function evaluateRuleAgainstValue(
     return booleanValue === rule.check.expected ? "ok" : rule.failSeverity;
   }
 
+  if (rule.check.kind === "type") {
+    return value.valueKind === rule.check.expectedType ? "ok" : rule.failSeverity;
+  }
+
   const numericValue = coerceFiniteNumber(value.text);
   if (numericValue === null) {
     return rule.failSeverity;
@@ -516,7 +570,7 @@ function evaluateRuleAgainstValue(
 }
 
 function toValidationValue(
-  value: Pick<ViewerInspectionValue, "text" | "state"> | undefined,
+  value: Pick<ViewerInspectionValue, "raw" | "text" | "state"> | undefined,
 ): ViewerValidationValue {
   if (!value) {
     return missingValidationValue();
@@ -525,6 +579,7 @@ function toValidationValue(
   return {
     text: value.text,
     state: value.state,
+    valueKind: inferViewerValidationValueKind(value.raw),
   };
 }
 
@@ -828,6 +883,7 @@ function buildCompactRowValue(
   return {
     text: cell.text,
     state: cell.state,
+    valueKind: inferViewerValidationValueKind(cell.raw),
   };
 }
 
@@ -913,6 +969,10 @@ export function describeViewerValidationRule(rule: ViewerValidationRule) {
 
   if (rule.check.kind === "boolean") {
     return `${targetLabel} must be ${rule.check.expected ? "TRUE" : "FALSE"}`;
+  }
+
+  if (rule.check.kind === "type") {
+    return `${targetLabel} must have type ${rule.check.expectedType}`;
   }
 
   if (rule.check.min !== null && rule.check.max !== null) {
