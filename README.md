@@ -222,6 +222,7 @@ Other optional backend variables:
 - `COREY_MCP_PUBLIC_URL`, `COREY_APP_PUBLIC_URL`, and `COREY_MCP_INTERNAL_URL`
 - `COREY_MCP_ADMIN_USERS` (comma-separated user IDs; defaults to `COREY_DEFAULT_USER`)
 - `COREY_MCP_ALLOWED_ORIGINS`, `COREY_MCP_PORT`, and `COREY_MCP_INDEX_CACHE_ENTRIES`
+- `COREY_MCP_TRUST_PROXY` (proxy hop count or trusted proxy network; unset by default)
 
 The backend is intended for self-hosted deployments. Put a reverse proxy in front
 of it on public networks, and configure payload limits, TLS, authentication, and

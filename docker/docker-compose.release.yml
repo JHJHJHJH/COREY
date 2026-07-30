@@ -62,6 +62,7 @@ services:
       COREY_MCP_PUBLIC_URL: ${COREY_MCP_PUBLIC_URL:-http://localhost:4001/mcp}
       COREY_APP_PUBLIC_URL: ${COREY_APP_PUBLIC_URL:-http://localhost:4000}
       COREY_MCP_INDEX_CACHE_ENTRIES: ${COREY_MCP_INDEX_CACHE_ENTRIES:-3}
+      COREY_MCP_TRUST_PROXY: ${COREY_MCP_TRUST_PROXY:-0}
     ports:
       - "${MCP_PORT:-4001}:4001"
     depends_on:

@@ -19,6 +19,23 @@ function numberEnv(name: string, fallback: number) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+export function parseTrustProxy(value: string | undefined): false | number | string {
+  const normalized = value?.trim();
+  if (!normalized || normalized === "0" || normalized.toLowerCase() === "false") {
+    return false;
+  }
+  if (normalized.toLowerCase() === "true") {
+    throw new Error(
+      "COREY_MCP_TRUST_PROXY must be a positive proxy-hop count or trusted proxy address/subnet, not true.",
+    );
+  }
+  if (/^\d+$/.test(normalized)) {
+    const hops = Number(normalized);
+    if (Number.isSafeInteger(hops) && hops > 0) return hops;
+  }
+  return normalized;
+}
+
 function sameSecret(supplied: string | undefined, expected: string) {
   if (!supplied || supplied.length !== expected.length) return false;
   return timingSafeEqual(Buffer.from(supplied), Buffer.from(expected));
@@ -53,6 +70,7 @@ function configuration() {
     port: numberEnv("COREY_MCP_PORT", 4001),
     userHeader: process.env.COREY_USER_HEADER?.trim().toLowerCase() || "x-forwarded-user",
     cacheEntries: numberEnv("COREY_MCP_INDEX_CACHE_ENTRIES", 3),
+    trustProxy: parseTrustProxy(process.env.COREY_MCP_TRUST_PROXY),
   };
 }
 
@@ -87,6 +105,7 @@ export async function runCoreyMcp() {
     serviceSecret: config.secret,
   });
   const app = express();
+  if (config.trustProxy !== false) app.set("trust proxy", config.trustProxy);
   const issuerUrl = new URL("/", config.publicUrl);
   const resourceMetadataUrl = getOAuthProtectedResourceMetadataUrl(config.publicUrl);
 

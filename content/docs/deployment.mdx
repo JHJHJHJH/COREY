@@ -75,6 +75,10 @@ the companion's OAuth endpoints automatically. Public deployments must route
 both through TLS and must not expose the internal COREY user header or
 `COREY_MCP_INTERNAL_URL` to untrusted clients.
 
+When a reverse proxy adds `X-Forwarded-For`, set `COREY_MCP_TRUST_PROXY` to
+the exact number of proxy hops between the public client and the MCP service,
+or to the trusted proxy address/subnet. Leave it unset for direct local access.
+
 ### Railway MCP image
 
 The official Railway template provides the COREY app, PostgreSQL, and model
@@ -99,6 +103,7 @@ characters and expose it to both services. With the template service names
 PORT=4001
 COREY_MCP_PORT=4001
 COREY_MCP_BIND=::
+COREY_MCP_TRUST_PROXY=1
 COREY_BASE_URL=http://${{COREY.RAILWAY_PRIVATE_DOMAIN}}:4000
 COREY_MCP_BRIDGE_SECRET=${{shared.COREY_MCP_BRIDGE_SECRET}}
 COREY_MCP_ALLOWED_ORIGINS=https://${{COREY.RAILWAY_PUBLIC_DOMAIN}}
