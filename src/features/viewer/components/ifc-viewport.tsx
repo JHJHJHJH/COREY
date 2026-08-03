@@ -824,6 +824,17 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       );
       syncSession(getPrimarySelection(runtime.highlighter.selection.select, runtime.labels, runtime.categories));
     },
+    async isolateElements(elements) {
+      const runtime = runtimeRef.current;
+      if (!runtime?.model) return;
+
+      await runtime.hider.isolate(elements);
+      const hiddenItems = await runtime.hider.getVisibilityMap(false);
+      runtime.hiddenItems = Object.fromEntries(
+        Object.entries(hiddenItems).map(([modelId, ids]) => [modelId, new Set(ids)]),
+      );
+      syncSession(getPrimarySelection(runtime.highlighter.selection.select, runtime.labels, runtime.categories));
+    },
     async hideCategory(category) {
       const runtime = runtimeRef.current;
       if (!runtime?.model) return;

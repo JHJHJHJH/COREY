@@ -88,7 +88,15 @@ import { saveWritebackAsVersion } from "@/features/viewer/lib/model-compare-api"
 import { ServerModelsMenu } from "@/features/viewer/components/server-models-menu";
 import { ModelComparePanel } from "@/features/viewer/components/model-compare-panel";
 import { VisualCompareOverlay } from "@/features/viewer/components/visual-compare-overlay";
-import { buildViewerValidationClauseTableViews } from "@/features/viewer/lib/validation-clauses";
+import {
+  buildViewerValidationClauseTableViews,
+  buildViewerValidationSeverityRowKeys,
+} from "@/features/viewer/lib/validation-clauses";
+import {
+  buildViewerValidationSeverityElements,
+  collectViewerValidationElementIdMap,
+  isViewerElementIdMapEmpty,
+} from "@/features/viewer/lib/validation-severity";
 import { exportEditedIfc } from "@/features/viewer/lib/ifc-writeback";
 import type {
   ModelCompareElementRef,
@@ -106,6 +114,7 @@ import type {
   ViewerSessionState,
   ViewerStatus,
   ViewerValidationHighlights,
+  ViewerValidationSeverityFilter,
   ViewerValidationClauseTableView,
   ViewerValidationRunPayload,
   ViewerValidationRunResult,
@@ -1020,6 +1029,9 @@ export function ViewerShell() {
     emptyValidationHighlights,
   );
   const [validationResult, setValidationResult] = useState<ViewerValidationRunResult | null>(null);
+  // What the viewport is currently isolated to. Both panels own their own severity filter, so
+  // this is the one shared record of which of them last drove the 3D view.
+  const [severityIsolation, setSeverityIsolation] = useState<ViewerValidationSeverityFilter>("all");
   const [selectedValidationClauseId, setSelectedValidationClauseId] = useState("");
   const [viewerTheme, setViewerTheme] = useState<ViewerTheme>("light");
   const [viewerThemeLoaded, setViewerThemeLoaded] = useState(false);
@@ -1169,6 +1181,18 @@ export function ViewerShell() {
         result: validationResult,
       }),
     [effectiveDataTableData, validationResult],
+  );
+  const validationSeverityRowKeys = useMemo(
+    () =>
+      buildViewerValidationSeverityRowKeys({
+        data: effectiveDataTableData,
+        result: validationResult,
+      }),
+    [effectiveDataTableData, validationResult],
+  );
+  const validationSeverityElements = useMemo(
+    () => buildViewerValidationSeverityElements(validationResult?.results ?? null),
+    [validationResult],
   );
   const debugTreeSample = useMemo(
     () => (tree.length > 0 ? buildViewerTreeDebugSample(tree) : null),
@@ -2774,6 +2798,39 @@ export function ViewerShell() {
     [dataTableVisibleRowKeysInView, syncDataTableToView],
   );
 
+  const handleSeverityFilterChange = useCallback(
+    (filter: ViewerValidationSeverityFilter) => {
+      setSeverityIsolation(filter);
+
+      void runViewportVisibilityAction(async () => {
+        if (filter === "all") {
+          await viewportRef.current?.showAll();
+          return;
+        }
+
+        const elements = collectViewerValidationElementIdMap(validationSeverityElements, filter);
+        // Isolating an empty set would blank the viewport with no visible cause; the panel's
+        // own empty state already explains that nothing matched.
+        if (isViewerElementIdMapEmpty(elements)) {
+          return;
+        }
+
+        await viewportRef.current?.isolateElements(elements);
+      });
+    },
+    [runViewportVisibilityAction, validationSeverityElements],
+  );
+
+  // Highlights going empty (new model, cleared rules) makes both panels drop their severity
+  // filter, so the isolation label has to follow or it will name a filter nothing is showing.
+  useEffect(() => {
+    if (!areValidationHighlightsEqual(validationHighlights, emptyValidationHighlights)) {
+      return;
+    }
+
+    setSeverityIsolation((current) => (current === "all" ? current : "all"));
+  }, [validationHighlights]);
+
   const showDataTableDialog = useCallback(() => {
     setShowDataTable(true);
     setShowDataTableInWindow(false);
@@ -2905,12 +2962,15 @@ export function ViewerShell() {
         tableState={effectiveDataTableState}
         validationClauseViews={validationClauseTableViews}
         selectedValidationClauseId={selectedValidationClauseId}
+        validationSeverityRowKeys={validationSeverityRowKeys}
+        severityIsolation={severityIsolation}
         activeSelection={session.selected}
         visibleRowKeysInView={dataTableVisibleRowKeysInView}
         importRevision={dataTableImportFocus.revision}
         importedColumnKeys={dataTableImportFocus.columnKeys}
         onSyncToView={handleSyncDataTableToView}
         onValidationClauseChange={setSelectedValidationClauseId}
+        onSeverityFilterChange={handleSeverityFilterChange}
         onEditCell={handleDataTableCellEdit}
         onSelectRow={handleDataTableRowSelect}
         showMetaHeader={false}
@@ -3204,6 +3264,9 @@ export function ViewerShell() {
                     categories={categories}
                     nodes={tree}
                     selection={session.selected}
+                    severityElements={validationSeverityElements}
+                    severityIsolation={severityIsolation}
+                    onSeverityFilterChange={handleSeverityFilterChange}
                     onSelectNode={(localId) => {
                       void viewportRef.current?.selectNode(localId);
                     }}

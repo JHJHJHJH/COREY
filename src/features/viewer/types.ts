@@ -6,6 +6,12 @@ export type ViewerInspectionValueState = "present" | "missing" | "empty" | "null
 
 export type ViewerValidationFailureSeverity = "warn" | "error";
 
+/** `"issues"` means error-or-warn; `"all"` disables the filter entirely. */
+export type ViewerValidationSeverityFilter =
+  | "all"
+  | "issues"
+  | ViewerValidationFailureSeverity;
+
 export type ViewerValidationResult = "ok" | "warn" | "error";
 
 export type ViewerValidationTarget =
@@ -154,6 +160,23 @@ export type ViewerValidationElementMap = Record<string, number[]>;
 export interface ViewerValidationHighlights {
   warn: ViewerValidationElementMap;
   error: ViewerValidationElementMap;
+}
+
+/**
+ * Per-severity membership for filtering. An element appears under *every* severity it failed
+ * at, so one with both a warn and an error failure is in both sets.
+ *
+ * This is deliberately different from `ViewerValidationHighlights`, which buckets each element
+ * by its single worst severity because the 3D view can only paint it one colour.
+ */
+export interface ViewerValidationSeverityElements {
+  warn: ViewerElementIdMap;
+  error: ViewerElementIdMap;
+}
+
+export interface ViewerValidationSeverityRowKeys {
+  warn: Set<string>;
+  error: Set<string>;
 }
 
 export interface ModelMetadata {
@@ -524,6 +547,7 @@ export interface ViewerViewportHandle {
   hideSelection(): Promise<void>;
   isolateSelection(): Promise<void>;
   isolateCategory(category: string): Promise<void>;
+  isolateElements(elements: ViewerElementIdMap): Promise<void>;
   hideCategory(category: string): Promise<void>;
   focusSelection(): Promise<void>;
   clearMeasurements(): void;
