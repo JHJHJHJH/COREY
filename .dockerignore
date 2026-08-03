@@ -13,6 +13,7 @@ Dockerfile*
 node_modules
 npm-debug.log*
 out
+dist
 playwright-artifacts
 src/generated/prisma
 yarn-debug.log*

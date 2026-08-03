@@ -138,32 +138,6 @@ export function collectViewerValidationLocalIds(
   return localIds;
 }
 
-export function collectViewerValidationElementIdMap(
-  elements: ViewerValidationSeverityElements,
-  filter: ViewerValidationSeverityFilter,
-): ViewerElementIdMap {
-  const merged: ViewerElementIdMap = {};
-  if (filter === "all") {
-    return merged;
-  }
-
-  for (const bucket of severityBuckets(filter)) {
-    for (const [modelId, ids] of Object.entries(elements[bucket])) {
-      const existing = merged[modelId] ?? new Set<number>();
-      for (const localId of ids) {
-        existing.add(localId);
-      }
-      merged[modelId] = existing;
-    }
-  }
-
-  return merged;
-}
-
-export function isViewerElementIdMapEmpty(elements: ViewerElementIdMap) {
-  return Object.values(elements).every((ids) => ids.size === 0);
-}
-
 /**
  * Element counts per severity. An element failing at both severities is counted under both, so
  * `warn + error` can exceed the "any issue" total — that is the point of the filter.

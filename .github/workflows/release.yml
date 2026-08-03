@@ -12,12 +12,18 @@ permissions:
   packages: write
   id-token: write
 
-env:
-  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/corey
-
 jobs:
   image:
+    name: Publish ${{ matrix.image }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: corey
+            target: runner
+          - image: corey-mcp
+            target: mcp-runner
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -33,7 +39,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE_NAME }}
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -47,7 +53,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          target: runner
+          target: ${{ matrix.target }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

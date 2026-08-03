@@ -769,6 +769,15 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       const selection = buildSingleItemMap(runtime.model.modelId, localId);
       await runtime.highlighter.highlightByID("select", selection);
     },
+    async selectElements(localIds) {
+      const runtime = runtimeRef.current;
+      if (!runtime?.model) return;
+      const selection = { [runtime.model.modelId]: new Set(localIds) };
+      await runtime.highlighter.clear("select");
+      if (!OBC.ModelIdMapUtils.isEmpty(selection)) {
+        await runtime.highlighter.highlightByID("select", selection);
+      }
+    },
     getHiddenElements() {
       return cloneElementIdMap(runtimeRef.current?.hiddenItems ?? null);
     },
@@ -796,6 +805,23 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       syncSession(null);
       resetSelectionDetails();
     },
+    async hideElements(localIds) {
+      const runtime = runtimeRef.current;
+      if (!runtime?.model || localIds.length === 0) return;
+      const selection = { [runtime.model.modelId]: new Set(localIds) };
+      await runtime.hider.set(false, selection);
+      const hiddenItems = await runtime.hider.getVisibilityMap(false);
+      runtime.hiddenItems = Object.fromEntries(
+        Object.entries(hiddenItems).map(([modelId, ids]) => [modelId, new Set(ids)]),
+      );
+      syncSession(
+        getPrimarySelection(
+          runtime.highlighter.selection.select,
+          runtime.labels,
+          runtime.categories,
+        ),
+      );
+    },
     async isolateSelection() {
       const runtime = runtimeRef.current;
       if (!runtime) return;
@@ -810,6 +836,23 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       );
       syncSession(getPrimarySelection(selection, runtime.labels, runtime.categories));
     },
+    async isolateElements(localIds) {
+      const runtime = runtimeRef.current;
+      if (!runtime?.model || localIds.length === 0) return;
+      const selection = { [runtime.model.modelId]: new Set(localIds) };
+      await runtime.hider.isolate(selection);
+      const hiddenItems = await runtime.hider.getVisibilityMap(false);
+      runtime.hiddenItems = Object.fromEntries(
+        Object.entries(hiddenItems).map(([modelId, ids]) => [modelId, new Set(ids)]),
+      );
+      syncSession(
+        getPrimarySelection(
+          runtime.highlighter.selection.select,
+          runtime.labels,
+          runtime.categories,
+        ),
+      );
+    },
     async isolateCategory(category) {
       const runtime = runtimeRef.current;
       if (!runtime?.model) return;
@@ -818,17 +861,6 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       const localIds = new Set(Object.values(items).flat());
       const selection = { [runtime.model.modelId]: localIds };
       await runtime.hider.isolate(selection);
-      const hiddenItems = await runtime.hider.getVisibilityMap(false);
-      runtime.hiddenItems = Object.fromEntries(
-        Object.entries(hiddenItems).map(([modelId, ids]) => [modelId, new Set(ids)]),
-      );
-      syncSession(getPrimarySelection(runtime.highlighter.selection.select, runtime.labels, runtime.categories));
-    },
-    async isolateElements(elements) {
-      const runtime = runtimeRef.current;
-      if (!runtime?.model) return;
-
-      await runtime.hider.isolate(elements);
       const hiddenItems = await runtime.hider.getVisibilityMap(false);
       runtime.hiddenItems = Object.fromEntries(
         Object.entries(hiddenItems).map(([modelId, ids]) => [modelId, new Set(ids)]),
@@ -875,6 +907,20 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
           paddingTop: 0.25,
           paddingLeft: 0.25,
           paddingRight: 0.25,
+        });
+      }
+    },
+    async fitModel() {
+      const runtime = runtimeRef.current;
+      const controls = runtime?.world.camera.controls;
+      if (!runtime?.model || !controls) return;
+      const modelBox = runtime.model.box.clone();
+      if (hasRenderableBox(modelBox)) {
+        await controls.fitToBox(modelBox, true, {
+          paddingBottom: 0.2,
+          paddingTop: 0.2,
+          paddingLeft: 0.2,
+          paddingRight: 0.2,
         });
       }
     },

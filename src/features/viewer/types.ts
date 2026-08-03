@@ -542,14 +542,17 @@ export interface ViewerViewportHandle {
   loadIfc(source: ModelSourceResult): Promise<void>;
   clearModel(): Promise<void>;
   selectNode(localId: number): Promise<void>;
+  selectElements(localIds: number[]): Promise<void>;
   getHiddenElements(): ViewerElementIdMap | null;
   showAll(): Promise<void>;
   hideSelection(): Promise<void>;
+  hideElements(localIds: number[]): Promise<void>;
   isolateSelection(): Promise<void>;
+  isolateElements(localIds: number[]): Promise<void>;
   isolateCategory(category: string): Promise<void>;
-  isolateElements(elements: ViewerElementIdMap): Promise<void>;
   hideCategory(category: string): Promise<void>;
   focusSelection(): Promise<void>;
+  fitModel(): Promise<void>;
   clearMeasurements(): void;
   clearSections(): void;
   setTool(tool: ViewerTool): void;

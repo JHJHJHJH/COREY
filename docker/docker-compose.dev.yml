@@ -14,6 +14,12 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:-corey-secret}
       S3_BUCKET: ${S3_BUCKET:-corey-models}
       COREY_MAX_MODEL_BYTES: ${COREY_MAX_MODEL_BYTES:-262144000}
+      COREY_MCP_BRIDGE_URL: ${COREY_MCP_BRIDGE_URL:-}
+      COREY_MCP_BRIDGE_SECRET: ${COREY_MCP_BRIDGE_SECRET:-}
+      COREY_MCP_PUBLIC_URL: ${COREY_MCP_PUBLIC_URL:-http://localhost:4001/mcp}
+      COREY_APP_PUBLIC_URL: ${COREY_APP_PUBLIC_URL:-http://localhost:4000}
+      COREY_MCP_INTERNAL_URL: http://mcp:4001
+      COREY_MCP_ADMIN_USERS: ${COREY_MCP_ADMIN_USERS:-local}
       NEXT_TELEMETRY_DISABLED: "1"
       NEXT_WATCH_POLL_INTERVAL_MS: ${NEXT_WATCH_POLL_INTERVAL_MS:-1000}
       WATCHPACK_POLLING: ${WATCHPACK_POLLING:-true}
@@ -49,6 +55,29 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  mcp:
+    profiles: ["mcp"]
+    build:
+      context: ..
+      target: mcp-runner
+    init: true
+    environment:
+      COREY_BASE_URL: http://app:4000
+      COREY_USER_HEADER: ${COREY_USER_HEADER:-x-forwarded-user}
+      COREY_MCP_BIND: 0.0.0.0
+      COREY_MCP_PORT: 4001
+      COREY_MCP_BRIDGE_SECRET: ${COREY_MCP_BRIDGE_SECRET:-disabled}
+      COREY_MCP_ALLOWED_ORIGINS: ${COREY_MCP_ALLOWED_ORIGINS:-http://localhost:4000}
+      COREY_MCP_PUBLIC_URL: ${COREY_MCP_PUBLIC_URL:-http://localhost:4001/mcp}
+      COREY_APP_PUBLIC_URL: ${COREY_APP_PUBLIC_URL:-http://localhost:4000}
+      COREY_MCP_INDEX_CACHE_ENTRIES: ${COREY_MCP_INDEX_CACHE_ENTRIES:-3}
+      COREY_MCP_TRUST_PROXY: ${COREY_MCP_TRUST_PROXY:-0}
+    ports:
+      - "${MCP_PORT:-4001}:4001"
+    depends_on:
+      app:
+        condition: service_healthy
 
   postgres:
     image: postgres:17-alpine
