@@ -12,11 +12,19 @@ import {
 } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { filterTree, formatBytes, formatTreeNodeCount } from "@/features/viewer/lib/ifc-data";
+import {
+  VIEWER_SEVERITY_FILTER_OPTIONS,
+  collectViewerValidationLocalIds,
+  countViewerValidationSeverities,
+  viewerSeverityFilterLabel,
+} from "@/features/viewer/lib/validation-severity";
 import type {
   ModelMetadata,
   ViewerCategorySummary,
   ViewerSelection,
   ViewerTreeNode,
+  ViewerValidationSeverityElements,
+  ViewerValidationSeverityFilter,
 } from "@/features/viewer/types";
 
 type ModelTreePanelProps = {
@@ -25,10 +33,30 @@ type ModelTreePanelProps = {
   categories: ViewerCategorySummary[];
   nodes: ViewerTreeNode[];
   selection: ViewerSelection | null;
+  severityElements: ViewerValidationSeverityElements;
+  /** What the 3D viewport is currently isolated to, which may differ from this panel's filter. */
+  severityIsolation: ViewerValidationSeverityFilter;
   onSelectNode: (localId: number) => void;
   onHideCategory: (category: string) => void;
   onIsolateCategory: (category: string) => void;
+  onSeverityFilterChange: (filter: ViewerValidationSeverityFilter) => void;
 };
+
+function severityOptionTone(value: ViewerValidationSeverityFilter, active: boolean) {
+  if (!active) {
+    return "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]";
+  }
+
+  if (value === "error") {
+    return "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]";
+  }
+
+  if (value === "warn") {
+    return "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
+  }
+
+  return "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]";
+}
 
 type TreeNodeRowProps = {
   node: ViewerTreeNode;
@@ -201,14 +229,18 @@ export function ModelTreePanel({
   categories,
   nodes,
   selection,
+  severityElements,
+  severityIsolation,
   onSelectNode,
   onHideCategory,
   onIsolateCategory,
+  onSeverityFilterChange,
 }: ModelTreePanelProps) {
   const [query, setQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => collectExpandableKeys(nodes));
   const [selectedCategories, setSelectedCategories] = useState<Set<string> | null>(null);
+  const [severityFilter, setSeverityFilter] = useState<ViewerValidationSeverityFilter>("all");
   const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const deferredQuery = useDeferredValue(query);
   const filterMenuRef = useRef<HTMLDivElement | null>(null);
@@ -275,20 +307,37 @@ export function ModelTreePanel({
   const hasActiveCategoryFilter = selectedCategories !== null;
   const activeCategoryCount = selectedCategories?.size ?? categories.length;
 
+  const validationCounts = useMemo(
+    () => countViewerValidationSeverities(severityElements),
+    [severityElements],
+  );
+  const hasValidationHighlights = validationCounts.issues > 0;
+  const hasActiveSeverityFilter = severityFilter !== "all";
+  const severityLocalIds = useMemo(
+    () => collectViewerValidationLocalIds(severityElements, severityFilter),
+    [severityElements, severityFilter],
+  );
+
+  // Once validation has nothing to say, a severity filter can only hide everything.
+  useEffect(() => {
+    if (!hasValidationHighlights) {
+      setSeverityFilter("all");
+    }
+  }, [hasValidationHighlights]);
+
   const filteredNodes = useMemo(
-    () => filterTree(nodes, deferredQuery, selectedCategories),
-    [deferredQuery, nodes, selectedCategories],
+    () => filterTree(nodes, deferredQuery, selectedCategories, severityLocalIds),
+    [deferredQuery, nodes, selectedCategories, severityLocalIds],
   );
   const selectedPathKeys = useMemo(
     () => collectSelectedPathKeys(nodes, selection?.localId),
     [nodes, selection?.localId],
   );
+  const hasActiveFilters =
+    Boolean(deferredQuery.trim()) || hasActiveCategoryFilter || hasActiveSeverityFilter;
   const effectiveExpandedKeys = useMemo(
-    () =>
-      deferredQuery.trim() || hasActiveCategoryFilter
-        ? collectExpandableKeys(filteredNodes)
-        : expandedKeys,
-    [deferredQuery, expandedKeys, filteredNodes, hasActiveCategoryFilter],
+    () => (hasActiveFilters ? collectExpandableKeys(filteredNodes) : expandedKeys),
+    [expandedKeys, filteredNodes, hasActiveFilters],
   );
 
   const stats = useMemo(
@@ -333,10 +382,19 @@ export function ModelTreePanel({
     });
   };
 
-  const filterSummary = hasActiveCategoryFilter
+  const categorySummary = hasActiveCategoryFilter
     ? `${activeCategoryCount} of ${categories.length} categories`
     : "All categories";
-  const forceExpanded = Boolean(deferredQuery.trim() || hasActiveCategoryFilter);
+  const filterSummary =
+    [hasActiveSeverityFilter ? viewerSeverityFilterLabel(severityFilter) : null, categorySummary]
+      .filter((part): part is string => part !== null)
+      .join(" · ");
+  const forceExpanded = hasActiveFilters;
+
+  const selectSeverityFilter = (next: ViewerValidationSeverityFilter) => {
+    setSeverityFilter(next);
+    onSeverityFilterChange(next);
+  };
 
   const collapseSearch = () => {
     if (query.trim().length === 0) {
@@ -454,23 +512,33 @@ export function ModelTreePanel({
           <div className="relative shrink-0" ref={filterMenuRef}>
             <button
               type="button"
-              aria-label="Filter categories"
+              aria-label="Filter tree"
               aria-expanded={showCategoryFilter}
               onClick={() => setShowCategoryFilter((current) => !current)}
               className={`relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border bg-[color:var(--surface-soft)] transition ${
-                hasActiveCategoryFilter
+                hasActiveCategoryFilter || hasActiveSeverityFilter
                   ? "border-[color:var(--accent)]/50"
                   : "border-[color:var(--viewer-border)] hover:bg-[color:var(--surface-strong)]"
               }`}
             >
               <ListFilter
-                className={`h-4 w-4 ${hasActiveCategoryFilter ? "text-[color:var(--accent)]" : ""}`}
+                className={`h-4 w-4 ${
+                  hasActiveCategoryFilter || hasActiveSeverityFilter
+                    ? "text-[color:var(--accent)]"
+                    : ""
+                }`}
                 aria-hidden="true"
               />
               {hasActiveCategoryFilter ? (
                 <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[color:var(--accent)] px-1 text-[10px] font-semibold text-[color:var(--accent-ink)]">
                   {activeCategoryCount}
                 </span>
+              ) : null}
+              {hasActiveSeverityFilter ? (
+                <span
+                  className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border ${severityOptionTone(severityFilter, true)}`}
+                  aria-hidden="true"
+                />
               ) : null}
             </button>
 
@@ -479,20 +547,73 @@ export function ModelTreePanel({
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-                      Category Filter
+                      Tree Filters
                     </div>
-                    <div className="mt-0.5 text-[11px] text-[color:var(--muted-ink)]">{filterSummary}</div>
+                    <div className="mt-0.5 text-[11px] text-[color:var(--muted-ink)]">{categorySummary}</div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setSelectedCategories(null)}
+                    onClick={() => {
+                      setSelectedCategories(null);
+                      selectSeverityFilter("all");
+                    }}
                     className="rounded-full border border-[color:var(--viewer-border)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-soft)] hover:text-[color:var(--foreground)]"
                   >
                     Reset
                   </button>
                 </div>
 
-                <div className="mt-2 max-h-72 space-y-0.5 overflow-y-auto pr-0.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                <div className="mt-3 border-t border-[color:var(--viewer-border)] pt-2.5">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-ink)]">
+                    Validation Severity
+                  </div>
+                  {hasValidationHighlights ? (
+                    <>
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {VIEWER_SEVERITY_FILTER_OPTIONS.map((option) => {
+                          const count =
+                            option.value === "error"
+                              ? validationCounts.error
+                              : option.value === "warn"
+                                ? validationCounts.warn
+                                : option.value === "issues"
+                                  ? validationCounts.issues
+                                  : null;
+
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => selectSeverityFilter(option.value)}
+                              aria-pressed={severityFilter === option.value}
+                              className={`cursor-pointer rounded-lg border px-2 py-1 text-[11px] font-medium transition ${severityOptionTone(option.value, severityFilter === option.value)}`}
+                            >
+                              {option.value === "all" ? "Any" : option.label}
+                              {count === null ? null : (
+                                <span className="ml-1 tabular-nums opacity-75">{count}</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {severityIsolation !== severityFilter ? (
+                        <div className="mt-1.5 text-[10px] text-[color:var(--muted-ink)]">
+                          3D isolated to {viewerSeverityFilterLabel(severityIsolation)}
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <div className="mt-1.5 rounded-xl border border-dashed border-[color:var(--viewer-border)] px-2.5 py-2.5 text-[12px] text-[color:var(--muted-ink)]">
+                      Run validation to filter by severity.
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--muted-ink)]">
+                  Categories
+                </div>
+
+                <div className="mt-1.5 max-h-72 space-y-0.5 overflow-y-auto pr-0.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                   {categories.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-[color:var(--viewer-border)] px-2.5 py-3 text-[13px] text-[color:var(--muted-ink)]">
                       Load a model to filter categories.

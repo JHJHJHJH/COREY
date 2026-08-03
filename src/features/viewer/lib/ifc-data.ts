@@ -1609,11 +1609,15 @@ export function filterTree(
   nodes: ViewerTreeNode[],
   query: string,
   categoryFilter?: ReadonlySet<string> | null,
+  localIdFilter?: ReadonlySet<number> | null,
 ): ViewerTreeNode[] {
   const trimmed = query.trim().toLowerCase();
   const activeCategoryFilter = categoryFilter && categoryFilter.size > 0 ? categoryFilter : null;
+  // Unlike the category filter, an empty set here is meaningful: it means the filter is on
+  // and nothing matched, which must prune everything rather than disable the filter.
+  const activeLocalIdFilter = localIdFilter ?? null;
 
-  if (!trimmed && !activeCategoryFilter) {
+  if (!trimmed && !activeCategoryFilter && !activeLocalIdFilter) {
     return nodes;
   }
 
@@ -1629,8 +1633,12 @@ export function filterTree(
     const matchesCategory =
       !activeCategoryFilter ||
       (node.category !== null && activeCategoryFilter.has(node.category));
+    // Container and category rows have no localId, so they survive only via their children.
+    const matchesLocalId =
+      !activeLocalIdFilter ||
+      (node.localId !== null && activeLocalIdFilter.has(node.localId));
 
-    if ((matchesQuery && matchesCategory) || children.length > 0) {
+    if ((matchesQuery && matchesCategory && matchesLocalId) || children.length > 0) {
       return {
         ...node,
         children,

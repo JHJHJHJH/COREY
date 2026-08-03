@@ -23,9 +23,18 @@ import {
   getDefaultViewerDataTableColumnKeys,
   sortViewerDataTableRows,
 } from "@/features/viewer/lib/ifc-data";
+import {
+  VIEWER_SEVERITY_FILTER_OPTIONS,
+  createEmptyViewerValidationSeverityRowKeys,
+  matchesViewerValidationSeverityRowKey,
+  viewerSeverityFilterChipLabel,
+  viewerSeverityFilterLabel,
+} from "@/features/viewer/lib/validation-severity";
 import type {
   ModelMetadata,
   ViewerValidationClauseTableView,
+  ViewerValidationSeverityFilter,
+  ViewerValidationSeverityRowKeys,
   ViewerDataTableCell,
   ViewerDataTableCellEditRequest,
   ViewerDataTableColumn,
@@ -34,18 +43,24 @@ import type {
   ViewerSelection,
 } from "@/features/viewer/types";
 
+const emptySeverityRowKeys = createEmptyViewerValidationSeverityRowKeys();
+
 type DataTablePanelProps = {
   embedded?: boolean;
   metadata: ModelMetadata | null;
   tableState: ViewerDataTableState;
   validationClauseViews: ViewerValidationClauseTableView[];
   selectedValidationClauseId?: string;
+  validationSeverityRowKeys?: ViewerValidationSeverityRowKeys;
+  /** What the 3D viewport is currently isolated to, which may differ from this panel's filter. */
+  severityIsolation?: ViewerValidationSeverityFilter;
   activeSelection: ViewerSelection | null;
   visibleRowKeysInView: Set<string> | null;
   importRevision?: number;
   importedColumnKeys?: string[];
   onSyncToView: () => Promise<void>;
   onValidationClauseChange?: (clauseId: string) => void;
+  onSeverityFilterChange?: (filter: ViewerValidationSeverityFilter) => void;
   onEditCell: (edit: ViewerDataTableCellEditRequest) => void;
   onSelectRow: (localId: number) => void;
   showMetaHeader?: boolean;
@@ -56,6 +71,7 @@ type DataTableUiState = {
   query: string;
   ifcTypeFilter: string;
   validationClauseId: string;
+  validationSeverity: ViewerValidationSeverityFilter;
   showEditedOnly: boolean;
   sort: ViewerDataTableSort | null;
   visibleColumnKeys: string[];
@@ -91,6 +107,22 @@ function validationClauseTone(result: ViewerValidationClauseTableView["result"])
   return result === "error"
     ? "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]"
     : "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
+}
+
+function validationSeverityFilterTone(filter: ViewerValidationSeverityFilter) {
+  if (filter === "error") {
+    return "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]";
+  }
+
+  if (filter === "warn") {
+    return "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
+  }
+
+  if (filter === "issues") {
+    return "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]";
+  }
+
+  return "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)]";
 }
 
 function compactButtonTone(active: boolean) {
@@ -143,6 +175,7 @@ function buildDefaultUiState(dataSignature: string, state: ViewerDataTableState[
     query: "",
     ifcTypeFilter: "",
     validationClauseId: "",
+    validationSeverity: "all",
     showEditedOnly: false,
     sort: null,
     visibleColumnKeys: state ? getDefaultViewerDataTableColumnKeys(state.columns) : [],
@@ -323,8 +356,8 @@ const DataTableContent = memo(function DataTableContent({
               The current filters hide every element
             </div>
             <p className="mt-2 text-sm leading-6 text-[color:var(--muted-ink)]">
-              Adjust the text filter, IFC type filter, validation clause view, edited-only
-              toggle, or visible columns to bring matching rows back into view.
+              Adjust the text filter, IFC type filter, severity filter, validation clause view,
+              edited-only toggle, or visible columns to bring matching rows back into view.
             </p>
           </div>
         </div>
@@ -463,12 +496,15 @@ const DataTablePanelComponent = function DataTablePanel({
   tableState,
   validationClauseViews,
   selectedValidationClauseId = "",
+  validationSeverityRowKeys = emptySeverityRowKeys,
+  severityIsolation = "all",
   activeSelection,
   visibleRowKeysInView,
   importRevision = 0,
   importedColumnKeys = [],
   onSyncToView,
   onValidationClauseChange,
+  onSeverityFilterChange,
   onEditCell,
   onSelectRow,
   showMetaHeader = true,
@@ -477,6 +513,8 @@ const DataTablePanelComponent = function DataTablePanel({
   const clauseMenuRef = useRef<HTMLDivElement | null>(null);
   const columnMenuRef = useRef<HTMLDivElement | null>(null);
   const data = tableState.data;
+  const hasValidationSeverities =
+    validationSeverityRowKeys.error.size > 0 || validationSeverityRowKeys.warn.size > 0;
   const dataSignature = useMemo(() => buildDataSignature(data), [data]);
   const [uiState, setUiState] = useState<DataTableUiState>(() =>
     buildDefaultUiState(dataSignature, data),
@@ -533,6 +571,15 @@ const DataTablePanelComponent = function DataTablePanel({
     if (activeClauseRowKeySet) {
       nextRows = nextRows.filter((row) => activeClauseRowKeySet.has(row.key));
     }
+    if (activeUiState.validationSeverity !== "all") {
+      nextRows = nextRows.filter((row) =>
+        matchesViewerValidationSeverityRowKey(
+          row.key,
+          validationSeverityRowKeys,
+          activeUiState.validationSeverity,
+        ),
+      );
+    }
     if (activeUiState.showEditedOnly) {
       nextRows = nextRows.filter(rowHasImportedEdits);
     }
@@ -543,9 +590,11 @@ const DataTablePanelComponent = function DataTablePanel({
   }, [
     activeClauseRowKeySet,
     activeUiState.showEditedOnly,
+    activeUiState.validationSeverity,
     data,
     deferredIfcTypeFilter,
     deferredQuery,
+    validationSeverityRowKeys,
     visibleRowKeysInView,
   ]);
 
@@ -722,13 +771,21 @@ const DataTablePanelComponent = function DataTablePanel({
         query: "",
         ifcTypeFilter: "",
         validationClauseId: "",
+        validationSeverity: "all",
         showEditedOnly: true,
         visibleColumnKeys: [...nextVisibleColumnKeys],
         selectedRowKeys: new Set<string>(),
       };
     });
     onValidationClauseChange?.("");
-  }, [importRevision, importedColumnKeys, onValidationClauseChange, updateUiState]);
+    onSeverityFilterChange?.("all");
+  }, [
+    importRevision,
+    importedColumnKeys,
+    onSeverityFilterChange,
+    onValidationClauseChange,
+    updateUiState,
+  ]);
 
   useEffect(() => {
     if (!activeUiState.validationClauseId) {
@@ -745,6 +802,18 @@ const DataTablePanelComponent = function DataTablePanel({
     }));
     onValidationClauseChange?.("");
   }, [activeUiState.validationClauseId, onValidationClauseChange, updateUiState, validationClauseViews]);
+
+  // Once there are no validated rows, a severity filter can only hide everything.
+  useEffect(() => {
+    if (hasValidationSeverities || activeUiState.validationSeverity === "all") {
+      return;
+    }
+
+    updateUiState((current) => ({
+      ...current,
+      validationSeverity: "all",
+    }));
+  }, [activeUiState.validationSeverity, hasValidationSeverities, updateUiState]);
 
   const toggleSort = useCallback((columnKey: string) => {
     updateUiState((current) => {
@@ -819,15 +888,26 @@ const DataTablePanelComponent = function DataTablePanel({
     setShowClauseMenu(false);
   };
 
+  const setValidationSeverityFilter = (severity: ViewerValidationSeverityFilter) => {
+    updateUiState((current) => ({
+      ...current,
+      validationSeverity: severity,
+      selectedRowKeys: new Set<string>(),
+    }));
+    onSeverityFilterChange?.(severity);
+  };
+
   const resetFilters = async () => {
     updateUiState((current) => ({
       ...current,
       query: "",
       ifcTypeFilter: "",
       validationClauseId: "",
+      validationSeverity: "all",
       showEditedOnly: false,
     }));
     onValidationClauseChange?.("");
+    onSeverityFilterChange?.("all");
     setShowClauseMenu(false);
     setShowColumnMenu(false);
 
@@ -845,6 +925,7 @@ const DataTablePanelComponent = function DataTablePanel({
     Boolean(activeUiState.query.trim()) ||
     Boolean(activeUiState.ifcTypeFilter) ||
     Boolean(activeUiState.validationClauseId) ||
+    activeUiState.validationSeverity !== "all" ||
     activeUiState.showEditedOnly ||
     Boolean(visibleRowKeysInView);
   const clauseSummary = activeClauseView ? activeClauseView.clauseTitle : "All rows";
@@ -857,6 +938,9 @@ const DataTablePanelComponent = function DataTablePanel({
     activeUiState.query.trim() ? "Search" : null,
     activeUiState.ifcTypeFilter || null,
     activeClauseView ? "Clause" : null,
+    activeUiState.validationSeverity !== "all"
+      ? viewerSeverityFilterChipLabel(activeUiState.validationSeverity)
+      : null,
     activeUiState.showEditedOnly ? "Edited only" : null,
     visibleRowKeysInView ? "View synced" : null,
   ].filter((value): value is string => Boolean(value));
@@ -999,6 +1083,33 @@ const DataTablePanelComponent = function DataTablePanel({
                       {data?.ifcTypes.map((ifcType) => (
                         <option key={ifcType} value={ifcType}>
                           {ifcType}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="w-[12rem] shrink-0">
+                    <select
+                      value={activeUiState.validationSeverity}
+                      onChange={(event) =>
+                        setValidationSeverityFilter(
+                          event.target.value as ViewerValidationSeverityFilter,
+                        )
+                      }
+                      aria-label="Filter by validation severity"
+                      disabled={!data || !hasValidationSeverities}
+                      title={
+                        !hasValidationSeverities
+                          ? "Run validation to filter by severity"
+                          : severityIsolation !== activeUiState.validationSeverity
+                            ? `3D isolated to ${viewerSeverityFilterLabel(severityIsolation)}`
+                            : undefined
+                      }
+                      className={`h-9 w-full rounded-[var(--r-control)] border px-2.5 text-sm outline-none transition focus:border-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50 ${validationSeverityFilterTone(activeUiState.validationSeverity)}`}
+                    >
+                      {VIEWER_SEVERITY_FILTER_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
                         </option>
                       ))}
                     </select>
@@ -1259,6 +1370,10 @@ const DataTablePanelComponent = function DataTablePanel({
               { label: "Model", value: metadata?.name ?? "—" },
               { label: "Size", value: metadata ? formatBytes(metadata.size) : "—" },
               { label: "Clause view", value: activeClauseView?.clauseTitle ?? "None" },
+              {
+                label: "Severity",
+                value: viewerSeverityFilterLabel(activeUiState.validationSeverity),
+              },
             ]}
           />
         }
