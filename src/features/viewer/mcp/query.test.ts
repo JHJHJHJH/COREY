@@ -92,6 +92,7 @@ const data: ViewerDataTableData = {
       modelId: "model",
       localId: 1,
       ifcType: "IFCWALL",
+      subtype: null,
       selection: { modelId: "model", localId: 1, label: "Wall A", category: "IFCWALL" },
       cells: {
         ifcType: value("IFCWALL", { kind: "attribute", name: "type" }),
@@ -110,6 +111,7 @@ const data: ViewerDataTableData = {
       modelId: "model",
       localId: 2,
       ifcType: "IFCDOOR",
+      subtype: null,
       selection: { modelId: "model", localId: 2, label: "Door A", category: "IFCDOOR" },
       cells: {
         ifcType: value("IFCDOOR", { kind: "attribute", name: "type" }),

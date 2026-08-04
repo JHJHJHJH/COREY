@@ -42,7 +42,7 @@ type RulesScreenProps = {
   onClose?: () => void;
 };
 
-type SortColumnKey = "clause" | "ifcType" | "target" | "constraint" | "severity";
+type SortColumnKey = "clause" | "ifcType" | "subtype" | "target" | "constraint" | "severity";
 type SortDirection = "asc" | "desc";
 type RulesSort = { columnKey: SortColumnKey; direction: SortDirection };
 type SeverityFilter = "all" | ViewerValidationRule["failSeverity"];
@@ -176,6 +176,8 @@ function rowSortValue(row: RuleRow, columnKey: SortColumnKey) {
       return row.clauseTitle;
     case "ifcType":
       return row.rule.ifcType;
+    case "subtype":
+      return row.rule.subtype ?? "";
     case "target":
       return `${row.rule.target.kind} ${describeTarget(row.rule.target)}`;
     case "constraint":
@@ -189,6 +191,7 @@ function rowMatchesQuery(row: RuleRow, query: string) {
   const haystack = [
     row.clauseTitle,
     row.rule.ifcType,
+    row.rule.subtype ?? "",
     row.rule.target.kind,
     describeTarget(row.rule.target),
     row.rule.check.kind,
@@ -549,6 +552,16 @@ function RuleTableRow({
         />
       </td>
       <td className={`${bodyCellClassName} ${columnDividerClassName}`}>
+        <input
+          value={rule.subtype ?? ""}
+          onChange={(event) => onChange({ ...rule, subtype: event.target.value })}
+          className={cellInputClassName(true)}
+          placeholder="Any"
+          aria-label="Predefined subtype"
+          title="Optional PredefinedType filter. Leave blank to apply to every element of this IFC type."
+        />
+      </td>
+      <td className={`${bodyCellClassName} ${columnDividerClassName}`}>
         <TargetCell rule={rule} onChange={onChange} />
       </td>
       <td className={`${bodyCellClassName} ${columnDividerClassName}`}>
@@ -889,7 +902,8 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
     setSort(null);
   };
 
-  const groupColumnCount = 5;
+  // IFC type, subtype, target, constraint, severity, actions — the grouped view drops the clause column.
+  const groupColumnCount = 6;
   const hasRules = totalRuleCount > 0;
   const showNoMatches = hasRules && matchedRows.length === 0;
 
@@ -1105,6 +1119,13 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
                   sort={sort}
                   onToggle={handleToggleSort}
                   widthClassName={`min-w-[10rem] ${columnDividerClassName}`}
+                />
+                <SortableHeader
+                  label="Subtype"
+                  columnKey="subtype"
+                  sort={sort}
+                  onToggle={handleToggleSort}
+                  widthClassName={`min-w-[9rem] ${columnDividerClassName}`}
                 />
                 <SortableHeader
                   label="Target"

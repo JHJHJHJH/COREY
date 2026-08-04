@@ -73,6 +73,20 @@
             "max": 5
           },
           "failSeverity": "warn"
+        },
+        {
+          "id": "sample-external-wall-fire-rating",
+          "ifcType": "IfcWall",
+          "subtype": "SOLIDWALL",
+          "target": {
+            "kind": "property",
+            "group": "Pset_WallCommon",
+            "label": "FireRating"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
         }
       ]
     }

@@ -32,9 +32,23 @@ Every rule answers four questions:
 | Part | Question it answers | Example |
 |---|---|---|
 | **IFC Type** | Which kind of element does this apply to? | `IFCWALL` (walls) |
+| **Subtype** | *(optional)* Which predefined type does this narrow to? | `SOLIDWALL`, or blank for every wall |
 | **Target** | Which piece of information should we look at? | The property `Pset_WallCommon › Reference` |
 | **Check** | What must that information satisfy? | Must be one of `WALL-A`, `WALL-B`, `WALL-C` |
 | **Severity** | How serious is a failure? | `Error` or `Warning` |
+
+### Subtype: narrowing to a predefined type
+
+Leave **Subtype** blank and the rule applies to every element of that IFC type — this is how all
+rules behave by default. Fill it in and the rule applies only to elements whose predefined type
+matches, so `IFCSLAB` + `FLOOR` checks floor slabs and stays silent on roof slabs.
+
+A subtype that does not match makes the rule *inapplicable*, not failed. That is the difference
+between using Subtype and writing a check against the `PredefinedType` attribute: the latter would
+report every roof slab as an error.
+
+COREY reads the subtype from the element's `PredefinedType`, falling back to its type object when
+the exporter put the value there, and to `ObjectType` when `PredefinedType` is `USERDEFINED`.
 
 ### Target: where to look
 

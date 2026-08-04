@@ -61,6 +61,7 @@ them as stable once a config is shared.
 |---|---|---|
 | `id` | string | Stable rule identifier. Generated when missing during sanitization. |
 | `ifcType` | string | IFC entity name, such as `IfcWall`. Matching is case-insensitive. |
+| `subtype` | string (optional) | Predefined type, ANDed with `ifcType` — such as `FLOOR` for `IfcSlab`. Matching is case-insensitive. Omitted or blank means any subtype, which is how every rule authored before this field behaves. See [Subtype applicability](#subtype-applicability). |
 | `target` | `ViewerValidationTarget` | Attribute or property to inspect. |
 | `check` | `ViewerValidationCheck` | Constraint applied to the target value. |
 | `failSeverity` | `error` or `warn` | Severity emitted when this rule fails. Defaults to `error` if invalid input is sanitized. |
@@ -156,6 +157,31 @@ Boolean:
 Boolean values are parsed from `true`, `1`, `yes`, `y`, `.t.`, `t`, `false`,
 `0`, `no`, `n`, `.f.`, and `f`, case-insensitively.
 
+## Subtype applicability
+
+A rule applies to an element when **both** hold:
+
+1. `ifcType` matches the element's IFC entity name.
+2. `subtype` is blank or absent, **or** it matches the element's resolved subtype.
+
+Both comparisons are case-insensitive and trim surrounding whitespace.
+
+An element's subtype is its `PredefinedType`, except when that is `USERDEFINED`, where
+`ObjectType` is used instead — that is where IFC-SG models carry project-specific types. The
+predefined type is read from the element itself, falling back to its type object
+(`IsTypedBy` / `IsDefinedBy` → `RelatingType`), so a rule matches the same way whether the exporter
+put the value on the occurrence or the type.
+
+A subtype mismatch makes the rule **inapplicable**, never failed. `IfcSlab` + `subtype: FLOOR` is
+silent on roof slabs. This is what distinguishes `subtype` from a rule whose *target* is the
+`PredefinedType` attribute — the latter reports every non-`FLOOR` slab as a failure.
+
+Rules with and without a subtype coexist on the same IFC type: a `FLOOR` slab is evaluated by both
+`IfcSlab` rules and `IfcSlab` + `FLOOR` rules.
+
+Because `subtype` is omitted from serialized output when blank, configs written before this field
+existed round-trip unchanged.
+
 ## Runnable rules
 
 The persisted config shape can contain incomplete draft rows from the rule
@@ -164,7 +190,7 @@ runnable rules.
 
 A rule is runnable when:
 
-- `ifcType` is not blank.
+- `ifcType` is not blank. A blank `subtype` is valid and means "any subtype".
 - attribute targets have a non-blank `name`.
 - property targets have non-blank `group` and `label`.
 - enum checks have at least one `allowedValues` entry after sanitization.
@@ -188,6 +214,7 @@ shape.
       "modelId": "model-123",
       "localId": 42,
       "ifcType": "IfcWall",
+      "subtype": "SOLIDWALL",
       "values": {
         "attribute:globalid": {
           "text": "0F4...example",
