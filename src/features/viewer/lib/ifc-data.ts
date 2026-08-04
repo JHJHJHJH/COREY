@@ -20,6 +20,7 @@ import type {
   ViewerValidationTarget,
   ViewerTreeNode,
 } from "@/features/viewer/types";
+import { resolveIfcSubtype } from "@/features/rules/lib/validation";
 
 type NameMap = Map<number, string>;
 type CategoryMap = Map<number, string | null>;
@@ -131,10 +132,17 @@ const DEFAULT_VIEWER_DATA_TABLE_COLUMN_PRIORITY = [
   "attribute:OverallWidth",
 ];
 
+/**
+ * `IsTypedBy` is traversed here (not just in `elementInspectionDataConfig`) so `resolveElementSubtype`
+ * can fall back to the type object's PredefinedType. Without it, IFC4 models that carry the
+ * predefined type only on the type object would match subtype rules in the properties panel but not
+ * in the data table or a validation run.
+ */
 const viewerDataTableDataConfig = {
   attributesDefault: true,
   relations: {
     IsDefinedBy: { attributes: true, relations: true },
+    IsTypedBy: { attributes: true, relations: true },
   },
   relationsDefault: { attributes: false, relations: false },
 } satisfies Partial<ItemsDataConfig>;
@@ -243,6 +251,21 @@ function resolvePredefinedType(data: ItemData): ResolvedInspectionAttribute | nu
   }
 
   return direct.exists ? direct : relatedFallback;
+}
+
+/**
+ * The element's subtype as validation rules match it: the resolved PredefinedType, falling back to
+ * ObjectType when that is USERDEFINED. Shared by the inspection, data-table and headless paths so a
+ * subtype rule applies identically everywhere.
+ */
+export function resolveElementSubtype(data: ItemData): string | null {
+  const predefinedType = resolvePredefinedType(data);
+  const predefinedTypeText =
+    predefinedType && hasPresentInspectionValue(predefinedType.value)
+      ? buildInspectionValue(true, predefinedType.value).text
+      : null;
+
+  return resolveIfcSubtype(predefinedTypeText, readFirstText(data, ["ObjectType"]));
 }
 
 function humanizeKey(value: string) {
@@ -1106,6 +1129,7 @@ function buildViewerDataTableRow(
     cells,
     searchText: buildViewerDataTableSearchText([...columnMap.values()], cells),
     ifcType,
+    subtype: resolveElementSubtype(data),
   };
 }
 

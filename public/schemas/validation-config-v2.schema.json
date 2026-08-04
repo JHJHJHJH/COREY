@@ -53,6 +53,10 @@
           "type": "string",
           "description": "IFC entity type to evaluate, such as IfcWall or IfcBeam. Matching is case-insensitive."
         },
+        "subtype": {
+          "type": "string",
+          "description": "Optional predefined type, ANDed with ifcType, such as FLOOR for IfcSlab. Matching is case-insensitive, and resolves to the element's PredefinedType (or ObjectType when PredefinedType is USERDEFINED). Omit or leave blank to apply the rule to every element of ifcType. An element whose subtype differs is not evaluated by this rule; it does not fail it."
+        },
         "target": {
           "$ref": "#/$defs/target"
         },

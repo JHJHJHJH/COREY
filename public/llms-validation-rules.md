@@ -29,6 +29,7 @@ Each rule:
 {
   "id": "stable-rule-id",
   "ifcType": "IfcWall",
+  "subtype": "SOLIDWALL",
   "target": {},
   "check": {},
   "failSeverity": "error"
@@ -36,6 +37,10 @@ Each rule:
 ```
 
 `failSeverity` must be `error` or `warn`.
+
+`subtype` is optional. Omit it (or leave it blank) to apply the rule to every element of `ifcType`.
+Set it to a predefined type — `FLOOR` for `IfcSlab`, `SOLIDWALL` for `IfcWall` — to narrow the rule
+to those elements only. It is ANDed with `ifcType`.
 
 ## Targets
 
@@ -122,7 +127,12 @@ Boolean:
 - Enum comparison trims values and ignores case.
 - Boolean checks accept `true`, `1`, `yes`, `y`, `.t.`, `t`, `false`, `0`,
   `no`, `n`, `.f.`, and `f`, case-insensitively.
-- IFC type and target matching are case-insensitive.
+- IFC type, subtype, and target matching are case-insensitive.
+- An element's subtype is its `PredefinedType`, or `ObjectType` when `PredefinedType`
+  is `USERDEFINED`.
+- A rule whose `subtype` does not match the element is simply not evaluated against
+  that element. It does not produce a failure. Use `subtype` to scope a rule; use a
+  `PredefinedType` attribute target only when a wrong predefined type is itself the defect.
 - `GlobalId`, `GUID`, and `_guid` refer to the same attribute target.
 - If an element fails several rules, `error` outranks `warn`.
 
@@ -134,7 +144,9 @@ Boolean:
   check kind strings.
 - Do not leave enum `allowedValues` empty.
 - Do not leave `ifcType`, attribute `name`, property `group`, or property
-  `label` blank.
+  `label` blank. `subtype` is the only applicability field that may be blank or omitted.
+- Do not use `subtype` to assert that an element *should* have a given predefined
+  type — it filters which elements a rule applies to, so a mismatch is silent.
 
 ## Complete example
 
