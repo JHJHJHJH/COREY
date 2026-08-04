@@ -480,6 +480,21 @@ function dataTablePhaseTone(phase: ViewerDataTableState["phase"]) {
   }
 }
 
+/**
+ * Renders a compiled-rule applicability key (`ifctype::subtype`) for the diagnostic message, so a
+ * subtype that matches nothing reads as `IFCSLAB (FLOOR)` rather than looking like a bad IFC type.
+ */
+function describeValidationApplicabilityKey(key: string) {
+  const separatorIndex = key.indexOf("::");
+  if (separatorIndex < 0) {
+    return key;
+  }
+
+  const ifcType = key.slice(0, separatorIndex);
+  const subtype = key.slice(separatorIndex + 2);
+  return subtype ? `${ifcType} (${subtype})` : ifcType;
+}
+
 function summarizeIfcTypes(ifcTypes: string[], max = 6) {
   if (ifcTypes.length === 0) {
     return "none";
@@ -1115,14 +1130,16 @@ export function ViewerShell() {
       ),
     [compiledValidationRules],
   );
-  const runnableRuleIfcTypes = useMemo(
+  const runnableRuleApplicabilities = useMemo(
     () =>
-      [...compiledValidationRules.keys()].sort((left, right) =>
-        left.localeCompare(right, undefined, {
-          numeric: true,
-          sensitivity: "base",
-        }),
-      ),
+      [...compiledValidationRules.keys()]
+        .sort((left, right) =>
+          left.localeCompare(right, undefined, {
+            numeric: true,
+            sensitivity: "base",
+          }),
+        )
+        .map(describeValidationApplicabilityKey),
     [compiledValidationRules],
   );
   const effectiveDataTableData = useMemo(
@@ -2025,8 +2042,8 @@ export function ViewerShell() {
           progress: 100,
           issueCount: 0,
           failedClauseCount: 0,
-          message: `No indexed elements match the current rule IFC types. Rules: ${summarizeIfcTypes(
-            runnableRuleIfcTypes,
+          message: `No indexed elements match the current rule IFC types and subtypes. Rules: ${summarizeIfcTypes(
+            runnableRuleApplicabilities,
           )}. Indexed: ${summarizeIfcTypes(indexedIfcTypes)}.`,
         });
       });
@@ -2254,7 +2271,7 @@ export function ViewerShell() {
     deferredClauses.length,
     metadata,
     runnableRuleCount,
-    runnableRuleIfcTypes,
+    runnableRuleApplicabilities,
     status.phase,
     stopValidationRequest,
     stopValidationWorker,

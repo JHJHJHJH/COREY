@@ -212,6 +212,7 @@ export function buildViewerDataTableFromSnapshot(
       cells,
       searchText: "",
       ifcType: element.ifcType,
+      subtype: element.subtype,
     };
     row.searchText = buildSearchText(columnMap, cells);
     rows.push(row);

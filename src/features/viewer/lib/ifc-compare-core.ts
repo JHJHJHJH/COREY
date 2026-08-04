@@ -18,7 +18,9 @@ import {
 import {
   buildViewerValidationTargetId,
   compileViewerValidationRules,
-  normalizeIfcType,
+  resolveCompiledRulesForElement,
+  resolveIfcSubtype,
+  type CompiledViewerValidationRuleCache,
 } from "@/features/rules/lib/validation";
 
 /**
@@ -41,6 +43,8 @@ export type IfcElementSnapshot = {
   globalId: string;
   expressId: number;
   ifcType: string;
+  /** Predefined type as validation rules match it — see `resolveIfcSubtype`. */
+  subtype: string | null;
   name: string | null;
   attributes: Record<string, IfcSnapshotValue>;
   properties: Record<string, IfcSnapshotValue>;
@@ -238,6 +242,59 @@ function collectPropertySetValues(
   return propertiesByElement;
 }
 
+/**
+ * PredefinedType inherited from an element's type object, mirroring the `IsTypedBy` ->
+ * `RelatingType` fallback the client uses in `resolvePredefinedType`. Without this the compare path
+ * would disagree with the viewer on subtype rule applicability for models that only declare the
+ * predefined type on the type object.
+ */
+function collectTypeObjectPredefinedTypes(
+  api: IfcApiInstance,
+  modelId: number,
+): Map<number, string> {
+  const predefinedTypeByElement = new Map<number, string>();
+  const relCode = api.GetTypeCodeFromName("IFCRELDEFINESBYTYPE");
+  if (!relCode) {
+    return predefinedTypeByElement;
+  }
+
+  const relIds = api.GetLineIDsWithType(modelId, relCode);
+  for (let index = 0; index < relIds.size(); index += 1) {
+    const rel = api.GetLine(modelId, relIds.get(index), false, false) as {
+      RelatingType?: unknown;
+      RelatedObjects?: unknown[];
+    } | null;
+    if (!rel || !isHandle(rel.RelatingType)) {
+      continue;
+    }
+
+    const typeLine = api.GetLine(modelId, rel.RelatingType.value, false, false) as {
+      PredefinedType?: unknown;
+      ElementType?: unknown;
+    } | null;
+    if (!typeLine) {
+      continue;
+    }
+
+    // The type object's own ElementType stands in for ObjectType when it declares USERDEFINED.
+    const predefinedType = resolveIfcSubtype(
+      readStringValue(typeLine.PredefinedType),
+      readStringValue(typeLine.ElementType),
+    );
+    if (!predefinedType) {
+      continue;
+    }
+
+    for (const related of Array.isArray(rel.RelatedObjects) ? rel.RelatedObjects : []) {
+      if (isHandle(related)) {
+        predefinedTypeByElement.set(related.value, predefinedType);
+      }
+    }
+  }
+
+  return predefinedTypeByElement;
+}
+
 export async function buildIfcElementSnapshots(bytes: Uint8Array): Promise<IfcModelSnapshot> {
   const { IfcAPI } = await loadWebIfc();
   const api = new IfcAPI();
@@ -256,6 +313,7 @@ export async function buildIfcElementSnapshots(bytes: Uint8Array): Promise<IfcMo
     const singleValueCode = api.GetTypeCodeFromName("IFCPROPERTYSINGLEVALUE");
     const productIds = api.GetLineIDsWithType(modelId, productCode, true);
     const propertiesByElement = collectPropertySetValues(api, modelId, singleValueCode);
+    const typePredefinedTypes = collectTypeObjectPredefinedTypes(api, modelId);
     const snapshotsByExpressId = new Map<number, IfcElementSnapshot>();
 
     for (let index = 0; index < productIds.size(); index += 1) {
@@ -279,10 +337,14 @@ export async function buildIfcElementSnapshots(bytes: Uint8Array): Promise<IfcMo
         continue;
       }
 
+      const objectType = readStringValue(line.ObjectType);
       const snapshot: IfcElementSnapshot = {
         globalId,
         expressId,
         ifcType: api.GetNameFromTypeCode(api.GetLineType(modelId, expressId)),
+        subtype:
+          resolveIfcSubtype(readStringValue(line.PredefinedType), objectType) ??
+          resolveIfcSubtype(typePredefinedTypes.get(expressId) ?? null, objectType),
         name: readStringValue(line.Name),
         attributes: readElementAttributes(line),
         properties: propertiesByElement.get(expressId) ?? {},
@@ -504,10 +566,16 @@ export function buildSnapshotValidationRows(
   modelId: string,
 ): ViewerValidationRow[] {
   const compiledRules = compileViewerValidationRules(clauses);
+  const ruleCache: CompiledViewerValidationRuleCache = new Map();
   const rows: ViewerValidationRow[] = [];
 
   for (const element of snapshot.elements.values()) {
-    const rulesForType = compiledRules.get(normalizeIfcType(element.ifcType));
+    const rulesForType = resolveCompiledRulesForElement(
+      compiledRules,
+      element.ifcType,
+      element.subtype,
+      ruleCache,
+    );
     if (!rulesForType || rulesForType.size === 0) {
       continue;
     }
@@ -536,6 +604,7 @@ export function buildSnapshotValidationRows(
       modelId,
       localId: element.expressId,
       ifcType: element.ifcType,
+      subtype: element.subtype,
       values,
     });
   }

@@ -62,7 +62,20 @@ type CompiledViewerValidationRule = {
   rule: ViewerValidationRule;
 };
 
-type CompiledViewerValidationRuleMap = Map<string, Map<string, CompiledViewerValidationRule[]>>;
+type CompiledViewerValidationTargetMap = Map<string, CompiledViewerValidationRule[]>;
+
+/**
+ * Keyed by applicability (`buildViewerValidationApplicabilityKey`) rather than by IFC type alone,
+ * so rules scoped to a predefined subtype sit in their own bucket. Use
+ * `resolveCompiledRulesForElement` to look rules up: an element is served by both its subtype
+ * bucket and the `any subtype` bucket for its IFC type.
+ */
+type CompiledViewerValidationRuleMap = Map<string, CompiledViewerValidationTargetMap>;
+
+export type CompiledViewerValidationRuleCache = Map<
+  string,
+  CompiledViewerValidationTargetMap | null
+>;
 
 function createValidationId(prefix: "rule" | "clause") {
   return (
@@ -225,6 +238,7 @@ function sanitizeValidationRow(row: unknown): ViewerValidationRow {
     modelId: row.modelId,
     localId: row.localId,
     ifcType: typeof row.ifcType === "string" && row.ifcType.trim().length > 0 ? row.ifcType : null,
+    subtype: typeof row.subtype === "string" && row.subtype.trim().length > 0 ? row.subtype : null,
     values,
   };
 }
@@ -298,11 +312,22 @@ function compareValidationResult(left: ViewerValidationResult, right: ViewerVali
   return VALIDATION_RESULT_PRIORITY[left] - VALIDATION_RESULT_PRIORITY[right];
 }
 
-function getInspectionIfcType(inspection: ViewerElementInspection) {
+function readInspectionAttributeText(inspection: ViewerElementInspection, name: string) {
   const row = inspection.summaryRows.find(
-    (entry) => entry.target?.kind === "attribute" && normalizeToken(entry.target.name) === "type",
+    (entry) => entry.target?.kind === "attribute" && normalizeToken(entry.target.name) === name,
   );
   return row?.value.state === "present" ? row.value.text : null;
+}
+
+function getInspectionIfcType(inspection: ViewerElementInspection) {
+  return readInspectionAttributeText(inspection, "type");
+}
+
+function getInspectionSubtype(inspection: ViewerElementInspection) {
+  return resolveIfcSubtype(
+    readInspectionAttributeText(inspection, "predefinedtype"),
+    readInspectionAttributeText(inspection, "objecttype"),
+  );
 }
 
 function sanitizeTarget(target: unknown): ViewerValidationTarget {
@@ -377,12 +402,15 @@ function sanitizeRule(rule: unknown): ViewerValidationRule {
   }
 
   const ifcType = normalizeStoredText(String(rule.ifcType ?? ""));
+  const subtype = normalizeStoredText(String(rule.subtype ?? ""));
   const failSeverity =
     rule.failSeverity === "warn" || rule.failSeverity === "error" ? rule.failSeverity : "error";
 
   return {
     id: typeof rule.id === "string" && rule.id.trim().length > 0 ? rule.id : createRuleId(),
     ifcType,
+    // Omitted when blank so rules authored without a subtype serialize exactly as before.
+    ...(subtype ? { subtype } : {}),
     target: sanitizeTarget(rule.target),
     check: sanitizeCheck(rule.check),
     failSeverity,
@@ -447,6 +475,7 @@ function normalizeValidationAttributeName(value: string) {
 
 function findRulesForTarget(
   ifcType: string | null,
+  subtype: string | null,
   target: ViewerValidationTarget | null,
   compiledRules: CompiledViewerValidationRuleMap,
 ) {
@@ -454,12 +483,12 @@ function findRulesForTarget(
     return null;
   }
 
-  const rulesForType = compiledRules.get(normalizeIfcType(ifcType));
-  if (!rulesForType) {
+  const rulesForElement = resolveCompiledRulesForElement(compiledRules, ifcType, subtype);
+  if (!rulesForElement) {
     return null;
   }
 
-  return rulesForType.get(buildViewerValidationTargetId(target)) ?? null;
+  return rulesForElement.get(buildViewerValidationTargetId(target)) ?? null;
 }
 
 function evaluateRuleAgainstValue(
@@ -658,12 +687,13 @@ function appendMissingValidationPropertyRows(
   propertySets: ViewerInspectionGroup[],
   compiledRules: CompiledViewerValidationRuleMap,
   ifcType: string | null,
+  subtype: string | null,
 ) {
   if (!ifcType) {
     return propertySets;
   }
 
-  const rulesForType = compiledRules.get(normalizeIfcType(ifcType));
+  const rulesForType = resolveCompiledRulesForElement(compiledRules, ifcType, subtype);
   if (!rulesForType) {
     return propertySets;
   }
@@ -736,10 +766,11 @@ function applyValidationToInspectionRows(
   rows: ViewerInspectionRow[],
   compiledRules: CompiledViewerValidationRuleMap,
   ifcType: string | null,
+  subtype: string | null,
   matches: ViewerValidationMatch[],
 ) {
   return rows.map((row) => {
-    const rules = findRulesForTarget(ifcType, row.target, compiledRules);
+    const rules = findRulesForTarget(ifcType, subtype, row.target, compiledRules);
     if (!rules || rules.length === 0) {
       return {
         ...row,
@@ -884,6 +915,87 @@ export function normalizeIfcType(value: string) {
   return normalizeToken(value);
 }
 
+function normalizeIfcSubtype(value: string | null | undefined) {
+  return normalizeToken(value ?? "");
+}
+
+/**
+ * The subtype a rule's `subtype` filter is matched against. IFC puts the real subtype name in
+ * `ObjectType` whenever `PredefinedType` is `USERDEFINED`, which is how IFC-SG models carry
+ * project-specific types, so both pipelines resolve it the same way here.
+ */
+export function resolveIfcSubtype(
+  predefinedType: string | null | undefined,
+  objectType: string | null | undefined,
+): string | null {
+  const predefined = normalizeStoredText(predefinedType ?? "");
+  if (predefined && normalizeToken(predefined) !== "userdefined") {
+    return predefined;
+  }
+
+  return normalizeStoredText(objectType ?? "") || predefined || null;
+}
+
+/**
+ * Sole owner of the compiled-rule bucket key format. An empty subtype is the `any subtype` bucket,
+ * which is what every rule authored before subtypes existed lands in.
+ */
+export function buildViewerValidationApplicabilityKey(
+  ifcType: string | null | undefined,
+  subtype: string | null | undefined,
+) {
+  return `${normalizeIfcType(ifcType ?? "")}::${normalizeIfcSubtype(subtype)}`;
+}
+
+/**
+ * Rules that apply to an element, ANDing the IFC type with the predefined subtype: the element gets
+ * the rules written for its exact subtype plus those written for any subtype of the same IFC type.
+ *
+ * Models routinely carry 100k+ elements, so the common shapes avoid allocating — a merged map is
+ * built only when both buckets are populated, and `cache` (keyed by applicability) lets per-element
+ * loops skip the merge entirely after the first element of each type/subtype pair.
+ */
+export function resolveCompiledRulesForElement(
+  compiled: CompiledViewerValidationRuleMap,
+  ifcType: string | null | undefined,
+  subtype: string | null | undefined,
+  cache?: CompiledViewerValidationRuleCache,
+): CompiledViewerValidationTargetMap | null {
+  const normalizedIfcType = normalizeIfcType(ifcType ?? "");
+  if (!normalizedIfcType) {
+    return null;
+  }
+
+  const normalizedSubtype = normalizeIfcSubtype(subtype);
+  const cacheKey = `${normalizedIfcType}::${normalizedSubtype}`;
+  const cached = cache?.get(cacheKey);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const anySubtypeRules = compiled.get(buildViewerValidationApplicabilityKey(normalizedIfcType, ""));
+  const subtypeRules = normalizedSubtype
+    ? compiled.get(buildViewerValidationApplicabilityKey(normalizedIfcType, normalizedSubtype))
+    : undefined;
+
+  let resolved: CompiledViewerValidationTargetMap | null;
+  if (!subtypeRules || subtypeRules.size === 0) {
+    resolved = anySubtypeRules ?? null;
+  } else if (!anySubtypeRules || anySubtypeRules.size === 0) {
+    resolved = subtypeRules;
+  } else {
+    resolved = new Map(anySubtypeRules);
+    for (const [targetId, rules] of subtypeRules.entries()) {
+      const existing = resolved.get(targetId);
+      resolved.set(targetId, existing ? [...existing, ...rules] : rules);
+    }
+  }
+
+  cache?.set(cacheKey, resolved);
+
+  return resolved;
+}
+
 export function buildViewerValidationTargetId(target: ViewerValidationTarget) {
   if (target.kind === "attribute") {
     return `attribute:${normalizeValidationAttributeName(target.name)}`;
@@ -892,8 +1004,10 @@ export function buildViewerValidationTargetId(target: ViewerValidationTarget) {
   return `property:${normalizeToken(target.group)}::${normalizeToken(target.label)}`;
 }
 
-export function buildViewerValidationRuleKey(rule: Pick<ViewerValidationRule, "ifcType" | "target">) {
-  return `${normalizeIfcType(rule.ifcType)}::${buildViewerValidationTargetId(rule.target)}`;
+export function buildViewerValidationRuleKey(
+  rule: Pick<ViewerValidationRule, "ifcType" | "subtype" | "target">,
+) {
+  return `${buildViewerValidationApplicabilityKey(rule.ifcType, rule.subtype)}::${buildViewerValidationTargetId(rule.target)}`;
 }
 
 export function describeViewerValidationRule(rule: ViewerValidationRule) {
@@ -1064,10 +1178,11 @@ export function compileViewerValidationRules(clauses: ViewerValidationClause[]) 
 
   for (const clause of clauses.map((entry) => sanitizeClause(entry))) {
     for (const rule of clause.rules.filter(isRunnableRule)) {
-      const normalizedIfcType = normalizeIfcType(rule.ifcType);
+      const applicabilityKey = buildViewerValidationApplicabilityKey(rule.ifcType, rule.subtype);
       const targetId = buildViewerValidationTargetId(rule.target);
-      const rulesForType = compiled.get(normalizedIfcType) ?? new Map<string, CompiledViewerValidationRule[]>();
-      const compiledRulesForTarget = rulesForType.get(targetId) ?? [];
+      const rulesForApplicability =
+        compiled.get(applicabilityKey) ?? new Map<string, CompiledViewerValidationRule[]>();
+      const compiledRulesForTarget = rulesForApplicability.get(targetId) ?? [];
 
       compiledRulesForTarget.push({
         clauseId: clause.id,
@@ -1076,8 +1191,8 @@ export function compileViewerValidationRules(clauses: ViewerValidationClause[]) 
         rule,
       });
 
-      rulesForType.set(targetId, compiledRulesForTarget);
-      compiled.set(normalizedIfcType, rulesForType);
+      rulesForApplicability.set(targetId, compiledRulesForTarget);
+      compiled.set(applicabilityKey, rulesForApplicability);
     }
   }
 
@@ -1092,12 +1207,19 @@ export function buildViewerValidationRows(
   const targetKeyToColumnKey = buildRowTargetKeyToColumnKey(data);
   const rows: ViewerValidationRow[] = [];
 
+  const ruleCache: CompiledViewerValidationRuleCache = new Map();
+
   for (const row of data.rows) {
     if (!row.ifcType) {
       continue;
     }
 
-    const rulesForType = compiledRules.get(normalizeIfcType(row.ifcType));
+    const rulesForType = resolveCompiledRulesForElement(
+      compiledRules,
+      row.ifcType,
+      row.subtype,
+      ruleCache,
+    );
     if (!rulesForType || rulesForType.size === 0) {
       continue;
     }
@@ -1111,6 +1233,7 @@ export function buildViewerValidationRows(
       modelId: row.modelId,
       localId: row.localId,
       ifcType: row.ifcType,
+      subtype: row.subtype,
       values,
     });
   }
@@ -1131,6 +1254,7 @@ export async function evaluateViewerValidationPayload(
   const allRuleFailures: ViewerValidationRuleFailure[] = [];
   const totalRowCount = payload.rows.length;
   const chunkSize = Math.max(1, options?.chunkSize ?? DEFAULT_VALIDATION_CHUNK_SIZE);
+  const ruleCache: CompiledViewerValidationRuleCache = new Map();
 
   for (let index = 0; index < payload.rows.length; index += chunkSize) {
     if (options?.signal?.aborted) {
@@ -1139,12 +1263,16 @@ export async function evaluateViewerValidationPayload(
 
     const chunk = payload.rows.slice(index, index + chunkSize);
     for (const row of chunk) {
-      const ifcType = row.ifcType ? normalizeIfcType(row.ifcType) : null;
-      if (!ifcType) {
+      if (!row.ifcType) {
         continue;
       }
 
-      const rulesForType = compiledRules.get(ifcType);
+      const rulesForType = resolveCompiledRulesForElement(
+        compiledRules,
+        row.ifcType,
+        row.subtype,
+        ruleCache,
+      );
       if (!rulesForType) {
         continue;
       }
@@ -1224,20 +1352,29 @@ export function applyViewerValidationToInspection(
 
   const compiledRules = compileViewerValidationRules(clauses);
   const inspectionIfcType = getInspectionIfcType(inspection);
+  const inspectionSubtype = getInspectionSubtype(inspection);
   const matches: ViewerValidationMatch[] = [];
   const summaryRows = applyValidationToInspectionRows(
     inspection.summaryRows,
     compiledRules,
     inspectionIfcType,
+    inspectionSubtype,
     matches,
   );
   const propertySetsWithMissingRows = appendMissingValidationPropertyRows(
     inspection.propertySets,
     compiledRules,
     inspectionIfcType,
+    inspectionSubtype,
   );
   const propertySets: ViewerInspectionGroup[] = propertySetsWithMissingRows.map((group) => {
-    const rows = applyValidationToInspectionRows(group.rows, compiledRules, inspectionIfcType, matches);
+    const rows = applyValidationToInspectionRows(
+      group.rows,
+      compiledRules,
+      inspectionIfcType,
+      inspectionSubtype,
+      matches,
+    );
 
     return {
       ...group,

@@ -69,6 +69,7 @@ it, and how serious a failed check is.
 |---|---|---|
 | `id` | string | Stable identifier for the rule. |
 | `ifcType` | string | IFC entity name, such as `IfcWall` or `IfcBeam`. Matching is case-insensitive. |
+| `subtype` | string (optional) | Predefined type, ANDed with `ifcType` — such as `FLOOR` for `IfcSlab`. Matching is case-insensitive. Omit or leave blank to apply the rule to every element of `ifcType`. |
 | `target` | object | The attribute or property to inspect. |
 | `check` | object | The requirement to apply. |
 | `failSeverity` | `error` or `warn` | Result severity when the rule fails. |

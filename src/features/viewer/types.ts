@@ -51,6 +51,11 @@ export type ViewerValidationCheck =
 export interface ViewerValidationRule {
   id: string;
   ifcType: string;
+  /**
+   * Optional predefined-type filter, ANDed with `ifcType`. Blank or absent means the rule applies
+   * to every element of `ifcType`. A subtype mismatch makes the rule inapplicable, never a failure.
+   */
+  subtype?: string;
   target: ViewerValidationTarget;
   check: ViewerValidationCheck;
   failSeverity: ViewerValidationFailureSeverity;
@@ -123,6 +128,7 @@ export interface ViewerValidationRow {
   modelId: string;
   localId: number;
   ifcType: string | null;
+  subtype: string | null;
   values: Record<string, ViewerValidationValue>;
 }
 
@@ -406,6 +412,7 @@ export interface ViewerDataTableRow {
   cells: Record<string, ViewerDataTableCell>;
   searchText: string;
   ifcType: string | null;
+  subtype: string | null;
 }
 
 export interface ViewerDataTableData {
