@@ -93,3 +93,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:' + (process.env.COREY_MCP_PORT || 4001) + '/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
 CMD ["node", "dist/mcp/corey-mcp.cjs"]
+
+# GitHub-connected platforms build the final stage when no target is specified.
+# Keep the COREY web app as that default while retaining mcp-runner as an
+# explicit target for the companion image.
+FROM runner AS production
