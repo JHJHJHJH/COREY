@@ -26650,7 +26650,7 @@ class FaceUtils {
     const xDim = 0;
     const yDim = 1;
     const zDim = 2;
-    const isMostlyHorizontal = absZ > absX && absZ > absY;
+    const isMostlyHorizontal = absZ >= absX && absZ >= absY;
     if (isMostlyHorizontal) {
       const lookingUp = normal.z > 0;
       if (lookingUp) {
@@ -26658,7 +26658,7 @@ class FaceUtils {
       }
       return [yDim, xDim];
     }
-    const isMostlyLookingToY = absY > absX && absY > absZ;
+    const isMostlyLookingToY = absY >= absX && absY >= absZ;
     if (isMostlyLookingToY) {
       const isLookingYPositive = normal.y > 0;
       if (isLookingYPositive) {
@@ -30179,9 +30179,187 @@ class RaycastController {
     if (!lookup) {
       return [];
     }
-    const itemIds = lookup.collideFrustum(planes, frustum, fullyInside);
-    const raycastedItemIds = this.filterVisible(itemIds);
+    const itemIds = lookup.collideFrustum(planes, frustum, false);
+    let raycastedItemIds = this.filterVisible(itemIds);
+    if (raycastedItemIds.length) {
+      raycastedItemIds = this.narrowPhaseFrustum(
+        raycastedItemIds,
+        frustum,
+        planes,
+        fullyInside
+      );
+    }
     return this.localIdsFromItemIds(raycastedItemIds);
+  }
+  // Filters broad-phase sample candidates by testing their real geometry
+  // against the selection frustum (+ clipping planes). Mirrors the section/clip
+  // generator: builds a transient BVH per representation (cached for this call)
+  // and shapecasts it; the frustum is moved into each sample's local space so
+  // instanced items that share one local geometry are handled by transform.
+  // fullyInside === true keeps only items whose geometry is entirely inside;
+  // false keeps items whose geometry touches the selection.
+  narrowPhaseFrustum(sampleIds, frustum, clipPlanes, fullyInside) {
+    var _a2;
+    const worldPlanes = clipPlanes && clipPlanes.length ? [...frustum.planes, ...clipPlanes] : frustum.planes;
+    const geomCache = /* @__PURE__ */ new Map();
+    const result = [];
+    const start = performance.now();
+    let exceeded = false;
+    for (const sampleId of sampleIds) {
+      if (exceeded) {
+        result.push(sampleId);
+        continue;
+      }
+      const box = this._boxes.get(sampleId);
+      if (CameraUtils.isIncluded(box, worldPlanes)) {
+        result.push(sampleId);
+        continue;
+      }
+      if (this.sampleMatchesFrustum(
+        sampleId,
+        frustum,
+        clipPlanes,
+        fullyInside,
+        geomCache
+      )) {
+        result.push(sampleId);
+      }
+      exceeded = this.isTimeExceeded(start);
+    }
+    for (const [, geometries] of geomCache) {
+      for (const geometry of geometries) {
+        (_a2 = geometry.disposeBoundsTree) == null ? void 0 : _a2.call(geometry);
+        geometry.dispose();
+      }
+    }
+    return result;
+  }
+  sampleMatchesFrustum(sampleId, frustum, clipPlanes, fullyInside, geomCache) {
+    const sample = this._meshes.samples(sampleId, this._temp.sample);
+    if (!sample)
+      return !fullyInside;
+    const reprId = sample.representation();
+    TransformHelper.get(this._temp.sample, this._meshes, this._temp.m1);
+    this._temp.m2.copy(this._temp.m1).invert();
+    let geometries = geomCache.get(reprId);
+    if (!geometries) {
+      geometries = this.buildSampleGeometries(sampleId);
+      geomCache.set(reprId, geometries);
+    }
+    if (geometries.length === 0)
+      return !fullyInside;
+    const localPlanes = this.toLocalPlanes(frustum, clipPlanes, this._temp.m2);
+    if (fullyInside) {
+      for (const geometry of geometries) {
+        if (!this.geometryFullyInside(geometry, localPlanes)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    for (const geometry of geometries) {
+      if (this.geometryIntersectsPlanes(geometry, localPlanes)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  // True only if every vertex of the geometry is inside every plane.
+  geometryFullyInside(geometry, planes) {
+    const position = geometry.getAttribute("position");
+    const array = position.array;
+    const vertex = this._temp.v1;
+    for (let i = 0; i < array.length; i += 3) {
+      vertex.set(array[i], array[i + 1], array[i + 2]);
+      for (const plane of planes) {
+        if (plane.distanceToPoint(vertex) < 0) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+  buildSampleGeometries(sampleId) {
+    const geometries = [];
+    const sampleGeom = this._tiles.fetchSample(sampleId, CurrentLod.GEOMETRY);
+    MiscHelper.forEach(sampleGeom.geometries, (geometryData) => {
+      if (!geometryData.indexBuffer || !geometryData.positionBuffer) {
+        return;
+      }
+      const geometry = new BufferGeometry();
+      geometry.setIndex(Array.from(geometryData.indexBuffer));
+      geometry.setAttribute(
+        "position",
+        new BufferAttribute(geometryData.positionBuffer, 3)
+      );
+      geometry.computeBoundsTree();
+      geometries.push(geometry);
+    });
+    return geometries;
+  }
+  toLocalPlanes(frustum, clipPlanes, toLocal) {
+    const local = [];
+    this.pushLocalPlanes(frustum.planes, toLocal, local);
+    if (clipPlanes) {
+      this.pushLocalPlanes(clipPlanes, toLocal, local);
+    }
+    return local;
+  }
+  pushLocalPlanes(planes, toLocal, out) {
+    for (const plane of planes) {
+      if (!Number.isFinite(plane.constant)) {
+        continue;
+      }
+      out.push(new Plane().copy(plane).applyMatrix4(toLocal));
+    }
+  }
+  geometryIntersectsPlanes(geometry, planes) {
+    let hit = false;
+    geometry.boundsTree.shapecast({
+      intersectsBounds: (box) => CameraUtils.collides(box, planes),
+      intersectsTriangle: (tri) => {
+        if (this.triangleIntersectsFrustum(tri, planes)) {
+          hit = true;
+          return true;
+        }
+        return false;
+      }
+    });
+    return hit;
+  }
+  // Exact triangle-vs-frustum test by clipping. The frustum is the intersection
+  // of its plane half-spaces, so clipping the triangle polygon against every
+  // plane (Sutherland-Hodgman) yields exactly triangle ∩ frustum. Non-empty
+  // result means they really intersect. This avoids the false positives a
+  // "not fully outside any single plane" test gives on large triangles.
+  triangleIntersectsFrustum(tri, planes) {
+    let poly = [tri.a, tri.b, tri.c];
+    for (const plane of planes) {
+      poly = this.clipPolygonByPlane(poly, plane);
+      if (poly.length === 0) {
+        return false;
+      }
+    }
+    return poly.length > 0;
+  }
+  // Clips a convex polygon to the inside (distance >= 0) half-space of a plane.
+  clipPolygonByPlane(poly, plane) {
+    const out = [];
+    const count = poly.length;
+    for (let i = 0; i < count; i++) {
+      const current = poly[i];
+      const next = poly[(i + 1) % count];
+      const dCurrent = plane.distanceToPoint(current);
+      const dNext = plane.distanceToPoint(next);
+      if (dCurrent >= 0) {
+        out.push(current);
+      }
+      if (dCurrent >= 0 !== dNext >= 0) {
+        const t = dCurrent / (dCurrent - dNext);
+        out.push(new Vector3().lerpVectors(current, next, t));
+      }
+    }
+    return out;
   }
   snapCastEdges(data, snaps) {
     const results = [];
@@ -30375,16 +30553,19 @@ class RaycastController {
       if ("facePoints" in result) {
         const sample = this._meshes.samples(id, this._temp.sample);
         TransformHelper.get(sample, this._meshes, this._temp.m3);
-        for (let i = 0; i < result.facePoints.length; i += 3) {
-          const x = result.facePoints[i];
-          const y = result.facePoints[i + 1];
-          const z = result.facePoints[i + 2];
+        const sourceFacePoints = result.facePoints;
+        const transformedFacePoints = new Float64Array(sourceFacePoints.length);
+        for (let i = 0; i < sourceFacePoints.length; i += 3) {
+          const x = sourceFacePoints[i];
+          const y = sourceFacePoints[i + 1];
+          const z = sourceFacePoints[i + 2];
           this._temp.v1.set(x, y, z);
           this._temp.v1.applyMatrix4(this._temp.m3);
-          result.facePoints[i] = this._temp.v1.x;
-          result.facePoints[i + 1] = this._temp.v1.y;
-          result.facePoints[i + 2] = this._temp.v1.z;
+          transformedFacePoints[i] = this._temp.v1.x;
+          transformedFacePoints[i + 1] = this._temp.v1.y;
+          transformedFacePoints[i + 2] = this._temp.v1.z;
         }
+        result.facePoints = transformedFacePoints;
       }
       result.sampleId = id;
       result.itemId = this._temp.sample.item();
@@ -34525,6 +34706,96 @@ function edit(model, requests, config) {
       continue;
     }
     if (request.type === EditRequestType.CREATE_INDEX || request.type === EditRequestType.UPDATE_INDEX) {
+      const { keys, values, end, start } = request.data;
+      const validateNumbers = (items, key) => {
+        if (!items || items.length === 0 || typeof items[0] !== "number") {
+          return;
+        }
+        const numberErrors = [];
+        for (let index = 0; index < items.length; index++) {
+          const value = items[index];
+          if (!Number.isInteger(value) || value < 0 || value > 4294967295) {
+            numberErrors.push({ index, value });
+          }
+        }
+        if (numberErrors.length) {
+          throw new Error(
+            `Invalid index request: ${key} must be non-negative 32-bit integers`,
+            {
+              cause: {
+                type: "invalid-number",
+                key,
+                errors: numberErrors
+              }
+            }
+          );
+        }
+      };
+      validateNumbers(keys, "keys");
+      validateNumbers(values, "values");
+      if (values && !end) {
+        if (values.length !== keys.length) {
+          throw new Error(
+            "Invalid index request: unexpected values vector length",
+            {
+              cause: {
+                type: "invalid-length",
+                key: "values",
+                expected: keys.length,
+                actual: values.length
+              }
+            }
+          );
+        }
+      }
+      if (values && end) {
+        if (end.length !== keys.length) {
+          throw new Error(
+            "Invalid index request: unexpected end vector length",
+            {
+              cause: {
+                type: "invalid-length",
+                key: "end",
+                expected: keys.length,
+                actual: end.length
+              }
+            }
+          );
+        }
+        if (start && start.length !== keys.length) {
+          throw new Error(
+            "Invalid index request: unexpected start vector length",
+            {
+              cause: {
+                type: "invalid-length",
+                key: "start",
+                expected: keys.length,
+                actual: start.length
+              }
+            }
+          );
+        }
+        const errors = [];
+        for (let index = 0; index < keys.length; index++) {
+          const valuesStart = (start == null ? void 0 : start[index]) ?? end[index - 1] ?? 0;
+          const valuesEnd = end[index];
+          if (valuesStart < 0 || valuesEnd > values.length || valuesStart > valuesEnd) {
+            errors.push({
+              index,
+              start: valuesStart,
+              end: valuesEnd
+            });
+          }
+        }
+        if (errors.length) {
+          throw new Error("Invalid index request: out of bounds value slices", {
+            cause: {
+              type: "invalid-bounds",
+              errors
+            }
+          });
+        }
+      }
       indexesToUpsert.set(request.data.name, request.data);
       indexesToDelete.delete(request.data.name);
       continue;
@@ -35232,7 +35503,6 @@ function edit(model, requests, config) {
     }
     categoriesOffsets.push(builder.createSharedString(attributes.category));
     if (attributes.guid) {
-      console.log(attributes.guid);
       guidsOffsets.push(builder.createSharedString(attributes.guid));
       guidsItems.push(currentId);
     }
@@ -36044,19 +36314,16 @@ function applyChangesToIds(actions, ids, key, addCreatedElements) {
   const resultSet = new Set(ids);
   const deleteType = EditRequestType[`DELETE_${key}`];
   const createType = EditRequestType[`CREATE_${key}`];
-  if (actions) {
-    for (const action of actions) {
-      if (action.type === deleteType) {
-        resultSet.delete(action.localId);
-        continue;
-      }
-      if (addCreatedElements && action.type === createType) {
-        resultSet.add(action.localId);
-      }
+  for (const action of actions) {
+    if (action.type === deleteType) {
+      resultSet.delete(action.localId);
+      continue;
     }
-    return Array.from(resultSet);
+    if (addCreatedElements && action.type === createType) {
+      resultSet.add(action.localId);
+    }
   }
-  return ids;
+  return Array.from(resultSet);
 }
 class EditUtils {
 }
@@ -78488,6 +78755,53 @@ if (typeof document !== "undefined") {
       currentScriptData.src.lastIndexOf("/") + 1
     );
 }
+const crCharCode = 13;
+const nl = "\n";
+class IfcDecoderStream extends TransformStream {
+  constructor(encoding = "utf-8") {
+    let tail = "";
+    const decoder = new TextDecoder(encoding);
+    super({
+      transform(chunk, controller) {
+        const text = decoder.decode(chunk, { stream: true });
+        if (!text)
+          return;
+        let start = 0;
+        let idx = text.indexOf(nl);
+        if (idx !== -1) {
+          let end = idx;
+          if (end > 0 && text.charCodeAt(end - 1) === crCharCode)
+            end--;
+          controller.enqueue(
+            tail ? tail + text.substring(start, end) : text.substring(start, end)
+          );
+          tail = "";
+          start = idx + 1;
+          idx = text.indexOf(nl, start);
+        } else {
+          tail += text;
+          return;
+        }
+        while (idx !== -1) {
+          let end = idx;
+          if (end > start && text.charCodeAt(end - 1) === crCharCode)
+            end--;
+          controller.enqueue(text.substring(start, end));
+          start = idx + 1;
+          idx = text.indexOf(nl, start);
+        }
+        if (start < text.length)
+          tail = text.substring(start);
+      },
+      flush(controller) {
+        const remaining = decoder.decode();
+        const full = tail + remaining;
+        if (full)
+          controller.enqueue(full);
+      }
+    });
+  }
+}
 class VirtualPropertiesController {
   constructor(virtualModel, boxes, config) {
     __publicField(this, "_model");
@@ -78503,6 +78817,13 @@ class VirtualPropertiesController {
     __publicField(this, "_spatialStructure", null);
     __publicField(this, "_virtualModel");
     __publicField(this, "_relations", /* @__PURE__ */ new Map());
+    // Memoized localId → array index lookups. The flatbuffer accessors return
+    // a fresh TypedArray view on every call, so the caches are keyed by the
+    // underlying buffer and length instead of array identity. Without these,
+    // every getItemAttributes/getItemRelations call does a linear indexOf scan,
+    // which makes bulk reads (e.g. getItemsData over all psets) O(n²).
+    __publicField(this, "_localIdIndexCache", null);
+    __publicField(this, "_relationsItemIndexCache", null);
     this._virtualModel = virtualModel;
     this._model = virtualModel.data;
     this._boxes = boxes;
@@ -78549,6 +78870,34 @@ class VirtualPropertiesController {
         itemInfo.guid = guid;
       }
     }
+  }
+  indexOfLocalId(localId) {
+    const arr = this._model.localIdsArray();
+    if (!arr)
+      return void 0;
+    let cache = this._localIdIndexCache;
+    if (!cache || cache.length !== arr.length || cache.buffer !== arr.buffer) {
+      const map = /* @__PURE__ */ new Map();
+      for (let i = 0; i < arr.length; i++)
+        map.set(arr[i], i);
+      cache = { buffer: arr.buffer, length: arr.length, map };
+      this._localIdIndexCache = cache;
+    }
+    return cache.map.get(localId) ?? -1;
+  }
+  indexOfRelationsItem(localId) {
+    const arr = this._model.relationsItemsArray();
+    if (!arr)
+      return void 0;
+    let cache = this._relationsItemIndexCache;
+    if (!cache || cache.length !== arr.length || cache.buffer !== arr.buffer) {
+      const map = /* @__PURE__ */ new Map();
+      for (let i = 0; i < arr.length; i++)
+        map.set(arr[i], i);
+      cache = { buffer: arr.buffer, length: arr.length, map };
+      this._relationsItemIndexCache = cache;
+    }
+    return cache.map.get(localId) ?? -1;
   }
   getAllLocalIds() {
     return this._model.localIdsArray() ?? [];
@@ -78600,7 +78949,14 @@ class VirtualPropertiesController {
   }
   getItemIdsFromLocalIds(localIds) {
     if (!localIds) {
-      return Array.from(this._model.meshes().meshesItemsArray());
+      const meshes = this._model.meshes();
+      if (!meshes)
+        return [];
+      const count = meshes.meshesItemsLength();
+      const all = new Array(count);
+      for (let itemId = 0; itemId < count; itemId++)
+        all[itemId] = itemId;
+      return all;
     }
     const itemIds = [];
     for (const localId of localIds) {
@@ -78884,13 +79240,12 @@ class VirtualPropertiesController {
   //   return result;
   // }
   getItemAttributes(id) {
-    var _a2;
     const isLocalId = typeof id === "number";
     const localId = isLocalId ? id : this.getLocalIdsByGuids([id])[0];
     if (localId === null) {
       return null;
     }
-    const index = (_a2 = this._model.localIdsArray()) == null ? void 0 : _a2.indexOf(localId);
+    const index = this.indexOfLocalId(localId);
     if (index === void 0 || index === -1) {
       const data2 = {};
       for (let i = this._virtualModel.requests.length - 1; i >= 0; i--) {
@@ -79059,7 +79414,6 @@ class VirtualPropertiesController {
     return result;
   }
   getItemRelations(id) {
-    var _a2;
     const isLocalId = typeof id === "number";
     const localId = isLocalId ? id : this.getLocalIdsByGuids([id])[0];
     for (let i = this._virtualModel.requests.length - 1; i >= 0; i--) {
@@ -79074,7 +79428,7 @@ class VirtualPropertiesController {
       return null;
     }
     const relations = this._relations.get(localId) ?? {};
-    const index = (_a2 = this._model.relationsItemsArray()) == null ? void 0 : _a2.indexOf(localId);
+    const index = this.indexOfRelationsItem(localId);
     if (index === void 0 || index === -1) {
       return Object.keys(relations).length > 0 ? relations : null;
     }
@@ -79217,12 +79571,13 @@ class VirtualPropertiesController {
     const allAttributesLength = this._model.attributesLength();
     const res = [];
     const missingItemsToIterate = new Set(itemIds);
+    const itemIdSet = (itemIds == null ? void 0 : itemIds.length) ? new Set(itemIds) : null;
     for (let i = 0; i < allAttributesLength; i++) {
       const localId = this._model.localIds(i);
       if (localId === null)
         continue;
       missingItemsToIterate.delete(localId);
-      if ((itemIds == null ? void 0 : itemIds.length) && !itemIds.includes(localId))
+      if (itemIdSet && !itemIdSet.has(localId))
         continue;
       const attribute = this._model.attributes(i);
       if (!attribute)
@@ -79490,7 +79845,7 @@ class AlignmentsController {
     __publicField(this, "_fragments");
     this._fragments = virtualFragmentsModel;
   }
-  async getAlignments() {
+  getAlignments() {
     const allAlignments = [];
     const alignCat = new RegExp(ALIGNMENT_CATEGORY);
     const allItemsIds = this._fragments.getItemsOfCategories([alignCat]);
@@ -79589,6 +79944,21 @@ class VirtualIndexesController {
     if (!entry)
       return null;
     return entry.info.keyType === "number" ? this.materializeNumberKeys(entry) : this.materializeStringKeys(entry);
+  }
+  getKey(name, index) {
+    const entry = this.resolve(name);
+    if (!entry)
+      return null;
+    return entry.info.keyType === "number" ? this.materializeNumberKeys(entry)[index] ?? null : this.readStringKey(entry.source, index);
+  }
+  getValues(name) {
+    const entry = this.resolve(name);
+    if (!entry)
+      return null;
+    if (entry.info.valueType === "none")
+      return null;
+    const inverse = this.inverseMap(entry);
+    return Array.from(inverse.keys());
   }
   /**
    * Test whether a key exists in the named index without resolving its value.
@@ -80534,6 +80904,30 @@ class VirtualBoxController {
     this.fullBox.union(this._temp.box);
   }
 }
+class GridsController {
+  constructor(virtualFragmentsModel) {
+    __publicField(this, "_fragments");
+    this._fragments = virtualFragmentsModel;
+  }
+  async getGrids() {
+    const allGrids = [];
+    const gridCat = new RegExp(GRID_CATEGORY);
+    const allItemsIds = this._fragments.getItemsOfCategories([gridCat]);
+    const itemsIds = allItemsIds[GRID_CATEGORY];
+    if (!itemsIds) {
+      return [];
+    }
+    const gridsItems = this._fragments.getItemsData(
+      itemsIds,
+      {}
+    );
+    for (const item of gridsItems) {
+      const data = JSON.parse(item.data.value);
+      allGrids.push(data);
+    }
+    return allGrids;
+  }
+}
 class RaycastHelper {
   raycast(model, ray, frustum, returnAll) {
     if (model.view) {
@@ -80965,7 +81359,7 @@ class SectionHelper {
   constructor() {
     __publicField(this, "_sectionGenerator", new SectionGenerator());
   }
-  async getSection(model, plane, indices) {
+  getSection(model, plane, indices) {
     this._sectionGenerator.plane = plane;
     performance.now();
     const visitedGeometries = /* @__PURE__ */ new Map();
@@ -81099,7 +81493,7 @@ class ItemsHelper {
   }
   getItemsByConfig(model, condition) {
     const found = [];
-    const count = model.data.localIdsLength();
+    const count = model.itemConfig.size;
     for (let itemId = 0; itemId < count; itemId++) {
       const conditionPass = condition(itemId);
       if (!conditionPass)
@@ -81119,30 +81513,6 @@ class ItemsHelper {
     for (let id = 0; id < itemsCount; id++) {
       onItem(id, id);
     }
-  }
-}
-class GridsController {
-  constructor(virtualFragmentsModel) {
-    __publicField(this, "_fragments");
-    this._fragments = virtualFragmentsModel;
-  }
-  async getGrids() {
-    const allGrids = [];
-    const gridCat = new RegExp(GRID_CATEGORY);
-    const allItemsIds = this._fragments.getItemsOfCategories([gridCat]);
-    const itemsIds = allItemsIds[GRID_CATEGORY];
-    if (!itemsIds) {
-      return [];
-    }
-    const gridsItems = this._fragments.getItemsData(
-      itemsIds,
-      {}
-    );
-    for (const item of gridsItems) {
-      const data = JSON.parse(item.data.value);
-      allGrids.push(data);
-    }
-    return allGrids;
   }
 }
 class VirtualFragmentsModel {
@@ -81206,6 +81576,12 @@ class VirtualFragmentsModel {
   getIndexKeys(name) {
     return this.indexes.getKeys(name);
   }
+  getIndexKey(name, index) {
+    return this.indexes.getKey(name, index);
+  }
+  getIndexValues(name) {
+    return this.indexes.getValues(name);
+  }
   hasIndexEntry(name, key) {
     return this.indexes.has(name, key);
   }
@@ -81213,7 +81589,10 @@ class VirtualFragmentsModel {
     return this.indexes.getEntry(name, key);
   }
   getInverseIndexEntry(name, value) {
-    return this.indexes.getInverseEntry(name, value);
+    return this.indexes.getInverseEntry(
+      name,
+      value
+    );
   }
   getItemsByConfig(condition) {
     return this._itemsHelper.getItemsByConfig(this, condition);
@@ -81450,14 +81829,14 @@ class VirtualFragmentsModel {
   rectangleRaycast(frustum, fullyIncluded) {
     return this._raycastHelper.rectangleRaycast(this, frustum, fullyIncluded);
   }
-  async getSection(plane, localIds) {
+  getSection(plane, localIds) {
     const indices = this.properties.getItemIdsFromLocalIds(localIds);
     return this._sectionHelper.getSection(this, plane, indices);
   }
-  async getAlignments() {
+  getAlignments() {
     return this._alignments.getAlignments();
   }
-  async getGrids() {
+  getGrids() {
     return this._grids.getGrids();
   }
   getBuffer(raw) {
@@ -81488,10 +81867,10 @@ class VirtualFragmentsModel {
       });
     }
     const { model } = EditUtils.edit(this.data, requests, {
-      raw: true,
+      raw,
       delta: true
     });
-    return raw ? model : pako.deflate(model);
+    return model;
   }
   dispose() {
     this.tiles.dispose();
@@ -81536,14 +81915,14 @@ class VirtualFragmentsModel {
     this.tiles.update(time);
     return this.tiles.tilesUpdated;
   }
-  edit(requests) {
+  edit(requests, raw = true) {
     const ids = EditUtils.solveIds(requests, this._nextId);
     this._nextId += ids.length;
     for (const request of requests) {
       this.requests.push(request);
     }
     const { model, items } = EditUtils.edit(this.data, this.requests, {
-      raw: true,
+      raw,
       delta: true
     });
     this._visibilityHelper.clearHiddenForEdit();
@@ -81555,13 +81934,13 @@ class VirtualFragmentsModel {
     this._requestsForRedo = [];
     this._nextId = this.getMaxLocalId();
   }
-  save() {
+  save(raw = true) {
     this.requests.push({
       type: EditRequestType.UPDATE_MAX_LOCAL_ID,
       localId: this._nextId
     });
     const { model } = EditUtils.edit(this.data, this.requests, {
-      raw: true,
+      raw,
       delta: false
     });
     return model;
@@ -81755,7 +82134,8 @@ class VirtualFragmentsModel {
     return Model.getRootAsModel(byteBuffer);
   }
   setupItemsConfig() {
-    const itemsCount = this.data.localIdsLength();
+    const meshes = this.data.meshes();
+    const itemsCount = meshes ? meshes.meshesItemsLength() : 0;
     return new ItemConfigController(itemsCount);
   }
 }
@@ -81812,6 +82192,7 @@ class ThreadModelCreator extends ThreadController {
       config
     );
     this.thread.list.set(modelId, model);
+    this.thread.controllerManager.updater.start();
     notify("parsing", 1);
     throwIfAborted();
     await model.setupData((progress) => {
@@ -81996,19 +82377,49 @@ class ThreadUpdater {
     __publicField(this, "_thread");
     __publicField(this, "_updateThreshold", 16);
     __publicField(this, "_updateDelay", 128);
-    this._thread = thread2;
-    const updateAll = () => {
+    __publicField(this, "_running", false);
+    __publicField(this, "_timeout", null);
+    __publicField(this, "_tick", () => {
+      this._timeout = null;
+      if (!this._running)
+        return;
+      if (this._thread.list.size === 0) {
+        this._running = false;
+        return;
+      }
       const updated = this.updateAllModels();
       const delay = updated ? this._updateDelay : 0;
-      setTimeout(updateAll, delay);
-    };
-    updateAll();
+      this.schedule(delay);
+    });
+    this._thread = thread2;
+  }
+  // Starts the update loop if it is not already running. Idempotent. Called
+  // when a model is registered so the loop resumes after it stopped itself
+  // while idle. The loop is no longer started at construction time, so merely
+  // importing the library (e.g. for an IFC conversion task) does not spin a
+  // perpetual timer. See #234.
+  start() {
+    if (this._running)
+      return;
+    this._running = true;
+    this.schedule(0);
+  }
+  // Stops the loop and clears any pending timer. Safe to call repeatedly.
+  stop() {
+    this._running = false;
+    if (this._timeout !== null) {
+      clearTimeout(this._timeout);
+      this._timeout = null;
+    }
   }
   setUpdateDelay(delay) {
     if (typeof delay !== "number" || !Number.isFinite(delay) || delay < 0) {
       return;
     }
     this._updateDelay = delay;
+  }
+  schedule(delay) {
+    this._timeout = setTimeout(this._tick, delay);
   }
   updateAllModels() {
     const start = performance.now();
