@@ -6,7 +6,7 @@ licenses. The project license covers only COREY's original source.
 ## Runtime Assets Copied Into `public/`
 
 - `public/workers/thatopen-fragments-worker.mjs` is copied from
-  `@thatopen/fragments` 3.4.5, currently MIT licensed.
+  `@thatopen/fragments` 3.4.7, currently MIT licensed.
 - `public/wasm/web-ifc.wasm` and `public/wasm/web-ifc-mt.wasm` are copied from
   `web-ifc` 0.0.77, currently MPL-2.0 licensed.
 
