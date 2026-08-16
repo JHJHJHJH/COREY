@@ -31,7 +31,10 @@ type CursorPayload = {
 };
 
 function encodeCursor(payload: CursorPayload) {
-  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  const bytes = new TextEncoder().encode(JSON.stringify(payload));
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
 }
 
 function decodeCursor(cursor: string | undefined, revision: string) {
@@ -39,7 +42,11 @@ function decodeCursor(cursor: string | undefined, revision: string) {
 
   let payload: CursorPayload;
   try {
-    payload = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as CursorPayload;
+    const base64 = cursor.replaceAll("-", "+").replaceAll("_", "/");
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+    const binary = atob(padded);
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    payload = JSON.parse(new TextDecoder().decode(bytes)) as CursorPayload;
   } catch {
     throw new Error("The pagination cursor is invalid.");
   }

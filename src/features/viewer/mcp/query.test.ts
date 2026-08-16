@@ -4,11 +4,13 @@ import type {
   ViewerDataTableCell,
   ViewerDataTableColumn,
   ViewerDataTableData,
+  ViewerValidationRunResult,
 } from "@/features/viewer/types";
 import {
   getMcpElements,
   prepareMcpDraftEdits,
   queryMcpElements,
+  queryValidationIssues,
 } from "@/features/viewer/mcp/query";
 
 function value(raw: unknown, binding: ViewerDataTableCell["binding"]): ViewerDataTableCell {
@@ -163,6 +165,44 @@ test("pagination cursors are rejected after a revision change", () => {
   );
 });
 
+test("validation issue pagination works without a Node Buffer global", () => {
+  const bufferDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Buffer");
+  Object.defineProperty(globalThis, "Buffer", {
+    configurable: true,
+    enumerable: false,
+    writable: true,
+    value: undefined,
+  });
+
+  try {
+    const result: ViewerValidationRunResult = {
+      sourceId: "source",
+      failedClauseCount: 0,
+      failedClauses: [],
+      results: [
+        { modelId: "model", localId: 1, result: "error", failedClauses: [] },
+        { modelId: "model", localId: 2, result: "warn", failedClauses: [] },
+      ],
+    };
+    const first = queryValidationIssues({ data, result, revision: "r1", limit: 1 });
+    assert.equal(first.items[0]?.globalId, "wall-guid");
+    assert.match(first.nextCursor ?? "", /^[A-Za-z0-9_-]+$/);
+
+    const second = queryValidationIssues({
+      data,
+      result,
+      revision: "r1",
+      cursor: first.nextCursor ?? undefined,
+      limit: 1,
+    });
+    assert.equal(second.items[0]?.globalId, "door-guid");
+    assert.equal(second.nextCursor, null);
+  } finally {
+    if (bufferDescriptor) Object.defineProperty(globalThis, "Buffer", bufferDescriptor);
+    else Reflect.deleteProperty(globalThis, "Buffer");
+  }
+});
+
 test("element details use GlobalId and include normalized field bindings", () => {
   const result = getMcpElements({ data, validation: null, globalIds: ["wall-guid"] });
   assert.equal(result.items[0]?.found, true);
@@ -207,4 +247,3 @@ test("draft edit batches are optimistic and atomic", () => {
     /conflict/i,
   );
 });
-
