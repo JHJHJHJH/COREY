@@ -155,7 +155,7 @@ export function createCoreyMcpServer(userId: string, deps: ToolDeps) {
     "corey_get_model_summary",
     {
       description:
-        "Get model metadata, IFC type counts, field catalog, draft count, validation summary, and active viewer state.",
+        "Get model metadata, IFC type counts, field catalog, draft count, validation summary, and active viewer state. Warning and error counts overlap when an element contains both severities.",
       inputSchema: { target },
       annotations: { readOnlyHint: true, idempotentHint: true },
     },
@@ -176,7 +176,7 @@ export function createCoreyMcpServer(userId: string, deps: ToolDeps) {
     "corey_query_elements",
     {
       description:
-        "Search and filter IFC elements. Returns bounded summaries and an opaque revision-bound cursor.",
+        "Search and filter IFC elements. Validation filters match every failed-rule severity, so mixed elements match both warn and error; validation remains the worst result and validationSeverities lists all memberships. Returns bounded summaries and an opaque revision-bound cursor.",
       inputSchema: { target, ...elementQueryShape },
       annotations: { readOnlyHint: true, idempotentHint: true },
     },
@@ -203,7 +203,7 @@ export function createCoreyMcpServer(userId: string, deps: ToolDeps) {
     "corey_get_elements",
     {
       description:
-        "Get normalized attributes, properties, draft provenance, and validation failures for up to 25 GlobalIds.",
+        "Get normalized attributes, properties, draft provenance, and validation failures for up to 25 GlobalIds. validation is the worst result and validationSeverities lists all memberships.",
       inputSchema: {
         target,
         globalIds: z.array(z.string().min(1).max(100)).min(1).max(25),
@@ -231,7 +231,8 @@ export function createCoreyMcpServer(userId: string, deps: ToolDeps) {
   server.registerTool(
     "corey_get_validation_summary",
     {
-      description: "Summarize validation results for an explicit COREY target.",
+      description:
+        "Summarize validation results for an explicit COREY target. warnCount and errorCount overlap for mixed-severity elements; evaluatedIssueCount remains the unique failed-element count.",
       inputSchema: { target },
       annotations: { readOnlyHint: true, idempotentHint: true },
     },
@@ -251,7 +252,8 @@ export function createCoreyMcpServer(userId: string, deps: ToolDeps) {
   server.registerTool(
     "corey_query_validation_issues",
     {
-      description: "Filter and paginate element-level validation failures.",
+      description:
+        "Filter and paginate element-level validation failures. Severity filters match every failed-rule severity, so mixed elements match both warn and error; severity remains the worst result and severities lists all memberships.",
       inputSchema: {
         target,
         severities: z.array(z.enum(["warn", "error"])).max(2).optional(),
