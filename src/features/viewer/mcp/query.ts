@@ -3,27 +3,36 @@ import {
   coerceViewerDataTableInputValue,
   sanitizeViewerDataTableDraft,
 } from "@/features/viewer/lib/data-table-draft";
+import { collectElementResultSeverities } from "@/features/viewer/lib/validation-severity";
 import type {
   ViewerDataTableCell,
   ViewerDataTableColumn,
   ViewerDataTableData,
   ViewerDataTableDraft,
   ViewerDataTableEdit,
+  ViewerValidationElementResult,
+  ViewerValidationFailureSeverity,
+  ViewerValidationResult,
   ViewerValidationRunResult,
 } from "@/features/viewer/types";
 import type {
   CoreyMcpDraftEditRequest,
+  CoreyMcpElementSummary,
   CoreyMcpElementQuery,
   CoreyMcpExpectedValue,
   CoreyMcpFieldDescriptor,
   CoreyMcpFieldPredicate,
   CoreyMcpFieldRef,
+  CoreyMcpQueryResult,
+  CoreyMcpValidationIssueSummary,
+  CoreyMcpValidationSummary,
 } from "@/features/viewer/mcp/contracts";
 
 const DEFAULT_QUERY_LIMIT = 25;
 const MAX_QUERY_LIMIT = 100;
 const MAX_ELEMENT_DETAILS = 25;
 const MAX_DRAFT_EDITS = 50;
+const FAILURE_SEVERITY_ORDER: readonly ViewerValidationFailureSeverity[] = ["error", "warn"];
 
 type CursorPayload = {
   revision: string;
@@ -31,7 +40,10 @@ type CursorPayload = {
 };
 
 function encodeCursor(payload: CursorPayload) {
-  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  const bytes = new TextEncoder().encode(JSON.stringify(payload));
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
 }
 
 function decodeCursor(cursor: string | undefined, revision: string) {
@@ -39,7 +51,11 @@ function decodeCursor(cursor: string | undefined, revision: string) {
 
   let payload: CursorPayload;
   try {
-    payload = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as CursorPayload;
+    const base64 = cursor.replaceAll("-", "+").replaceAll("_", "/");
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+    const binary = atob(padded);
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    payload = JSON.parse(new TextDecoder().decode(bytes)) as CursorPayload;
   } catch {
     throw new Error("The pagination cursor is invalid.");
   }
@@ -129,10 +145,19 @@ function validationByLocalId(result: ViewerValidationRunResult | null) {
   return new Map(result?.results.map((entry) => [entry.localId, entry]) ?? []);
 }
 
+function failureSeverities(entry: ViewerValidationElementResult) {
+  const severities = collectElementResultSeverities(entry);
+  return FAILURE_SEVERITY_ORDER.filter((severity) => severities.has(severity));
+}
+
+function validationSeverities(entry: ViewerValidationElementResult | undefined) {
+  return entry ? failureSeverities(entry) : (["ok"] satisfies ViewerValidationResult[]);
+}
+
 function toElementSummary(
   row: ViewerDataTableData["rows"][number],
   validation: ReturnType<typeof validationByLocalId>,
-) {
+): CoreyMcpElementSummary {
   const match = validation.get(row.localId);
   return {
     globalId: globalIdForRow(row),
@@ -140,6 +165,7 @@ function toElementSummary(
     name: row.cells.name?.state === "present" ? row.cells.name.text : row.selection.label,
     localId: row.localId,
     validation: match?.result ?? "ok",
+    validationSeverities: validationSeverities(match),
   };
 }
 
@@ -163,7 +189,7 @@ export function queryMcpElements(input: {
   validation: ViewerValidationRunResult | null;
   query: CoreyMcpElementQuery;
   revision: string;
-}) {
+}): CoreyMcpQueryResult<CoreyMcpElementSummary> {
   const { data, query, revision } = input;
   const limit = Math.min(MAX_QUERY_LIMIT, Math.max(1, query.limit ?? DEFAULT_QUERY_LIMIT));
   const offset = decodeCursor(query.cursor, revision);
@@ -175,8 +201,13 @@ export function queryMcpElements(input: {
   const matched = data.rows.filter((row) => {
     if (wantedTypes.size > 0 && !wantedTypes.has((row.ifcType ?? "").toUpperCase())) return false;
     if (normalizedText && !row.searchText.includes(normalizedText)) return false;
-    const severity = validation.get(row.localId)?.result ?? "ok";
-    if (wantedValidation.size > 0 && !wantedValidation.has(severity)) return false;
+    const severities = validationSeverities(validation.get(row.localId));
+    if (
+      wantedValidation.size > 0 &&
+      !severities.some((severity) => wantedValidation.has(severity))
+    ) {
+      return false;
+    }
     return (query.where ?? []).every((predicate) => matchesPredicate(row, data, predicate));
   });
 
@@ -322,13 +353,24 @@ export function prepareMcpDraftEdits(input: {
   return { draft: sanitized.draft, applied };
 }
 
-export function validationSummary(result: ViewerValidationRunResult | null, rowCount: number) {
-  const errors = result?.results.filter((entry) => entry.result === "error").length ?? 0;
-  const warnings = result?.results.filter((entry) => entry.result === "warn").length ?? 0;
+export function validationSummary(
+  result: ViewerValidationRunResult | null,
+  rowCount: number,
+): CoreyMcpValidationSummary {
+  const results = result?.results ?? [];
+  let errors = 0;
+  let warnings = 0;
+  for (const entry of results) {
+    const severities = collectElementResultSeverities(entry);
+    if (severities.has("error")) errors += 1;
+    if (severities.has("warn")) warnings += 1;
+  }
+
+  const evaluatedIssueCount = results.length;
   return {
     rowCount,
-    evaluatedIssueCount: errors + warnings,
-    okCount: Math.max(0, rowCount - errors - warnings),
+    evaluatedIssueCount,
+    okCount: Math.max(0, rowCount - evaluatedIssueCount),
     warnCount: warnings,
     errorCount: errors,
     failedClauseCount: result?.failedClauseCount ?? 0,
@@ -345,29 +387,37 @@ export function queryValidationIssues(input: {
   cursor?: string;
   limit?: number;
   revision: string;
-}) {
+}): CoreyMcpQueryResult<CoreyMcpValidationIssueSummary> {
   const limit = Math.min(MAX_QUERY_LIMIT, Math.max(1, input.limit ?? DEFAULT_QUERY_LIMIT));
   const offset = decodeCursor(input.cursor, input.revision);
   const rowsByLocalId = new Map(input.data.rows.map((row) => [row.localId, row]));
   const severities = new Set(input.severities ?? []);
   const clauseIds = new Set(input.clauseIds ?? []);
   const ifcTypes = new Set((input.ifcTypes ?? []).map((value) => value.toUpperCase()));
-  const matches = (input.result?.results ?? []).filter((entry) => {
-    if (severities.size > 0 && !severities.has(entry.result)) return false;
-    const row = rowsByLocalId.get(entry.localId);
-    if (ifcTypes.size > 0 && !ifcTypes.has((row?.ifcType ?? "").toUpperCase())) return false;
-    return (
-      clauseIds.size === 0 ||
-      entry.failedClauses.some((clause) => clauseIds.has(clause.clauseId))
-    );
-  });
-  const items = matches.slice(offset, offset + limit).map((entry) => {
+  const matches = (input.result?.results ?? [])
+    .map((entry) => ({ entry, severities: failureSeverities(entry) }))
+    .filter(({ entry, severities: entrySeverities }) => {
+      if (
+        severities.size > 0 &&
+        !entrySeverities.some((severity) => severities.has(severity))
+      ) {
+        return false;
+      }
+      const row = rowsByLocalId.get(entry.localId);
+      if (ifcTypes.size > 0 && !ifcTypes.has((row?.ifcType ?? "").toUpperCase())) return false;
+      return (
+        clauseIds.size === 0 ||
+        entry.failedClauses.some((clause) => clauseIds.has(clause.clauseId))
+      );
+    });
+  const items = matches.slice(offset, offset + limit).map(({ entry, severities }) => {
     const row = rowsByLocalId.get(entry.localId);
     return {
       globalId: row ? globalIdForRow(row) : null,
       ifcType: row?.ifcType ?? null,
       name: row?.selection.label ?? null,
       severity: entry.result,
+      severities,
       failedClauses: entry.failedClauses,
     };
   });

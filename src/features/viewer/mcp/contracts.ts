@@ -2,7 +2,9 @@ import type {
   ViewerDataTableColumnBinding,
   ViewerDataTableEditableValueKind,
   ViewerInspectionValueState,
+  ViewerValidationClauseFailure,
   ViewerValidationFailureSeverity,
+  ViewerValidationResult,
 } from "@/features/viewer/types";
 
 export type CoreyMcpTarget =
@@ -57,6 +59,47 @@ export interface CoreyMcpFieldDescriptor {
   editableReason: string | null;
   valueKind: ViewerDataTableEditableValueKind | null;
   populatedRowCount: number;
+}
+
+export interface CoreyMcpElementSummary {
+  globalId: string | null;
+  ifcType: string | null;
+  name: string;
+  localId: number;
+  /** The element's single worst validation result. */
+  validation: ViewerValidationResult;
+  /** Every validation result the element belongs to, ordered by severity. */
+  validationSeverities: ViewerValidationResult[];
+}
+
+export interface CoreyMcpValidationIssueSummary {
+  globalId: string | null;
+  ifcType: string | null;
+  name: string | null;
+  /** The element's single worst failure severity. */
+  severity: ViewerValidationFailureSeverity;
+  /** Every failure severity present on the element, ordered by severity. */
+  severities: ViewerValidationFailureSeverity[];
+  failedClauses: ViewerValidationClauseFailure[];
+}
+
+export interface CoreyMcpValidationSummary {
+  rowCount: number;
+  /** Unique elements with at least one validation issue. */
+  evaluatedIssueCount: number;
+  okCount: number;
+  /** Elements with at least one warning; may overlap with errorCount. */
+  warnCount: number;
+  /** Elements with at least one error; may overlap with warnCount. */
+  errorCount: number;
+  failedClauseCount: number;
+  failedClauses: ViewerValidationClauseFailure[];
+}
+
+export interface CoreyMcpQueryResult<Item> {
+  total: number;
+  items: Item[];
+  nextCursor: string | null;
 }
 
 export interface CoreyMcpSessionDescriptor {
