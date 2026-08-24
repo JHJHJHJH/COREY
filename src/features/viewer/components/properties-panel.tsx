@@ -2,7 +2,15 @@
 
 import { CircleAlert, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useViewerSeverities } from "@/features/rules/rules-provider";
 import { inspectionTargetKey } from "@/features/viewer/lib/ifc-data";
+import {
+  SEVERITY_SURFACE_CLASS,
+  SEVERITY_TEXT_CLASS,
+  SEVERITY_TONE_CLASS,
+  severityCssVars,
+} from "@/features/viewer/lib/severity-style";
+import { VIEWER_VALIDATION_OK_RESULT } from "@/features/viewer/types";
 import type {
   ViewerElementInspection,
   ViewerInspectionGroup,
@@ -12,6 +20,7 @@ import type {
   ViewerSelectionDetails,
   ViewerValidationClauseFailure,
   ViewerValidationMatch,
+  ViewerValidationResult,
   ViewerValidationSummary,
 } from "@/features/viewer/types";
 
@@ -55,16 +64,13 @@ const diffToneLabel: Record<PropertyDiffTone, string> = {
 };
 
 function rowClass(value: ViewerInspectionValue, tone: PropertyDiffTone | null) {
-  if (value.validation?.result === "ok") {
+  const result = value.validation?.result;
+  if (result === VIEWER_VALIDATION_OK_RESULT) {
     return "bg-[color:var(--success-bg)]";
   }
 
-  if (value.validation?.result === "warn") {
-    return "bg-[color:var(--warning-bg)]";
-  }
-
-  if (value.validation?.result === "error") {
-    return "bg-[color:var(--danger-bg)]";
+  if (result) {
+    return SEVERITY_SURFACE_CLASS;
   }
 
   if (tone) {
@@ -75,16 +81,13 @@ function rowClass(value: ViewerInspectionValue, tone: PropertyDiffTone | null) {
 }
 
 function valueClass(value: ViewerInspectionValue, tone: PropertyDiffTone | null) {
-  if (value.validation?.result === "ok") {
+  const result = value.validation?.result;
+  if (result === VIEWER_VALIDATION_OK_RESULT) {
     return "text-[color:var(--success-fg)]";
   }
 
-  if (value.validation?.result === "warn") {
-    return "text-[color:var(--warning-fg)]";
-  }
-
-  if (value.validation?.result === "error") {
-    return "text-[color:var(--danger-fg)]";
+  if (result) {
+    return SEVERITY_TEXT_CLASS;
   }
 
   if (tone) {
@@ -105,28 +108,28 @@ export function DiffBadge({ tone, count }: { tone: PropertyDiffTone; count?: num
   );
 }
 
-function summaryFlagClass(result: ViewerValidationMatch["result"]) {
-  if (result === "ok") {
-    return "border-[color:var(--success-border)] bg-[color:var(--success-bg)] text-[color:var(--success-fg)]";
+/**
+ * `ok` keeps the fixed success token; every failure level is painted from its configured colour,
+ * so these return a class plus the inline base-colour variable it reads.
+ */
+function severityToneProps(result: ViewerValidationResult | null, color: string | null) {
+  if (result === VIEWER_VALIDATION_OK_RESULT) {
+    return {
+      className:
+        "border-[color:var(--success-border)] bg-[color:var(--success-bg)] text-[color:var(--success-fg)]",
+      style: undefined,
+    };
   }
 
-  if (result === "warn") {
-    return "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
+  if (!result || !color) {
+    return {
+      className:
+        "border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] text-[color:var(--foreground)]",
+      style: undefined,
+    };
   }
 
-  return "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]";
-}
-
-function popupTone(result: ValidationPopupPayload["result"]) {
-  if (result === "error") {
-    return "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]";
-  }
-
-  if (result === "warn") {
-    return "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
-  }
-
-  return "border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] text-[color:var(--foreground)]";
+  return { className: SEVERITY_TONE_CLASS, style: severityCssVars(color) };
 }
 
 function ValidationDetailsButton({
@@ -152,15 +155,20 @@ function ValidationDetailsButton({
 function ValidationSummaryFlag({
   label,
   result,
+  color,
   count,
 }: {
   label: string;
-  result: ViewerValidationMatch["result"];
+  result: ViewerValidationResult;
+  color: string | null;
   count: number;
 }) {
+  const tone = severityToneProps(result, color);
+
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${summaryFlagClass(result)}`}
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${tone.className}`}
+      style={tone.style}
     >
       {count} {label}
     </span>
@@ -198,9 +206,13 @@ function ValidationDetailsPopup({
   payload: ValidationPopupPayload;
   onClose: () => void;
 }) {
+  const { color } = useViewerSeverities();
+  const tone = severityToneProps(payload.result, color(payload.result ?? ""));
+
   return (
     <section
-      className={`absolute inset-x-3 top-16 z-20 max-h-[min(32rem,calc(100%-5rem))] overflow-hidden rounded-2xl border shadow-[0_22px_50px_rgba(15,23,42,0.22)] ${popupTone(payload.result)}`}
+      className={`absolute inset-x-3 top-16 z-20 max-h-[min(32rem,calc(100%-5rem))] overflow-hidden rounded-2xl border shadow-[0_22px_50px_rgba(15,23,42,0.22)] ${tone.className}`}
+      style={tone.style}
     >
       <div className="flex items-start justify-between gap-3 border-b border-black/10 px-3 py-3">
         <div className="min-w-0">
@@ -509,24 +521,33 @@ function ValidationSummaryBanner({
   summary: ViewerValidationSummary | null;
   onOpenDetails: (payload: Omit<ValidationPopupPayload, "selectionKey">) => void;
 }) {
+  const { severities, color } = useViewerSeverities();
+
   if (!summary) {
     return null;
   }
 
-  const tone =
-    summary.result === "error"
-      ? "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]"
-      : summary.result === "warn"
-        ? "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]"
-        : "border-[color:var(--success-border)] bg-[color:var(--success-bg)] text-[color:var(--success-fg)]";
+  const tone = severityToneProps(summary.result, color(summary.result ?? ""));
 
   return (
-    <section className={`rounded-xl border px-3 py-3 ${tone}`}>
+    <section className={`rounded-xl border px-3 py-3 ${tone.className}`} style={tone.style}>
       <div className="text-xs font-semibold uppercase tracking-[0.18em]">Validation Summary</div>
       <div className="mt-2 flex flex-wrap gap-1.5">
-        <ValidationSummaryFlag label="error" result="error" count={summary.errorCount} />
-        <ValidationSummaryFlag label="warn" result="warn" count={summary.warnCount} />
-        <ValidationSummaryFlag label="ok" result="ok" count={summary.okCount} />
+        {[...severities].reverse().map((severity) => (
+          <ValidationSummaryFlag
+            key={severity.id}
+            label={severity.label}
+            result={severity.id}
+            color={severity.color}
+            count={summary.countsBySeverity[severity.id] ?? 0}
+          />
+        ))}
+        <ValidationSummaryFlag
+          label="ok"
+          result={VIEWER_VALIDATION_OK_RESULT}
+          color={null}
+          count={summary.okCount}
+        />
       </div>
       {summary.failedClauseCount > 0 ? (
         <div className="mt-2 flex items-center justify-between gap-2">

@@ -1,0 +1,296 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "/schemas/validation-config-v4.schema.json",
+  "title": "COREY Validation Config v4",
+  "description": "Portable clause, rule and severity configuration used by COREY validation import/export, templates, and rules config APIs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "severities",
+    "clauses"
+  ],
+  "properties": {
+    "version": {
+      "const": 4,
+      "description": "Current clause-based validation config version."
+    },
+    "severities": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "description": "User-configurable severity levels. Higher order is more severe; an element failing at several levels is reported and coloured at the highest one.",
+      "items": {
+        "$ref": "#/$defs/severity"
+      }
+    },
+    "clauses": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/clause"
+      }
+    }
+  },
+  "$defs": {
+    "clause": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "rules"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable clause identifier."
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable clause title shown in validation results."
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rule"
+          }
+        }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "ifcType",
+        "target",
+        "check",
+        "failSeverity"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable rule identifier."
+        },
+        "ifcType": {
+          "type": "string",
+          "description": "IFC entity type to evaluate, such as IfcWall or IfcBeam. Matching is case-insensitive."
+        },
+        "subtype": {
+          "type": "string",
+          "description": "Optional predefined type, ANDed with ifcType, such as FLOOR for IfcSlab. Matching is case-insensitive, and resolves to the element's PredefinedType (or ObjectType when PredefinedType is USERDEFINED). Omit or leave blank to apply the rule to every element of ifcType. An element whose subtype differs is not evaluated by this rule; it does not fail it."
+        },
+        "target": {
+          "$ref": "#/$defs/target"
+        },
+        "check": {
+          "$ref": "#/$defs/check"
+        },
+        "failSeverity": {
+          "type": "string",
+          "description": "Id of the severity emitted when the rule fails. Must match one of the entries in severities."
+        }
+      }
+    },
+    "target": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/attributeTarget"
+        },
+        {
+          "$ref": "#/$defs/propertyTarget"
+        }
+      ]
+    },
+    "attributeTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "name"
+      ],
+      "properties": {
+        "kind": {
+          "const": "attribute"
+        },
+        "name": {
+          "type": "string",
+          "description": "IFC attribute name, such as Name or GlobalId."
+        }
+      }
+    },
+    "propertyTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "group",
+        "label"
+      ],
+      "properties": {
+        "kind": {
+          "const": "property"
+        },
+        "group": {
+          "type": "string",
+          "description": "Property set name, such as Pset_WallCommon."
+        },
+        "label": {
+          "type": "string",
+          "description": "Property label inside the property set."
+        }
+      }
+    },
+    "check": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/emptyCheck"
+        },
+        {
+          "$ref": "#/$defs/enumCheck"
+        },
+        {
+          "$ref": "#/$defs/numberRangeCheck"
+        },
+        {
+          "$ref": "#/$defs/regexCheck"
+        },
+        {
+          "$ref": "#/$defs/booleanCheck"
+        }
+      ]
+    },
+    "emptyCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "const": "empty",
+          "description": "Requires the value to be present and not empty."
+        }
+      }
+    },
+    "enumCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "allowedValues"
+      ],
+      "properties": {
+        "kind": {
+          "const": "enum"
+        },
+        "allowedValues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Allowed text values. Runtime comparison trims and ignores case."
+        }
+      }
+    },
+    "numberRangeCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "min",
+        "max"
+      ],
+      "properties": {
+        "kind": {
+          "const": "numberRange"
+        },
+        "min": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Inclusive lower bound, or null for no lower bound."
+        },
+        "max": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Inclusive upper bound, or null for no upper bound."
+        }
+      }
+    },
+    "regexCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "regex",
+        "caseInsensitive"
+      ],
+      "properties": {
+        "kind": {
+          "const": "regex"
+        },
+        "regex": {
+          "type": "string",
+          "description": "JavaScript regular expression source. Runtime matching anchors it against the whole value."
+        },
+        "caseInsensitive": {
+          "type": "boolean"
+        }
+      }
+    },
+    "booleanCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "expected"
+      ],
+      "properties": {
+        "kind": {
+          "const": "boolean"
+        },
+        "expected": {
+          "type": "boolean"
+        }
+      }
+    },
+    "severity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "color",
+        "order"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "not": {
+            "const": "ok"
+          },
+          "description": "Stable severity identifier referenced by rule.failSeverity. \"ok\" is reserved for the non-failure result."
+        },
+        "label": {
+          "type": "string",
+          "description": "Display name shown in badges, filters and the rules grid."
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "description": "Base colour. Border and background tones are derived from it, and the 3D viewer paints failing elements with it."
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Rank. Higher is more severe and wins the colour on an element with several failures."
+        }
+      }
+    }
+  }
+}

@@ -3,6 +3,7 @@ import type {
   ViewerDataTableEditableValueKind,
   ViewerInspectionValueState,
   ViewerValidationClauseFailure,
+  ViewerValidationSeverity,
   ViewerValidationFailureSeverity,
   ViewerValidationResult,
 } from "@/features/viewer/types";
@@ -88,10 +89,14 @@ export interface CoreyMcpValidationSummary {
   /** Unique elements with at least one validation issue. */
   evaluatedIssueCount: number;
   okCount: number;
-  /** Elements with at least one warning; may overlap with errorCount. */
-  warnCount: number;
-  /** Elements with at least one error; may overlap with warnCount. */
-  errorCount: number;
+  /** The configured severity levels, least severe first. */
+  severities: ViewerValidationSeverity[];
+  /**
+   * Elements with at least one failure at each severity, keyed by severity id. An element failing
+   * at several severities is counted under each, so these can sum to more than
+   * `evaluatedIssueCount`.
+   */
+  countsBySeverity: Record<string, number>;
   failedClauseCount: number;
   failedClauses: ViewerValidationClauseFailure[];
 }

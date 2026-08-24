@@ -48,7 +48,13 @@ const predicate = z.union([
 const elementQueryShape = {
   text: z.string().max(500).optional(),
   ifcTypes: z.array(z.string().min(1).max(200)).max(20).optional(),
-  validation: z.array(z.enum(["ok", "warn", "error"])).max(3).optional(),
+  validation: z
+    .array(z.string().min(1).max(40))
+    .max(16)
+    .optional()
+    .describe(
+      'Severity ids from the user\'s configured scale, or "ok" for elements with no failures. Read the ids from corey_get_validation_summary.',
+    ),
   where: z.array(predicate).max(10).optional(),
   cursor: z.string().max(2000).optional(),
   limit: z.number().int().min(1).max(100).optional(),
@@ -232,7 +238,7 @@ export function createCoreyMcpServer(userId: string, deps: ToolDeps) {
     "corey_get_validation_summary",
     {
       description:
-        "Summarize validation results for an explicit COREY target. warnCount and errorCount overlap for mixed-severity elements; evaluatedIssueCount remains the unique failed-element count.",
+        "Summarize validation results for an explicit COREY target. Returns the user-configured severities (least severe first) and countsBySeverity keyed by severity id; an element failing at several severities is counted under each, so those counts overlap, while evaluatedIssueCount remains the unique failed-element count.",
       inputSchema: { target },
       annotations: { readOnlyHint: true, idempotentHint: true },
     },
@@ -253,10 +259,14 @@ export function createCoreyMcpServer(userId: string, deps: ToolDeps) {
     "corey_query_validation_issues",
     {
       description:
-        "Filter and paginate element-level validation failures. Severity filters match every failed-rule severity, so mixed elements match both warn and error; severity remains the worst result and severities lists all memberships.",
+        "Filter and paginate element-level validation failures. Severity levels are user-configured; read the available ids from corey_get_validation_summary. Severity filters match every failed-rule severity, so an element failing at several severities matches each of them, while severity remains the worst result and severities lists all memberships.",
       inputSchema: {
         target,
-        severities: z.array(z.enum(["warn", "error"])).max(2).optional(),
+        severities: z
+          .array(z.string().min(1).max(40))
+          .max(16)
+          .optional()
+          .describe("Severity ids from the user's configured scale."),
         clauseIds: z.array(z.string().min(1)).max(50).optional(),
         ifcTypes: z.array(z.string().min(1)).max(20).optional(),
         cursor: z.string().max(2000).optional(),

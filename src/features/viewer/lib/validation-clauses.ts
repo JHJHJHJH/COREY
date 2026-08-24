@@ -1,4 +1,8 @@
 import {
+  buildViewerSeverityScale,
+  compareBySeverityDesc,
+} from "@/features/viewer/lib/severity-scale";
+import {
   collectElementResultSeverities,
   createEmptyViewerValidationSeverityRowKeys,
 } from "@/features/viewer/lib/validation-severity";
@@ -10,17 +14,7 @@ import type {
   ViewerValidationSeverityRowKeys,
 } from "@/features/viewer/types";
 
-function compareValidationFailureSeverity(
-  left: ViewerValidationFailureSeverity,
-  right: ViewerValidationFailureSeverity,
-) {
-  const rank: Record<ViewerValidationFailureSeverity, number> = {
-    warn: 1,
-    error: 2,
-  };
 
-  return rank[right] - rank[left];
-}
 
 function buildRowKeyByElementId(data: ViewerDataTableData) {
   const rowKeyByElementId = new Map<string, string>();
@@ -41,7 +35,7 @@ export function buildViewerValidationSeverityRowKeys(input: {
   result: ViewerValidationRunResult | null;
 }): ViewerValidationSeverityRowKeys {
   const { data, result } = input;
-  const rowKeys = createEmptyViewerValidationSeverityRowKeys();
+  const rowKeys = createEmptyViewerValidationSeverityRowKeys(result?.severities ?? []);
   if (!data || !result) {
     return rowKeys;
   }
@@ -54,7 +48,7 @@ export function buildViewerValidationSeverityRowKeys(input: {
     }
 
     for (const severity of collectElementResultSeverities(elementResult)) {
-      rowKeys[severity].add(rowKey);
+      rowKeys[severity]?.add(rowKey);
     }
   }
 
@@ -70,6 +64,7 @@ export function buildViewerValidationClauseTableViews(input: {
     return [];
   }
 
+  const scale = buildViewerSeverityScale(result.severities);
   const rowKeyByElementId = buildRowKeyByElementId(data);
 
   const clauses = new Map<
@@ -101,7 +96,7 @@ export function buildViewerValidationClauseTableViews(input: {
       }
 
       existingClause.result =
-        compareValidationFailureSeverity(clauseFailure.result, existingClause.result) < 0
+        compareBySeverityDesc(scale, clauseFailure.result, existingClause.result) < 0
           ? clauseFailure.result
           : existingClause.result;
       existingClause.rowKeys.add(rowKey);
@@ -117,7 +112,7 @@ export function buildViewerValidationClauseTableViews(input: {
       rowKeys: [...clause.rowKeys],
     }))
     .sort((left, right) => {
-      const severityComparison = compareValidationFailureSeverity(left.result, right.result);
+      const severityComparison = compareBySeverityDesc(scale, left.result, right.result);
       if (severityComparison !== 0) {
         return severityComparison;
       }

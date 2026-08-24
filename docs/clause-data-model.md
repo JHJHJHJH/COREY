@@ -7,13 +7,17 @@ and the parser, sanitizer, compiler, and evaluator live in
 
 ## Config shape
 
-Rule configuration uses `version: 2`. It is used by clause import/export,
+Rule configuration uses `version: 3`. It is used by clause import/export,
 backend rule config storage, rule templates, and the `clauses` portion of
 validation evaluation payloads.
 
 ```json
 {
-  "version": 2,
+  "version": 4,
+  "severities": [
+    { "id": "warn", "label": "Warn", "color": "#d29a2f", "order": 1 },
+    { "id": "error", "label": "Error", "color": "#bb5a36", "order": 2 }
+  ],
   "clauses": [
     {
       "id": "wall-basics",
@@ -41,8 +45,40 @@ Top-level fields:
 
 | Field | Type | Notes |
 |---|---|---|
-| `version` | literal `2` | Current portable config version. |
+| `version` | literal `3` | Current portable config version. |
 | `clauses` | `ViewerValidationClause[]` | Named groups of rules. |
+
+## Severities
+
+Severity levels are user-configurable and live in the root `severities` array. The list is always
+non-empty and is sorted by `order` ascending when sanitized.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | `string` | Stable slug (`a-z0-9_-`) referenced by `rule.failSeverity`. `ok` is reserved for the non-failure result and is rejected. |
+| `label` | `string` | Display name. Falls back to `id` when blank. |
+| `color` | `string` | Base `#rrggbb` colour. Border and background tones are derived from it; the 3D viewer paints failing elements with it. |
+| `order` | `integer` | Rank, higher is more severe. Renumbered densely from 1 on sanitize. |
+
+Ranking rules:
+
+- `ok` always ranks below every severity.
+- Clause and element results are max-severity rollups: when an element fails several rules, the
+  severity with the highest `order` is the one reported, and the one the 3D view paints it with.
+- Individual rule failures keep their own severity, so severity *filters* still match an element
+  under every level it failed at. Per-severity counts can therefore sum to more than the number of
+  failing elements.
+- A `failSeverity` naming a severity that is not configured is remapped to the highest-order
+  severity, never silently downgraded.
+
+Defaults, seeded for new configs and when migrating from version 2 or 3:
+
+```json
+[
+  { "id": "warn", "label": "Warn", "color": "#d29a2f", "order": 1 },
+  { "id": "error", "label": "Error", "color": "#bb5a36", "order": 2 }
+]
+```
 
 ## Clause
 
@@ -64,7 +100,7 @@ them as stable once a config is shared.
 | `subtype` | string (optional) | Predefined type, ANDed with `ifcType` — such as `FLOOR` for `IfcSlab`. Matching is case-insensitive. Omitted or blank means any subtype, which is how every rule authored before this field behaves. See [Subtype applicability](#subtype-applicability). |
 | `target` | `ViewerValidationTarget` | Attribute or property to inspect. |
 | `check` | `ViewerValidationCheck` | Constraint applied to the target value. |
-| `failSeverity` | `error` or `warn` | Severity emitted when this rule fails. Defaults to `error` if invalid input is sanitized. |
+| `failSeverity` | severity `id` | Severity emitted when this rule fails. Must name an entry in the root `severities` array; an unrecognized id is remapped to the highest-order severity rather than downgraded. |
 
 ## Target variants
 
@@ -131,18 +167,18 @@ Number range:
 `min` and `max` may be numbers or `null`. At least one bound is required for the
 rule to run. Values must parse to finite JavaScript numbers.
 
-Pattern:
+Regex:
 
 ```json
 {
-  "kind": "pattern",
-  "pattern": "[0-9A-Za-z_$]{22}",
+  "kind": "regex",
+  "regex": "[0-9A-Za-z_$]{22}",
   "caseInsensitive": false
 }
 ```
 
-`pattern` is JavaScript regular expression source text. The evaluator anchors it
-against the whole value as `^(?:pattern)$`. Invalid or blank patterns are not
+`regex` is JavaScript regular expression source text. The evaluator anchors it
+against the whole value as `^(?:regex)$`. Invalid or blank regular expressions are not
 runnable.
 
 Boolean:
@@ -195,7 +231,7 @@ A rule is runnable when:
 - property targets have non-blank `group` and `label`.
 - enum checks have at least one `allowedValues` entry after sanitization.
 - number range checks have `min` or `max`.
-- pattern checks have non-blank valid JavaScript regex source.
+- regex checks have non-blank valid JavaScript regular expression source.
 
 Boolean and required-value checks need no extra fields beyond their required
 shape.
@@ -206,7 +242,11 @@ shape.
 
 ```json
 {
-  "version": 2,
+  "version": 4,
+  "severities": [
+    { "id": "warn", "label": "Warn", "color": "#d29a2f", "order": 1 },
+    { "id": "error", "label": "Error", "color": "#bb5a36", "order": 2 }
+  ],
   "sourceId": "model-123",
   "clauses": [],
   "rows": [
@@ -262,7 +302,7 @@ its failed rules.
 
 ## Public artifacts
 
-- JSON Schema: `public/schemas/validation-config-v2.schema.json`
+- JSON Schema: `public/schemas/validation-config-v4.schema.json`
 - LLM contract: `public/llms-validation-rules.md`
 - In-app docs: `content/docs/clause-data-model.mdx`
 - Example config: `sample-rules.json`

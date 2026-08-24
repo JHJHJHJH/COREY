@@ -1473,6 +1473,23 @@ function collectLocalIds(node: SpatialTreeItem, collector: Set<number>) {
   }
 }
 
+export function collectViewerTreeLocalIds(node: ViewerTreeNode) {
+  const localIds = new Set<number>();
+
+  const visit = (current: ViewerTreeNode) => {
+    if (current.localId !== null) {
+      localIds.add(current.localId);
+    }
+
+    for (const child of current.children) {
+      visit(child);
+    }
+  };
+
+  visit(node);
+  return [...localIds];
+}
+
 function toTreeNode(
   modelId: string,
   node: SpatialTreeItem,

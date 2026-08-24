@@ -11,9 +11,19 @@ import {
   Search,
 } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { filterTree, formatBytes, formatTreeNodeCount } from "@/features/viewer/lib/ifc-data";
 import {
-  VIEWER_SEVERITY_FILTER_OPTIONS,
+  collectViewerTreeLocalIds,
+  filterTree,
+  formatBytes,
+  formatTreeNodeCount,
+} from "@/features/viewer/lib/ifc-data";
+import { useViewerSeverities } from "@/features/rules/rules-provider";
+import {
+  SEVERITY_TONE_CLASS,
+  severityCssVars,
+} from "@/features/viewer/lib/severity-style";
+import {
+  buildViewerSeverityFilterOptions,
   collectViewerValidationLocalIds,
   countViewerValidationSeverities,
   viewerSeverityFilterLabel,
@@ -39,23 +49,31 @@ type ModelTreePanelProps = {
   onSelectNode: (localId: number) => void;
   onHideCategory: (category: string) => void;
   onIsolateCategory: (category: string) => void;
+  onIsolateSubtree: (localIds: number[]) => void;
   onSeverityFilterChange: (filter: ViewerValidationSeverityFilter) => void;
 };
 
-function severityOptionTone(value: ViewerValidationSeverityFilter, active: boolean) {
+function severityOptionTone(
+  value: ViewerValidationSeverityFilter,
+  active: boolean,
+  color: string | null,
+) {
   if (!active) {
-    return "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]";
+    return {
+      className:
+        "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]",
+      style: undefined,
+    };
   }
 
-  if (value === "error") {
-    return "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]";
+  if (value !== "all" && value !== "issues" && color) {
+    return { className: SEVERITY_TONE_CLASS, style: severityCssVars(color) };
   }
 
-  if (value === "warn") {
-    return "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
-  }
-
-  return "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]";
+  return {
+    className: "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]",
+    style: undefined,
+  };
 }
 
 type TreeNodeRowProps = {
@@ -68,6 +86,7 @@ type TreeNodeRowProps = {
   registerRowButton: (localId: number | null, element: HTMLButtonElement | null) => void;
   onToggle: (key: string) => void;
   onSelectNode: (localId: number) => void;
+  onIsolateSubtree: (localIds: number[]) => void;
 };
 
 function collectExpandableKeys(nodes: ViewerTreeNode[]) {
@@ -135,6 +154,7 @@ function TreeNodeRow({
   registerRowButton,
   onToggle,
   onSelectNode,
+  onIsolateSubtree,
 }: TreeNodeRowProps) {
   const hasChildren = node.children.length > 0;
   const expanded = hasChildren ? expandedKeys.has(node.key) : false;
@@ -192,6 +212,22 @@ function TreeNodeRow({
               </span>
             ) : null}
           </button>
+          {hasChildren ? (
+            <button
+              type="button"
+              aria-label={`Isolate ${node.label} and descendants`}
+              title={`Isolate ${node.label} and descendants`}
+              onClick={() => {
+                const localIds = collectViewerTreeLocalIds(node);
+                if (localIds.length > 0) {
+                  onIsolateSubtree(localIds);
+                }
+              }}
+              className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
+            >
+              <ScanSearch className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -215,6 +251,7 @@ function TreeNodeRow({
                 registerRowButton={registerRowButton}
                 onToggle={onToggle}
                 onSelectNode={onSelectNode}
+                onIsolateSubtree={onIsolateSubtree}
               />
             </div>
           ))
@@ -234,6 +271,7 @@ export function ModelTreePanel({
   onSelectNode,
   onHideCategory,
   onIsolateCategory,
+  onIsolateSubtree,
   onSeverityFilterChange,
 }: ModelTreePanelProps) {
   const [query, setQuery] = useState("");
@@ -306,16 +344,21 @@ export function ModelTreePanel({
 
   const hasActiveCategoryFilter = selectedCategories !== null;
   const activeCategoryCount = selectedCategories?.size ?? categories.length;
+  const { severities, color: severityColor } = useViewerSeverities();
+  const severityFilterOptions = useMemo(
+    () => buildViewerSeverityFilterOptions(severities),
+    [severities],
+  );
 
   const validationCounts = useMemo(
-    () => countViewerValidationSeverities(severityElements),
-    [severityElements],
+    () => countViewerValidationSeverities(severities, severityElements),
+    [severities, severityElements],
   );
   const hasValidationHighlights = validationCounts.issues > 0;
   const hasActiveSeverityFilter = severityFilter !== "all";
   const severityLocalIds = useMemo(
-    () => collectViewerValidationLocalIds(severityElements, severityFilter),
-    [severityElements, severityFilter],
+    () => collectViewerValidationLocalIds(severities, severityElements, severityFilter),
+    [severities, severityElements, severityFilter],
   );
 
   // Once validation has nothing to say, a severity filter can only hide everything.
@@ -386,7 +429,10 @@ export function ModelTreePanel({
     ? `${activeCategoryCount} of ${categories.length} categories`
     : "All categories";
   const filterSummary =
-    [hasActiveSeverityFilter ? viewerSeverityFilterLabel(severityFilter) : null, categorySummary]
+    [
+      hasActiveSeverityFilter ? viewerSeverityFilterLabel(severities, severityFilter) : null,
+      categorySummary,
+    ]
       .filter((part): part is string => part !== null)
       .join(" · ");
   const forceExpanded = hasActiveFilters;
@@ -536,7 +582,12 @@ export function ModelTreePanel({
               ) : null}
               {hasActiveSeverityFilter ? (
                 <span
-                  className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border ${severityOptionTone(severityFilter, true)}`}
+                  className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border ${
+                    severityOptionTone(severityFilter, true, severityColor(severityFilter)).className
+                  }`}
+                  style={
+                    severityOptionTone(severityFilter, true, severityColor(severityFilter)).style
+                  }
                   aria-hidden="true"
                 />
               ) : null}
@@ -570,15 +621,14 @@ export function ModelTreePanel({
                   {hasValidationHighlights ? (
                     <>
                       <div className="mt-1.5 flex flex-wrap gap-1">
-                        {VIEWER_SEVERITY_FILTER_OPTIONS.map((option) => {
+                        {severityFilterOptions.map((option) => {
                           const count =
-                            option.value === "error"
-                              ? validationCounts.error
-                              : option.value === "warn"
-                                ? validationCounts.warn
-                                : option.value === "issues"
-                                  ? validationCounts.issues
-                                  : null;
+                            option.value === "all" ? null : validationCounts[option.value] ?? 0;
+                          const tone = severityOptionTone(
+                            option.value,
+                            severityFilter === option.value,
+                            option.color,
+                          );
 
                           return (
                             <button
@@ -586,7 +636,8 @@ export function ModelTreePanel({
                               type="button"
                               onClick={() => selectSeverityFilter(option.value)}
                               aria-pressed={severityFilter === option.value}
-                              className={`cursor-pointer rounded-lg border px-2 py-1 text-[11px] font-medium transition ${severityOptionTone(option.value, severityFilter === option.value)}`}
+                              className={`cursor-pointer rounded-lg border px-2 py-1 text-[11px] font-medium transition ${tone.className}`}
+                              style={tone.style}
                             >
                               {option.value === "all" ? "Any" : option.label}
                               {count === null ? null : (
@@ -598,7 +649,7 @@ export function ModelTreePanel({
                       </div>
                       {severityIsolation !== severityFilter ? (
                         <div className="mt-1.5 text-[10px] text-[color:var(--muted-ink)]">
-                          3D isolated to {viewerSeverityFilterLabel(severityIsolation)}
+                          3D isolated to {viewerSeverityFilterLabel(severities, severityIsolation)}
                         </div>
                       ) : null}
                     </>
@@ -738,6 +789,7 @@ export function ModelTreePanel({
                   registerRowButton={registerRowButton}
                   onToggle={toggleNode}
                   onSelectNode={onSelectNode}
+                  onIsolateSubtree={onIsolateSubtree}
                 />
               ))
             )}

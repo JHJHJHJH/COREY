@@ -20,14 +20,41 @@ import type {
   ViewerValidationRuleFailure,
   ViewerValidationRunPayload,
   ViewerValidationRunResult,
+  ViewerValidationSeverity,
   ViewerValidationSummary,
   ViewerValidationTarget,
   ViewerValidationValue,
 } from "@/features/viewer/types";
+import { VIEWER_VALIDATION_OK_RESULT } from "@/features/viewer/types";
+import {
+  buildViewerSeverityScale,
+  type ViewerSeverityScale,
+} from "@/features/viewer/lib/severity-scale";
 
-export const VIEWER_VALIDATION_CONFIG_VERSION = 2 as const;
+export const VIEWER_VALIDATION_CONFIG_VERSION = 4 as const;
 
 const LEGACY_VIEWER_VALIDATION_CONFIG_VERSION = 1 as const;
+/** Clause-based, `pattern` checks, no configurable severities. */
+const CLAUSE_VIEWER_VALIDATION_CONFIG_VERSION = 2 as const;
+/** `regex` checks, but severities still fixed to warn/error. */
+const PREVIOUS_VIEWER_VALIDATION_CONFIG_VERSION = 3 as const;
+
+/**
+ * Seeded severity list. The ids and colours match what warn/error rendered as before severities
+ * became configurable, so an existing install looks unchanged after migrating.
+ */
+export const DEFAULT_VIEWER_VALIDATION_SEVERITIES: readonly ViewerValidationSeverity[] = [
+  { id: "warn", label: "Warn", color: "#d29a2f", order: 1 },
+  { id: "error", label: "Error", color: "#bb5a36", order: 2 },
+];
+
+/** `"ok"` is the reserved non-failure result and can never name a severity. */
+const RESERVED_SEVERITY_IDS: ReadonlySet<string> = new Set([VIEWER_VALIDATION_OK_RESULT]);
+const SEVERITY_HEX_PATTERN = /^#[0-9a-f]{6}$/;
+const DEFAULT_SEVERITY_COLOR = "#6b7280";
+/** Cycled when adding a severity so consecutive new levels do not all look alike. */
+const NEW_SEVERITY_COLORS = ["#6b7280", "#2f7fd2", "#7c5cd6", "#1f9d6b", "#c2417a", "#b0761c"];
+const MAX_SEVERITIES = 12;
 
 export const VIEWER_VALIDATION_STORAGE_KEY = "corey.validation-rules.v1";
 
@@ -40,12 +67,6 @@ const EMPTY_VALUE_STATES: ReadonlySet<ViewerInspectionValueState> = new Set([
   "null",
   "undefined",
 ]);
-
-const VALIDATION_RESULT_PRIORITY: Record<ViewerValidationResult, number> = {
-  ok: 0,
-  warn: 1,
-  error: 2,
-};
 
 const VALID_INSPECTION_STATES: ReadonlySet<ViewerInspectionValueState> = new Set([
   "present",
@@ -135,9 +156,9 @@ function coerceBoolean(value: string): boolean | null {
   return null;
 }
 
-function compileAnchoredPattern(pattern: string, caseInsensitive: boolean): RegExp | null {
+function compileAnchoredRegex(regex: string, caseInsensitive: boolean): RegExp | null {
   try {
-    return new RegExp(`^(?:${pattern})$`, caseInsensitive ? "i" : "");
+    return new RegExp(`^(?:${regex})$`, caseInsensitive ? "i" : "");
   } catch {
     return null;
   }
@@ -210,8 +231,94 @@ function sanitizeValidationValue(value: unknown): ViewerValidationValue {
   };
 }
 
-function sanitizeValidationFailureSeverity(value: unknown): ViewerValidationFailureSeverity {
-  return value === "warn" ? "warn" : "error";
+/**
+ * Resolves a stored severity id against the configured scale. An unknown id lands on the most
+ * severe level rather than being silently downgraded — the previous fixed coercion to `"error"`
+ * would have made any custom id impossible to round-trip.
+ */
+function sanitizeValidationFailureSeverity(
+  scale: ViewerSeverityScale,
+  value: unknown,
+): ViewerValidationFailureSeverity {
+  return typeof value === "string" ? scale.resolve(value) : scale.fallbackId;
+}
+
+function slugifySeverityId(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+}
+
+/**
+ * Normalizes the configured severity list: valid ids and colours, no duplicates, no reserved
+ * ids, densely renumbered `order`, and never empty — the rest of the app assumes at least one
+ * severity exists.
+ */
+export function sanitizeViewerValidationSeverities(input: unknown): ViewerValidationSeverity[] {
+  const entries = Array.isArray(input) ? input : [];
+  const seen = new Set<string>();
+  const sanitized: ViewerValidationSeverity[] = [];
+
+  for (const entry of entries) {
+    if (!isRecord(entry)) {
+      continue;
+    }
+
+    const id = slugifySeverityId(String(entry.id ?? ""));
+    if (!id || RESERVED_SEVERITY_IDS.has(id) || seen.has(id)) {
+      continue;
+    }
+
+    const color = String(entry.color ?? "").trim().toLowerCase();
+    const label = normalizeStoredText(String(entry.label ?? ""));
+    const order = typeof entry.order === "number" && Number.isFinite(entry.order)
+      ? entry.order
+      : sanitized.length;
+
+    seen.add(id);
+    sanitized.push({
+      id,
+      label: label || id,
+      color: SEVERITY_HEX_PATTERN.test(color) ? color : DEFAULT_SEVERITY_COLOR,
+      order,
+    });
+
+    if (sanitized.length >= MAX_SEVERITIES) {
+      break;
+    }
+  }
+
+  if (sanitized.length === 0) {
+    return DEFAULT_VIEWER_VALIDATION_SEVERITIES.map((severity) => ({ ...severity }));
+  }
+
+  return sanitized
+    .sort((left, right) => left.order - right.order)
+    .map((severity, index) => ({ ...severity, order: index + 1 }));
+}
+
+/**
+ * Keeps the user's own definitions when a config arrives from an import or a starter template:
+ * ids they already have keep their label, colour and rank, and ids only the incoming config
+ * knows about are appended above them.
+ */
+export function mergeViewerValidationSeverities(
+  current: ViewerValidationSeverity[],
+  incoming: ViewerValidationSeverity[],
+): ViewerValidationSeverity[] {
+  const currentById = new Map(current.map((severity) => [severity.id, severity]));
+  const merged = [...current];
+
+  for (const severity of incoming) {
+    if (!currentById.has(severity.id)) {
+      merged.push(severity);
+    }
+  }
+
+  return sanitizeViewerValidationSeverities(merged);
 }
 
 function sanitizeValidationRow(row: unknown): ViewerValidationRow {
@@ -243,7 +350,7 @@ function sanitizeValidationRow(row: unknown): ViewerValidationRow {
   };
 }
 
-function sanitizeValidationRuleFailure(input: unknown): ViewerValidationRuleFailure {
+function sanitizeValidationRuleFailure(scale: ViewerSeverityScale, input: unknown): ViewerValidationRuleFailure {
   if (!isRecord(input)) {
     throw new Error("Each validation rule failure must be an object.");
   }
@@ -261,12 +368,12 @@ function sanitizeValidationRuleFailure(input: unknown): ViewerValidationRuleFail
     clauseId,
     clauseTitle,
     ruleId,
-    result: sanitizeValidationFailureSeverity(input.result),
+    result: sanitizeValidationFailureSeverity(scale, input.result),
     description,
   };
 }
 
-function sanitizeValidationClauseFailure(input: unknown): ViewerValidationClauseFailure {
+function sanitizeValidationClauseFailure(scale: ViewerSeverityScale, input: unknown): ViewerValidationClauseFailure {
   if (!isRecord(input)) {
     throw new Error("Each validation clause failure must be an object.");
   }
@@ -280,14 +387,14 @@ function sanitizeValidationClauseFailure(input: unknown): ViewerValidationClause
   return {
     clauseId,
     clauseTitle,
-    result: sanitizeValidationFailureSeverity(input.result),
+    result: sanitizeValidationFailureSeverity(scale, input.result),
     rules: Array.isArray(input.rules)
-      ? input.rules.map((failure) => sanitizeValidationRuleFailure(failure))
+      ? input.rules.map((failure) => sanitizeValidationRuleFailure(scale, failure))
       : [],
   };
 }
 
-function sanitizeValidationElementResult(input: unknown): ViewerValidationElementResult {
+function sanitizeValidationElementResult(scale: ViewerSeverityScale, input: unknown): ViewerValidationElementResult {
   if (!isRecord(input)) {
     throw new Error("Each validation element result must be an object.");
   }
@@ -301,15 +408,19 @@ function sanitizeValidationElementResult(input: unknown): ViewerValidationElemen
   return {
     modelId,
     localId: Math.trunc(localId),
-    result: sanitizeValidationFailureSeverity(input.result),
+    result: sanitizeValidationFailureSeverity(scale, input.result),
     failedClauses: Array.isArray(input.failedClauses)
-      ? input.failedClauses.map((failure) => sanitizeValidationClauseFailure(failure))
+      ? input.failedClauses.map((failure) => sanitizeValidationClauseFailure(scale, failure))
       : [],
   };
 }
 
-function compareValidationResult(left: ViewerValidationResult, right: ViewerValidationResult) {
-  return VALIDATION_RESULT_PRIORITY[left] - VALIDATION_RESULT_PRIORITY[right];
+function compareValidationResult(
+  scale: ViewerSeverityScale,
+  left: ViewerValidationResult,
+  right: ViewerValidationResult,
+) {
+  return scale.rank(left) - scale.rank(right);
 }
 
 function readInspectionAttributeText(inspection: ViewerElementInspection, name: string) {
@@ -378,10 +489,10 @@ function sanitizeCheck(check: unknown): ViewerValidationCheck {
     };
   }
 
-  if (check.kind === "pattern") {
+  if (check.kind === "regex") {
     return {
-      kind: "pattern",
-      pattern: normalizeStoredText(String(check.pattern ?? "")),
+      kind: "regex",
+      regex: normalizeStoredText(String(check.regex ?? "")),
       caseInsensitive: Boolean(check.caseInsensitive),
     };
   }
@@ -396,15 +507,14 @@ function sanitizeCheck(check: unknown): ViewerValidationCheck {
   throw new Error(`Unsupported rule check kind: ${String(check.kind)}`);
 }
 
-function sanitizeRule(rule: unknown): ViewerValidationRule {
+function sanitizeRule(scale: ViewerSeverityScale, rule: unknown): ViewerValidationRule {
   if (!isRecord(rule)) {
     throw new Error("Each rule entry must be an object.");
   }
 
   const ifcType = normalizeStoredText(String(rule.ifcType ?? ""));
   const subtype = normalizeStoredText(String(rule.subtype ?? ""));
-  const failSeverity =
-    rule.failSeverity === "warn" || rule.failSeverity === "error" ? rule.failSeverity : "error";
+  const failSeverity = sanitizeValidationFailureSeverity(scale, rule.failSeverity);
 
   return {
     id: typeof rule.id === "string" && rule.id.trim().length > 0 ? rule.id : createRuleId(),
@@ -417,7 +527,7 @@ function sanitizeRule(rule: unknown): ViewerValidationRule {
   };
 }
 
-function sanitizeClause(clause: unknown): ViewerValidationClause {
+function sanitizeClause(scale: ViewerSeverityScale, clause: unknown): ViewerValidationClause {
   if (!isRecord(clause)) {
     throw new Error("Each clause entry must be an object.");
   }
@@ -428,7 +538,7 @@ function sanitizeClause(clause: unknown): ViewerValidationClause {
   return {
     id: typeof clause.id === "string" && clause.id.trim().length > 0 ? clause.id : createClauseId(),
     title,
-    rules: rules.map((rule) => sanitizeRule(rule)),
+    rules: rules.map((rule) => sanitizeRule(scale, rule)),
   };
 }
 
@@ -453,9 +563,9 @@ function isRunnableRule(rule: ViewerValidationRule) {
     return false;
   }
 
-  if (rule.check.kind === "pattern") {
-    const pattern = normalizeStoredText(rule.check.pattern);
-    if (!pattern || !compileAnchoredPattern(pattern, rule.check.caseInsensitive)) {
+  if (rule.check.kind === "regex") {
+    const regex = normalizeStoredText(rule.check.regex);
+    if (!regex || !compileAnchoredRegex(regex, rule.check.caseInsensitive)) {
       return false;
     }
   }
@@ -510,8 +620,8 @@ function evaluateRuleAgainstValue(
       : rule.failSeverity;
   }
 
-  if (rule.check.kind === "pattern") {
-    const regex = compileAnchoredPattern(rule.check.pattern, rule.check.caseInsensitive);
+  if (rule.check.kind === "regex") {
+    const regex = compileAnchoredRegex(rule.check.regex, rule.check.caseInsensitive);
     if (!regex) {
       return rule.failSeverity;
     }
@@ -575,7 +685,10 @@ function uniqueRuleFailures(ruleFailures: ViewerValidationRuleFailure[]) {
   return [...unique.values()];
 }
 
-function aggregateClauseFailures(ruleFailures: ViewerValidationRuleFailure[]) {
+function aggregateClauseFailures(
+  scale: ViewerSeverityScale,
+  ruleFailures: ViewerValidationRuleFailure[],
+) {
   const grouped = new Map<string, ViewerValidationClauseFailure>();
 
   for (const failure of uniqueRuleFailures(ruleFailures)) {
@@ -591,36 +704,40 @@ function aggregateClauseFailures(ruleFailures: ViewerValidationRuleFailure[]) {
     }
 
     existing.result =
-      VALIDATION_RESULT_PRIORITY[failure.result] > VALIDATION_RESULT_PRIORITY[existing.result]
-        ? failure.result
-        : existing.result;
+      scale.rank(failure.result) > scale.rank(existing.result) ? failure.result : existing.result;
     existing.rules.push(failure);
   }
 
   return [...grouped.values()];
 }
 
-function summarizeValidation(matches: ViewerValidationMatch[]): ViewerValidationSummary | null {
+function summarizeValidation(
+  scale: ViewerSeverityScale,
+  matches: ViewerValidationMatch[],
+): ViewerValidationSummary | null {
   if (matches.length === 0) {
     return null;
   }
 
   let result: ViewerValidationResult | null = null;
   let okCount = 0;
-  let warnCount = 0;
-  let errorCount = 0;
+  // Seeded with every configured severity so callers can render a stable set of counters even
+  // when a severity has no failures.
+  const countsBySeverity: Record<string, number> = Object.fromEntries(
+    scale.ids.map((id) => [id, 0]),
+  );
   const failedRuleMatches: ViewerValidationRuleFailure[] = [];
 
   for (const match of matches) {
     result =
-      result === null || compareValidationResult(match.result, result) > 0 ? match.result : result;
+      result === null || compareValidationResult(scale, match.result, result) > 0
+        ? match.result
+        : result;
 
-    if (match.result === "ok") {
+    if (match.result === VIEWER_VALIDATION_OK_RESULT) {
       okCount += 1;
-    } else if (match.result === "warn") {
-      warnCount += 1;
     } else {
-      errorCount += 1;
+      countsBySeverity[match.result] = (countsBySeverity[match.result] ?? 0) + 1;
     }
 
     for (const clauseFailure of match.clauseFailures) {
@@ -628,14 +745,13 @@ function summarizeValidation(matches: ViewerValidationMatch[]): ViewerValidation
     }
   }
 
-  const failedClauses = aggregateClauseFailures(failedRuleMatches);
+  const failedClauses = aggregateClauseFailures(scale, failedRuleMatches);
 
   return {
     result,
     targetedRowCount: matches.length,
     okCount,
-    warnCount,
-    errorCount,
+    countsBySeverity,
     failedClauseCount: failedClauses.length,
     failedClauses,
   };
@@ -763,6 +879,7 @@ function appendMissingValidationPropertyRows(
 }
 
 function applyValidationToInspectionRows(
+  scale: ViewerSeverityScale,
   rows: ViewerInspectionRow[],
   compiledRules: CompiledViewerValidationRuleMap,
   ifcType: string | null,
@@ -779,25 +896,22 @@ function applyValidationToInspectionRows(
     }
 
     const failedRuleMatches: ViewerValidationRuleFailure[] = [];
-    let result: ViewerValidationResult = "ok";
+    let result: ViewerValidationResult = VIEWER_VALIDATION_OK_RESULT;
 
     for (const compiledRule of rules) {
       const evaluation = evaluateRuleAgainstValue(toValidationValue(row.value), compiledRule.rule);
-      if (evaluation === "ok") {
+      if (evaluation === VIEWER_VALIDATION_OK_RESULT) {
         continue;
       }
 
       failedRuleMatches.push(toRuleFailure(compiledRule, evaluation));
-      result =
-        VALIDATION_RESULT_PRIORITY[evaluation] > VALIDATION_RESULT_PRIORITY[result]
-          ? evaluation
-          : result;
+      result = scale.rank(evaluation) > scale.rank(result) ? evaluation : result;
     }
 
     const match = {
       result,
       failedRuleCount: failedRuleMatches.length,
-      clauseFailures: aggregateClauseFailures(failedRuleMatches),
+      clauseFailures: aggregateClauseFailures(scale, failedRuleMatches),
     } satisfies ViewerValidationMatch;
 
     matches.push(match);
@@ -862,28 +976,70 @@ function buildCompactRowValue(
   };
 }
 
+function migrateLegacyRegexCheck(check: unknown) {
+  if (!isRecord(check) || check.kind !== "pattern") {
+    return check;
+  }
+
+  return {
+    ...check,
+    kind: "regex",
+    regex: check.pattern,
+  };
+}
+
+function migrateLegacyRegexRule(rule: unknown) {
+  if (!isRecord(rule)) {
+    return rule;
+  }
+
+  return {
+    ...rule,
+    check: migrateLegacyRegexCheck(rule.check),
+  };
+}
+
+function migrateLegacyRegexClause(clause: unknown) {
+  if (!isRecord(clause)) {
+    return clause;
+  }
+
+  return {
+    ...clause,
+    rules: Array.isArray(clause.rules) ? clause.rules.map(migrateLegacyRegexRule) : clause.rules,
+  };
+}
+
 function migrateLegacyViewerValidationConfig(input: unknown): ViewerValidationConfig | null {
   if (!isRecord(input) || input.version !== LEGACY_VIEWER_VALIDATION_CONFIG_VERSION) {
     return null;
   }
 
   const rules = Array.isArray(input.rules) ? input.rules : [];
+  const severities = defaultViewerValidationSeverities();
+  const scale = buildViewerSeverityScale(severities);
 
   return {
     version: VIEWER_VALIDATION_CONFIG_VERSION,
+    severities,
     clauses: [
       {
         id: createClauseId(),
         title: LEGACY_MIGRATION_CLAUSE_TITLE,
-        rules: rules.map((rule) => sanitizeRule(rule)),
+        rules: rules.map((rule) => sanitizeRule(scale, migrateLegacyRegexRule(rule))),
       },
     ],
   };
 }
 
+export function defaultViewerValidationSeverities(): ViewerValidationSeverity[] {
+  return DEFAULT_VIEWER_VALIDATION_SEVERITIES.map((severity) => ({ ...severity }));
+}
+
 export function createEmptyViewerValidationConfig(): ViewerValidationConfig {
   return {
     version: VIEWER_VALIDATION_CONFIG_VERSION,
+    severities: defaultViewerValidationSeverities(),
     clauses: [],
   };
 }
@@ -901,6 +1057,24 @@ export function createViewerValidationRule(): ViewerValidationRule {
     },
     failSeverity: "error",
   };
+}
+
+/** A new severity, ranked as the most severe and given a distinct default colour. */
+export function createViewerValidationSeverity(
+  existing: ViewerValidationSeverity[],
+): ViewerValidationSeverity {
+  const used = new Set(existing.map((severity) => severity.id));
+  let index = existing.length + 1;
+  let id = `severity-${index}`;
+  while (used.has(id)) {
+    index += 1;
+    id = `severity-${index}`;
+  }
+
+  const maxOrder = existing.reduce((highest, severity) => Math.max(highest, severity.order), 0);
+  const palette = NEW_SEVERITY_COLORS[existing.length % NEW_SEVERITY_COLORS.length];
+
+  return { id, label: `Severity ${index}`, color: palette, order: maxOrder + 1 };
 }
 
 export function createViewerValidationClause(): ViewerValidationClause {
@@ -1021,8 +1195,8 @@ export function describeViewerValidationRule(rule: ViewerValidationRule) {
     return `${targetLabel} must be one of ${rule.check.allowedValues.join(", ")}`;
   }
 
-  if (rule.check.kind === "pattern") {
-    return `${targetLabel} must match /${rule.check.pattern}/${rule.check.caseInsensitive ? "i" : ""}`;
+  if (rule.check.kind === "regex") {
+    return `${targetLabel} must match /${rule.check.regex}/${rule.check.caseInsensitive ? "i" : ""}`;
   }
 
   if (rule.check.kind === "boolean") {
@@ -1044,10 +1218,17 @@ export function flattenViewerValidationClauses(clauses: ViewerValidationClause[]
   return clauses.flatMap((clause) => clause.rules);
 }
 
-export function sanitizeViewerValidationConfig(config: ViewerValidationConfig): ViewerValidationConfig {
+export function sanitizeViewerValidationConfig(config: {
+  severities?: unknown;
+  clauses: unknown[];
+}): ViewerValidationConfig {
+  const severities = sanitizeViewerValidationSeverities(config.severities);
+  const scale = buildViewerSeverityScale(severities);
+
   return {
     version: VIEWER_VALIDATION_CONFIG_VERSION,
-    clauses: config.clauses.map((clause) => sanitizeClause(clause)),
+    severities,
+    clauses: config.clauses.map((clause) => sanitizeClause(scale, clause)),
   };
 }
 
@@ -1062,7 +1243,12 @@ export function parseViewerValidationConfig(input: unknown): ViewerValidationCon
     );
   }
 
-  if (input.version !== VIEWER_VALIDATION_CONFIG_VERSION) {
+  const version = input.version;
+  if (
+    version !== CLAUSE_VIEWER_VALIDATION_CONFIG_VERSION &&
+    version !== PREVIOUS_VIEWER_VALIDATION_CONFIG_VERSION &&
+    version !== VIEWER_VALIDATION_CONFIG_VERSION
+  ) {
     throw new Error(`Rules JSON version must be ${VIEWER_VALIDATION_CONFIG_VERSION}.`);
   }
 
@@ -1070,10 +1256,18 @@ export function parseViewerValidationConfig(input: unknown): ViewerValidationCon
     throw new Error("Rules JSON must contain a clauses array.");
   }
 
-  return sanitizeViewerValidationConfig({
-    version: VIEWER_VALIDATION_CONFIG_VERSION,
-    clauses: input.clauses.map((clause) => sanitizeClause(clause)),
-  });
+  // v2 spelled the regex check `pattern`; v2 and v3 both predate configurable severities, so the
+  // sanitizer seeds the default warn/error list for them.
+  const clauses =
+    version === CLAUSE_VIEWER_VALIDATION_CONFIG_VERSION
+      ? input.clauses.map((clause) => migrateLegacyRegexClause(clause))
+      : input.clauses;
+  const severities =
+    version === VIEWER_VALIDATION_CONFIG_VERSION
+      ? input.severities
+      : defaultViewerValidationSeverities();
+
+  return sanitizeViewerValidationConfig({ severities, clauses });
 }
 
 export function parseStoredViewerValidationConfig(input: unknown): ViewerValidationConfig {
@@ -1092,6 +1286,7 @@ export function parseViewerValidationRunPayload(input: unknown): ViewerValidatio
 
   const config = parseViewerValidationConfig({
     version: input.version,
+    severities: input.severities,
     clauses: input.clauses,
   });
 
@@ -1106,6 +1301,7 @@ export function parseViewerValidationRunPayload(input: unknown): ViewerValidatio
   return {
     version: config.version,
     sourceId: input.sourceId,
+    severities: config.severities,
     clauses: config.clauses,
     rows: input.rows.map((row) => sanitizeValidationRow(row)),
   };
@@ -1128,14 +1324,17 @@ export function parseViewerValidationRunResult(
     throw new Error("Validation result does not match this model.");
   }
 
+  const severities = sanitizeViewerValidationSeverities(input.severities);
+  const scale = buildViewerSeverityScale(severities);
   const failedClauses = Array.isArray(input.failedClauses)
-    ? input.failedClauses.map((failure) => sanitizeValidationClauseFailure(failure))
+    ? input.failedClauses.map((failure) => sanitizeValidationClauseFailure(scale, failure))
     : [];
 
   return {
     sourceId,
+    severities,
     results: Array.isArray(input.results)
-      ? input.results.map((result) => sanitizeValidationElementResult(result))
+      ? input.results.map((result) => sanitizeValidationElementResult(scale, result))
       : [],
     failedClauseCount:
       typeof input.failedClauseCount === "number" && Number.isFinite(input.failedClauseCount)
@@ -1176,7 +1375,7 @@ export function serializeViewerValidationConfig(config: ViewerValidationConfig) 
 export function compileViewerValidationRules(clauses: ViewerValidationClause[]) {
   const compiled: CompiledViewerValidationRuleMap = new Map();
 
-  for (const clause of clauses.map((entry) => sanitizeClause(entry))) {
+  for (const clause of clauses) {
     for (const rule of clause.rules.filter(isRunnableRule)) {
       const applicabilityKey = buildViewerValidationApplicabilityKey(rule.ifcType, rule.subtype);
       const targetId = buildViewerValidationTargetId(rule.target);
@@ -1249,6 +1448,7 @@ export async function evaluateViewerValidationPayload(
     signal?: AbortSignal;
   },
 ): Promise<ViewerValidationRunResult> {
+  const scale = buildViewerSeverityScale(payload.severities);
   const compiledRules = compileViewerValidationRules(payload.clauses);
   const results: ViewerValidationElementResult[] = [];
   const allRuleFailures: ViewerValidationRuleFailure[] = [];
@@ -1286,20 +1486,18 @@ export async function evaluateViewerValidationPayload(
         for (const compiledRule of rulesForTarget) {
           const evaluation = evaluateRuleAgainstValue(value, compiledRule.rule);
 
-          if (evaluation === "ok") {
+          if (evaluation === VIEWER_VALIDATION_OK_RESULT) {
             continue;
           }
 
           failedRuleMatches.push(toRuleFailure(compiledRule, evaluation));
           result =
-            result === null || VALIDATION_RESULT_PRIORITY[evaluation] > VALIDATION_RESULT_PRIORITY[result]
-              ? evaluation
-              : result;
+            result === null || scale.rank(evaluation) > scale.rank(result) ? evaluation : result;
         }
       }
 
       if (result) {
-        const failedClauses = aggregateClauseFailures(failedRuleMatches);
+        const failedClauses = aggregateClauseFailures(scale, failedRuleMatches);
         allRuleFailures.push(...failedRuleMatches);
         results.push({
           modelId: row.modelId,
@@ -1316,45 +1514,60 @@ export async function evaluateViewerValidationPayload(
     });
   }
 
-  const failedClauses = aggregateClauseFailures(allRuleFailures);
+  const failedClauses = aggregateClauseFailures(scale, allRuleFailures);
 
   return {
     sourceId: payload.sourceId,
+    severities: scale.list,
     results,
     failedClauseCount: failedClauses.length,
     failedClauses,
   };
 }
 
+/**
+ * Buckets each element under its single worst severity, so the 3D view paints an element with
+ * several failures in the colour of the highest-order severity it hit.
+ */
 export function groupViewerValidationResultsBySeverity(
+  severities: ViewerValidationSeverity[],
   results: ViewerValidationElementResult[],
 ): ViewerValidationHighlights {
-  const warn: ViewerValidationElementMap = {};
-  const error: ViewerValidationElementMap = {};
+  const scale = buildViewerSeverityScale(severities);
+  const highlights: ViewerValidationHighlights = Object.fromEntries(
+    scale.ids.map((id) => [id, {} as ViewerValidationElementMap]),
+  );
 
   for (const result of results) {
-    const bucket = result.result === "error" ? error : warn;
+    const bucket = highlights[scale.resolve(result.result)];
+    if (!bucket) {
+      continue;
+    }
+
     const modelIds = bucket[result.modelId] ?? [];
     modelIds.push(result.localId);
     bucket[result.modelId] = modelIds;
   }
 
-  return { warn, error };
+  return highlights;
 }
 
 export function applyViewerValidationToInspection(
   inspection: ViewerElementInspection | null,
   clauses: ViewerValidationClause[],
+  severities: ViewerValidationSeverity[],
 ) {
   if (!inspection) {
     return null;
   }
 
+  const scale = buildViewerSeverityScale(severities);
   const compiledRules = compileViewerValidationRules(clauses);
   const inspectionIfcType = getInspectionIfcType(inspection);
   const inspectionSubtype = getInspectionSubtype(inspection);
   const matches: ViewerValidationMatch[] = [];
   const summaryRows = applyValidationToInspectionRows(
+    scale,
     inspection.summaryRows,
     compiledRules,
     inspectionIfcType,
@@ -1369,6 +1582,7 @@ export function applyViewerValidationToInspection(
   );
   const propertySets: ViewerInspectionGroup[] = propertySetsWithMissingRows.map((group) => {
     const rows = applyValidationToInspectionRows(
+      scale,
       group.rows,
       compiledRules,
       inspectionIfcType,
@@ -1388,6 +1602,6 @@ export function applyViewerValidationToInspection(
     summaryRows,
     propertySets,
     issueCount: countInspectionIssues(summaryRows, propertySets),
-    validationSummary: summarizeValidation(matches),
+    validationSummary: summarizeValidation(scale, matches),
   };
 }

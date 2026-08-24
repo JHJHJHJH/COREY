@@ -3,6 +3,7 @@ import {
   coerceViewerDataTableInputValue,
   sanitizeViewerDataTableDraft,
 } from "@/features/viewer/lib/data-table-draft";
+import { buildViewerSeverityScale } from "@/features/viewer/lib/severity-scale";
 import { collectElementResultSeverities } from "@/features/viewer/lib/validation-severity";
 import type {
   ViewerDataTableCell,
@@ -32,7 +33,12 @@ const DEFAULT_QUERY_LIMIT = 25;
 const MAX_QUERY_LIMIT = 100;
 const MAX_ELEMENT_DETAILS = 25;
 const MAX_DRAFT_EDITS = 50;
-const FAILURE_SEVERITY_ORDER: readonly ViewerValidationFailureSeverity[] = ["error", "warn"];
+/** Severity ids most-severe first, taken from the run's own configured scale. */
+function failureSeverityOrder(result: ViewerValidationRunResult | null) {
+  return buildViewerSeverityScale(result?.severities ?? []).descending.map(
+    (severity) => severity.id,
+  );
+}
 
 type CursorPayload = {
   revision: string;
@@ -145,18 +151,25 @@ function validationByLocalId(result: ViewerValidationRunResult | null) {
   return new Map(result?.results.map((entry) => [entry.localId, entry]) ?? []);
 }
 
-function failureSeverities(entry: ViewerValidationElementResult) {
+function failureSeverities(
+  order: readonly ViewerValidationFailureSeverity[],
+  entry: ViewerValidationElementResult,
+) {
   const severities = collectElementResultSeverities(entry);
-  return FAILURE_SEVERITY_ORDER.filter((severity) => severities.has(severity));
+  return order.filter((severity) => severities.has(severity));
 }
 
-function validationSeverities(entry: ViewerValidationElementResult | undefined) {
-  return entry ? failureSeverities(entry) : (["ok"] satisfies ViewerValidationResult[]);
+function validationSeverities(
+  order: readonly ViewerValidationFailureSeverity[],
+  entry: ViewerValidationElementResult | undefined,
+) {
+  return entry ? failureSeverities(order, entry) : (["ok"] satisfies ViewerValidationResult[]);
 }
 
 function toElementSummary(
   row: ViewerDataTableData["rows"][number],
   validation: ReturnType<typeof validationByLocalId>,
+  severityOrder: readonly ViewerValidationFailureSeverity[],
 ): CoreyMcpElementSummary {
   const match = validation.get(row.localId);
   return {
@@ -165,7 +178,7 @@ function toElementSummary(
     name: row.cells.name?.state === "present" ? row.cells.name.text : row.selection.label,
     localId: row.localId,
     validation: match?.result ?? "ok",
-    validationSeverities: validationSeverities(match),
+    validationSeverities: validationSeverities(severityOrder, match),
   };
 }
 
@@ -197,11 +210,12 @@ export function queryMcpElements(input: {
   const wantedValidation = new Set(query.validation ?? []);
   const normalizedText = query.text?.trim().toLowerCase() ?? "";
   const validation = validationByLocalId(input.validation);
+  const severityOrder = failureSeverityOrder(input.validation);
 
   const matched = data.rows.filter((row) => {
     if (wantedTypes.size > 0 && !wantedTypes.has((row.ifcType ?? "").toUpperCase())) return false;
     if (normalizedText && !row.searchText.includes(normalizedText)) return false;
-    const severities = validationSeverities(validation.get(row.localId));
+    const severities = validationSeverities(severityOrder, validation.get(row.localId));
     if (
       wantedValidation.size > 0 &&
       !severities.some((severity) => wantedValidation.has(severity))
@@ -211,7 +225,9 @@ export function queryMcpElements(input: {
     return (query.where ?? []).every((predicate) => matchesPredicate(row, data, predicate));
   });
 
-  const items = matched.slice(offset, offset + limit).map((row) => toElementSummary(row, validation));
+  const items = matched
+    .slice(offset, offset + limit)
+    .map((row) => toElementSummary(row, validation, severityOrder));
   const nextOffset = offset + items.length;
   return {
     total: matched.length,
@@ -254,6 +270,7 @@ export function getMcpElements(input: {
       .filter((entry): entry is [string, ViewerDataTableData["rows"][number]] => Boolean(entry[0])),
   );
   const validation = validationByLocalId(input.validation);
+  const severityOrder = failureSeverityOrder(input.validation);
   const columnsByKey = new Map(input.data.columns.map((column) => [column.key, column]));
   const items = ids.map((globalId) => {
     const row = rowsById.get(globalId);
@@ -277,7 +294,7 @@ export function getMcpElements(input: {
     );
     return {
       found: true as const,
-      ...toElementSummary(row, validation),
+      ...toElementSummary(row, validation, severityOrder),
       fields,
       validationFailures: validation.get(row.localId)?.failedClauses ?? [],
     };
@@ -358,12 +375,19 @@ export function validationSummary(
   rowCount: number,
 ): CoreyMcpValidationSummary {
   const results = result?.results ?? [];
-  let errors = 0;
-  let warnings = 0;
+  const severityList = result?.severities ?? [];
+  // Seeded with every configured severity so the shape is stable even at zero failures. An
+  // element failing at several severities is counted under each, so these can sum to more than
+  // `evaluatedIssueCount`.
+  const countsBySeverity: Record<string, number> = Object.fromEntries(
+    severityList.map((severity) => [severity.id, 0]),
+  );
   for (const entry of results) {
-    const severities = collectElementResultSeverities(entry);
-    if (severities.has("error")) errors += 1;
-    if (severities.has("warn")) warnings += 1;
+    for (const severity of collectElementResultSeverities(entry)) {
+      if (severity in countsBySeverity) {
+        countsBySeverity[severity] += 1;
+      }
+    }
   }
 
   const evaluatedIssueCount = results.length;
@@ -371,8 +395,8 @@ export function validationSummary(
     rowCount,
     evaluatedIssueCount,
     okCount: Math.max(0, rowCount - evaluatedIssueCount),
-    warnCount: warnings,
-    errorCount: errors,
+    severities: severityList,
+    countsBySeverity,
     failedClauseCount: result?.failedClauseCount ?? 0,
     failedClauses: result?.failedClauses ?? [],
   };
@@ -381,7 +405,7 @@ export function validationSummary(
 export function queryValidationIssues(input: {
   data: ViewerDataTableData;
   result: ViewerValidationRunResult | null;
-  severities?: Array<"warn" | "error">;
+  severities?: string[];
   clauseIds?: string[];
   ifcTypes?: string[];
   cursor?: string;
@@ -394,8 +418,9 @@ export function queryValidationIssues(input: {
   const severities = new Set(input.severities ?? []);
   const clauseIds = new Set(input.clauseIds ?? []);
   const ifcTypes = new Set((input.ifcTypes ?? []).map((value) => value.toUpperCase()));
+  const severityOrder = failureSeverityOrder(input.result);
   const matches = (input.result?.results ?? [])
-    .map((entry) => ({ entry, severities: failureSeverities(entry) }))
+    .map((entry) => ({ entry, severities: failureSeverities(severityOrder, entry) }))
     .filter(({ entry, severities: entrySeverities }) => {
       if (
         severities.size > 0 &&

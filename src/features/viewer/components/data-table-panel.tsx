@@ -14,7 +14,17 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import {
+  memo,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import { StatusBar, type StatusSegment, type StatusTone } from "@/components/status-bar/status-bar";
 import { InspectorDetailList } from "@/components/status-bar/status-inspector";
 import {
@@ -24,12 +34,17 @@ import {
   sortViewerDataTableRows,
 } from "@/features/viewer/lib/ifc-data";
 import {
-  VIEWER_SEVERITY_FILTER_OPTIONS,
+  SEVERITY_TONE_CLASS,
+  severityCssVars,
+} from "@/features/viewer/lib/severity-style";
+import {
+  buildViewerSeverityFilterOptions,
   createEmptyViewerValidationSeverityRowKeys,
   matchesViewerValidationSeverityRowKey,
   viewerSeverityFilterChipLabel,
   viewerSeverityFilterLabel,
 } from "@/features/viewer/lib/validation-severity";
+import { useViewerSeverities } from "@/features/rules/rules-provider";
 import type {
   ModelMetadata,
   ViewerValidationClauseTableView,
@@ -43,7 +58,7 @@ import type {
   ViewerSelection,
 } from "@/features/viewer/types";
 
-const emptySeverityRowKeys = createEmptyViewerValidationSeverityRowKeys();
+const emptySeverityRowKeys = createEmptyViewerValidationSeverityRowKeys([]);
 
 type DataTablePanelProps = {
   embedded?: boolean;
@@ -63,6 +78,10 @@ type DataTablePanelProps = {
   onSeverityFilterChange?: (filter: ViewerValidationSeverityFilter) => void;
   onEditCell: (edit: ViewerDataTableCellEditRequest) => void;
   onSelectRow: (localId: number) => void;
+  onShownRowsChange?: (snapshot: {
+    data: NonNullable<ViewerDataTableState["data"]>;
+    rowKeys: string[];
+  }) => void;
   showMetaHeader?: boolean;
 };
 
@@ -103,26 +122,37 @@ const bodyCellClassName =
 // Vertical hairline separating columns, like the clause grid.
 const columnDividerClassName = "border-r border-[color:var(--viewer-border)]";
 
-function validationClauseTone(result: ViewerValidationClauseTableView["result"]) {
-  return result === "error"
-    ? "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]"
-    : "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
+/** A clause chip is painted with the colour of the worst severity in that clause. */
+function validationClauseTone(color: string | null) {
+  return color
+    ? { className: SEVERITY_TONE_CLASS, style: severityCssVars(color) }
+    : {
+        className:
+          "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)]",
+        style: undefined,
+      };
 }
 
-function validationSeverityFilterTone(filter: ViewerValidationSeverityFilter) {
-  if (filter === "error") {
-    return "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]";
-  }
-
-  if (filter === "warn") {
-    return "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
-  }
-
+function validationSeverityFilterTone(
+  filter: ViewerValidationSeverityFilter,
+  color: string | null,
+) {
   if (filter === "issues") {
-    return "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]";
+    return {
+      className: "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]",
+      style: undefined,
+    };
   }
 
-  return "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)]";
+  if (filter !== "all" && color) {
+    return { className: SEVERITY_TONE_CLASS, style: severityCssVars(color) };
+  }
+
+  return {
+    className:
+      "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)]",
+    style: undefined,
+  };
 }
 
 function compactButtonTone(active: boolean) {
@@ -507,14 +537,21 @@ const DataTablePanelComponent = function DataTablePanel({
   onSeverityFilterChange,
   onEditCell,
   onSelectRow,
+  onShownRowsChange,
   showMetaHeader = true,
 }: DataTablePanelProps) {
   const selectAllRef = useRef<HTMLInputElement | null>(null);
   const clauseMenuRef = useRef<HTMLDivElement | null>(null);
   const columnMenuRef = useRef<HTMLDivElement | null>(null);
   const data = tableState.data;
-  const hasValidationSeverities =
-    validationSeverityRowKeys.error.size > 0 || validationSeverityRowKeys.warn.size > 0;
+  const { severities, color: severityColor, label: severityLabel } = useViewerSeverities();
+  const severityFilterOptions = useMemo(
+    () => buildViewerSeverityFilterOptions(severities),
+    [severities],
+  );
+  const hasValidationSeverities = Object.values(validationSeverityRowKeys).some(
+    (rowKeys) => rowKeys.size > 0,
+  );
   const dataSignature = useMemo(() => buildDataSignature(data), [data]);
   const [uiState, setUiState] = useState<DataTableUiState>(() =>
     buildDefaultUiState(dataSignature, data),
@@ -574,6 +611,7 @@ const DataTablePanelComponent = function DataTablePanel({
     if (activeUiState.validationSeverity !== "all") {
       nextRows = nextRows.filter((row) =>
         matchesViewerValidationSeverityRowKey(
+          severities,
           row.key,
           validationSeverityRowKeys,
           activeUiState.validationSeverity,
@@ -592,6 +630,7 @@ const DataTablePanelComponent = function DataTablePanel({
     activeUiState.showEditedOnly,
     activeUiState.validationSeverity,
     data,
+    severities,
     deferredIfcTypeFilter,
     deferredQuery,
     validationSeverityRowKeys,
@@ -639,6 +678,17 @@ const DataTablePanelComponent = function DataTablePanel({
     () => sortViewerDataTableRows(filteredRows, activeUiState.sort),
     [activeUiState.sort, filteredRows],
   );
+
+  useLayoutEffect(() => {
+    if (!data) {
+      return;
+    }
+
+    onShownRowsChange?.({
+      data,
+      rowKeys: visibleRows.map((row) => row.key),
+    });
+  }, [data, onShownRowsChange, visibleRows]);
 
   const allVisibleSelected =
     visibleRows.length > 0 &&
@@ -939,7 +989,7 @@ const DataTablePanelComponent = function DataTablePanel({
     activeUiState.ifcTypeFilter || null,
     activeClauseView ? "Clause" : null,
     activeUiState.validationSeverity !== "all"
-      ? viewerSeverityFilterChipLabel(activeUiState.validationSeverity)
+      ? viewerSeverityFilterChipLabel(severities, activeUiState.validationSeverity)
       : null,
     activeUiState.showEditedOnly ? "Edited only" : null,
     visibleRowKeysInView ? "View synced" : null,
@@ -1102,12 +1152,23 @@ const DataTablePanelComponent = function DataTablePanel({
                         !hasValidationSeverities
                           ? "Run validation to filter by severity"
                           : severityIsolation !== activeUiState.validationSeverity
-                            ? `3D isolated to ${viewerSeverityFilterLabel(severityIsolation)}`
+                            ? `3D isolated to ${viewerSeverityFilterLabel(severities, severityIsolation)}`
                             : undefined
                       }
-                      className={`h-9 w-full rounded-[var(--r-control)] border px-2.5 text-sm outline-none transition focus:border-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50 ${validationSeverityFilterTone(activeUiState.validationSeverity)}`}
+                      className={`h-9 w-full rounded-[var(--r-control)] border px-2.5 text-sm outline-none transition focus:border-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-50 ${
+                        validationSeverityFilterTone(
+                          activeUiState.validationSeverity,
+                          severityColor(activeUiState.validationSeverity),
+                        ).className
+                      }`}
+                      style={
+                        validationSeverityFilterTone(
+                          activeUiState.validationSeverity,
+                          severityColor(activeUiState.validationSeverity),
+                        ).style
+                      }
                     >
-                      {VIEWER_SEVERITY_FILTER_OPTIONS.map((option) => (
+                      {severityFilterOptions.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
                         </option>
@@ -1125,7 +1186,16 @@ const DataTablePanelComponent = function DataTablePanel({
                           setShowColumnMenu(false);
                         }}
                         disabled={!data}
-                        className={`inline-flex h-9 max-w-full items-center gap-2 rounded-[var(--r-control)] border px-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${activeClauseView ? validationClauseTone(activeClauseView.result) : compactButtonTone(showClauseMenu)}`}
+                        className={`inline-flex h-9 max-w-full items-center gap-2 rounded-[var(--r-control)] border px-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                          activeClauseView
+                            ? validationClauseTone(severityColor(activeClauseView.result)).className
+                            : compactButtonTone(showClauseMenu)
+                        }`}
+                        style={
+                          activeClauseView
+                            ? validationClauseTone(severityColor(activeClauseView.result)).style
+                            : undefined
+                        }
                       >
                         <ClipboardCheck className="h-4 w-4 shrink-0" />
                         <span className="min-w-0 truncate">
@@ -1182,14 +1252,19 @@ const DataTablePanelComponent = function DataTablePanel({
                                     onClick={() => setValidationClauseFilter(clause.clauseId)}
                                     className={`flex w-full items-start justify-between gap-3 rounded-[var(--r-control)] border px-3 py-2.5 text-left text-sm transition ${
                                       activeClauseView?.clauseId === clause.clauseId
-                                        ? validationClauseTone(clause.result)
+                                        ? validationClauseTone(severityColor(clause.result)).className
                                         : "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]"
                                     }`}
+                                    style={
+                                      activeClauseView?.clauseId === clause.clauseId
+                                        ? validationClauseTone(severityColor(clause.result)).style
+                                        : undefined
+                                    }
                                   >
                                     <span className="min-w-0">
                                       <span className="block break-words font-medium">{clause.clauseTitle}</span>
                                       <span className="mt-1 block text-[11px] uppercase tracking-[0.16em]">
-                                        {clause.result}
+                                        {severityLabel(clause.result)}
                                       </span>
                                     </span>
                                     <span className="shrink-0 text-[11px] uppercase tracking-[0.16em]">
@@ -1372,7 +1447,7 @@ const DataTablePanelComponent = function DataTablePanel({
               { label: "Clause view", value: activeClauseView?.clauseTitle ?? "None" },
               {
                 label: "Severity",
-                value: viewerSeverityFilterLabel(activeUiState.validationSeverity),
+                value: viewerSeverityFilterLabel(severities, activeUiState.validationSeverity),
               },
             ]}
           />

@@ -4,6 +4,7 @@ import type {
   ModelCompareValidationEntry,
   ViewerValidationClause,
   ViewerValidationElementResult,
+  ViewerValidationSeverity,
 } from "@/features/viewer/types";
 import {
   buildIfcElementSnapshots,
@@ -13,6 +14,7 @@ import {
   type IfcModelSnapshot,
 } from "@/features/viewer/lib/ifc-compare-core";
 import {
+  defaultViewerValidationSeverities,
   evaluateViewerValidationPayload,
   VIEWER_VALIDATION_CONFIG_VERSION,
 } from "@/features/rules/lib/validation";
@@ -68,18 +70,21 @@ async function buildValidationDiff(
   baseSnapshot: IfcModelSnapshot,
   targetSnapshot: IfcModelSnapshot,
   clauses: ViewerValidationClause[],
+  severities: ViewerValidationSeverity[],
   warnings: string[],
 ): Promise<ModelCompareValidationDiff> {
   const [baseRun, targetRun] = [
     await evaluateViewerValidationPayload({
       version: VIEWER_VALIDATION_CONFIG_VERSION,
       sourceId: modelId,
+      severities,
       clauses,
       rows: buildSnapshotValidationRows(baseSnapshot, clauses, modelId),
     }),
     await evaluateViewerValidationPayload({
       version: VIEWER_VALIDATION_CONFIG_VERSION,
       sourceId: modelId,
+      severities,
       clauses,
       rows: buildSnapshotValidationRows(targetSnapshot, clauses, modelId),
     }),
@@ -153,6 +158,7 @@ export async function compareModelVersions(input: {
   baseVersion: number;
   targetVersion: number;
   clauses?: ViewerValidationClause[];
+  severities?: ViewerValidationSeverity[];
 }): Promise<ModelCompareResult | null> {
   const store = getModelStore();
 
@@ -179,9 +185,18 @@ export async function compareModelVersions(input: {
   ];
 
   const clauses = input.clauses ?? [];
+  // Callers that predate configurable severities still compare against the seeded warn/error set.
+  const severities = input.severities ?? defaultViewerValidationSeverities();
   const validation =
     clauses.length > 0
-      ? await buildValidationDiff(input.modelId, baseSnapshot, targetSnapshot, clauses, warnings)
+      ? await buildValidationDiff(
+          input.modelId,
+          baseSnapshot,
+          targetSnapshot,
+          clauses,
+          severities,
+          warnings,
+        )
       : null;
 
   return {

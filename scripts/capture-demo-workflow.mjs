@@ -95,7 +95,7 @@ async function waitForInputValue(page, value) {
 
 await mkdir(mediaDir, { recursive: true });
 const originalRulesConfig = await readRulesConfig();
-await writeRulesConfig({ version: 2, clauses: [] });
+await writeRulesConfig({ version: 3, clauses: [] });
 
 const browser = await chromium.launch({
   headless: true,

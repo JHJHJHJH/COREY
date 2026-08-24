@@ -4,15 +4,36 @@ export type ViewerTool = "select" | "measure" | "section";
 
 export type ViewerInspectionValueState = "present" | "missing" | "empty" | "null" | "undefined";
 
-export type ViewerValidationFailureSeverity = "warn" | "error";
+/**
+ * A user-defined severity level. The set lives in `ViewerValidationConfig.severities`, so ids are
+ * open strings rather than a closed union — compile-time exhaustiveness is traded for
+ * configurability, and `buildViewerSeverityScale` in `features/viewer/lib/validation-severity.ts`
+ * is the runtime replacement for it.
+ */
+export interface ViewerValidationSeverity {
+  /** Stable slug referenced by `ViewerValidationRule.failSeverity`. `"ok"` is reserved. */
+  id: string;
+  label: string;
+  /** Base colour as `#rrggbb`. Every other tone (border, background) is derived from it. */
+  color: string;
+  /** Rank. Higher is more severe, and wins the colour on an element with several failures. */
+  order: number;
+}
 
-/** `"issues"` means error-or-warn; `"all"` disables the filter entirely. */
+/** A severity id, resolved against the configured severity list. */
+export type ViewerValidationFailureSeverity = string;
+
+/** `"issues"` means "any severity"; `"all"` disables the filter entirely. */
 export type ViewerValidationSeverityFilter =
   | "all"
   | "issues"
   | ViewerValidationFailureSeverity;
 
-export type ViewerValidationResult = "ok" | "warn" | "error";
+/** `"ok"` is the reserved non-failure result; anything else is a severity id. */
+export type ViewerValidationResult = "ok" | ViewerValidationFailureSeverity;
+
+/** The reserved result id that means "passed"; it can never be used as a severity id. */
+export const VIEWER_VALIDATION_OK_RESULT = "ok";
 
 export type ViewerValidationTarget =
   | {
@@ -39,8 +60,8 @@ export type ViewerValidationCheck =
       max: number | null;
     }
   | {
-      kind: "pattern";
-      pattern: string;
+      kind: "regex";
+      regex: string;
       caseInsensitive: boolean;
     }
   | {
@@ -68,7 +89,12 @@ export interface ViewerValidationClause {
 }
 
 export interface ViewerValidationConfig {
-  version: 2;
+  version: 4;
+  /**
+   * The configurable severity levels. Always non-empty after sanitizing, sorted by `order`
+   * ascending. Every `ViewerValidationRule.failSeverity` resolves against this list.
+   */
+  severities: ViewerValidationSeverity[];
   clauses: ViewerValidationClause[];
 }
 
@@ -113,8 +139,11 @@ export interface ViewerValidationSummary {
   result: ViewerValidationResult | null;
   targetedRowCount: number;
   okCount: number;
-  warnCount: number;
-  errorCount: number;
+  /**
+   * Elements counted per severity id, keyed by severity. An element is counted once, under its
+   * worst severity, so `okCount` plus these totals equals `targetedRowCount`.
+   */
+  countsBySeverity: Record<string, number>;
   failedClauseCount: number;
   failedClauses: ViewerValidationClauseFailure[];
 }
@@ -140,14 +169,18 @@ export interface ViewerValidationElementResult {
 }
 
 export interface ViewerValidationRunPayload {
-  version: number;
+  version: 4;
   sourceId: string;
+  /** The severity scale the worker ranks failures against. */
+  severities: ViewerValidationSeverity[];
   clauses: ViewerValidationClause[];
   rows: ViewerValidationRow[];
 }
 
 export interface ViewerValidationRunResult {
   sourceId: string;
+  /** Echoed back so consumers can render results without re-reading the rules config. */
+  severities: ViewerValidationSeverity[];
   results: ViewerValidationElementResult[];
   failedClauseCount: number;
   failedClauses: ViewerValidationClauseFailure[];
@@ -163,27 +196,22 @@ export interface ViewerValidationClauseTableView {
 
 export type ViewerValidationElementMap = Record<string, number[]>;
 
-export interface ViewerValidationHighlights {
-  warn: ViewerValidationElementMap;
-  error: ViewerValidationElementMap;
-}
+/**
+ * Elements bucketed by their single *worst* severity, keyed by severity id — the 3D view can
+ * only paint an element one colour, so the highest-order severity wins.
+ */
+export type ViewerValidationHighlights = Record<string, ViewerValidationElementMap>;
 
 /**
- * Per-severity membership for filtering. An element appears under *every* severity it failed
- * at, so one with both a warn and an error failure is in both sets.
+ * Per-severity membership for filtering, keyed by severity id. An element appears under *every*
+ * severity it failed at, so one with both a warn and an error failure is in both sets.
  *
  * This is deliberately different from `ViewerValidationHighlights`, which buckets each element
- * by its single worst severity because the 3D view can only paint it one colour.
+ * by its single worst severity.
  */
-export interface ViewerValidationSeverityElements {
-  warn: ViewerElementIdMap;
-  error: ViewerElementIdMap;
-}
+export type ViewerValidationSeverityElements = Record<string, ViewerElementIdMap>;
 
-export interface ViewerValidationSeverityRowKeys {
-  warn: Set<string>;
-  error: Set<string>;
-}
+export type ViewerValidationSeverityRowKeys = Record<string, Set<string>>;
 
 export interface ModelMetadata {
   name: string;
