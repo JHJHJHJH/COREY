@@ -4,7 +4,7 @@ Generate COREY validation configs as JSON. The portable config shape is:
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "clauses": []
 }
 ```
@@ -98,17 +98,17 @@ Number range:
 
 Use `null` for an open bound, but do not make both `min` and `max` null.
 
-Pattern:
+Regex:
 
 ```json
 {
-  "kind": "pattern",
-  "pattern": "[0-9A-Za-z_$]{22}",
+  "kind": "regex",
+  "regex": "[0-9A-Za-z_$]{22}",
   "caseInsensitive": false
 }
 ```
 
-The pattern is JavaScript regex source text. COREY matches it against the whole
+The regex is JavaScript regular expression source text. COREY matches it against the whole
 value, so do not add leading `^` or trailing `$` unless you intentionally want
 anchors inside the regex source.
 
@@ -140,7 +140,7 @@ Boolean:
 
 - Do not put `rules` at the root.
 - Do not use severity values like `warning`, `critical`, or `info`.
-- Do not use check kinds like `required`, `range`, or `regex`; use COREY's exact
+- Do not use check kinds like `required`, `range`, or `pattern`; use COREY's exact
   check kind strings.
 - Do not leave enum `allowedValues` empty.
 - Do not leave `ifcType`, attribute `name`, property `group`, or property
@@ -152,7 +152,7 @@ Boolean:
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "clauses": [
     {
       "id": "wall-basics",

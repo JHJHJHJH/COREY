@@ -132,8 +132,8 @@ function nextCheckForKind(kind: ViewerValidationCheck["kind"]): ViewerValidation
     return { kind: "enum", allowedValues: ["Allowed Value"] };
   }
 
-  if (kind === "pattern") {
-    return { kind: "pattern", pattern: "", caseInsensitive: false };
+  if (kind === "regex") {
+    return { kind: "regex", regex: "", caseInsensitive: false };
   }
 
   if (kind === "boolean") {
@@ -161,8 +161,8 @@ function describeConstraint(check: ViewerValidationCheck) {
   if (check.kind === "enum") {
     return `enum ${check.allowedValues.join(" ")}`;
   }
-  if (check.kind === "pattern") {
-    return `pattern ${check.pattern}`;
+  if (check.kind === "regex") {
+    return `regex ${check.regex}`;
   }
   if (check.kind === "boolean") {
     return `boolean ${check.expected ? "true" : "false"}`;
@@ -283,43 +283,43 @@ function EnumValuesCell({
   );
 }
 
-function PatternConstraintCell({
+function RegexConstraintCell({
   check,
   onCommit,
 }: {
-  check: Extract<ViewerValidationCheck, { kind: "pattern" }>;
-  onCommit: (next: Extract<ViewerValidationCheck, { kind: "pattern" }>) => void;
+  check: Extract<ViewerValidationCheck, { kind: "regex" }>;
+  onCommit: (next: Extract<ViewerValidationCheck, { kind: "regex" }>) => void;
 }) {
-  const serializedPattern = check.pattern;
-  const [draftPattern, setDraftPattern] = useState(serializedPattern);
+  const serializedRegex = check.regex;
+  const [draftRegex, setDraftRegex] = useState(serializedRegex);
 
   useEffect(() => {
-    setDraftPattern(serializedPattern);
-  }, [serializedPattern]);
+    setDraftRegex(serializedRegex);
+  }, [serializedRegex]);
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1">
       <input
         type="text"
-        value={draftPattern}
-        onChange={(event) => setDraftPattern(event.target.value)}
+        value={draftRegex}
+        onChange={(event) => setDraftRegex(event.target.value)}
         onBlur={() =>
           onCommit({
-            kind: "pattern",
-            pattern: draftPattern.trim(),
+            kind: "regex",
+            regex: draftRegex.trim(),
             caseInsensitive: check.caseInsensitive,
           })
         }
         className={cellInputClassName(true)}
         placeholder="^EC\d{3}$"
-        aria-label="Pattern (regular expression)"
+        aria-label="Regular expression"
       />
       <button
         type="button"
         onClick={() =>
           onCommit({
-            kind: "pattern",
-            pattern: draftPattern.trim(),
+            kind: "regex",
+            regex: draftRegex.trim(),
             caseInsensitive: !check.caseInsensitive,
           })
         }
@@ -445,7 +445,7 @@ function ConstraintCell({
         <option value="empty">Required</option>
         <option value="enum">Enum</option>
         <option value="numberRange">Range</option>
-        <option value="pattern">Pattern</option>
+        <option value="regex">Regex</option>
         <option value="boolean">Boolean</option>
       </select>
       {check.kind === "empty" ? (
@@ -455,8 +455,8 @@ function ConstraintCell({
           check={check}
           onCommit={(allowedValues) => onChange({ ...rule, check: { kind: "enum", allowedValues } })}
         />
-      ) : check.kind === "pattern" ? (
-        <PatternConstraintCell
+      ) : check.kind === "regex" ? (
+        <RegexConstraintCell
           check={check}
           onCommit={(next) => onChange({ ...rule, check: next })}
         />
@@ -1016,7 +1016,7 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
             <option value="empty">Required</option>
             <option value="enum">Enum</option>
             <option value="numberRange">Range</option>
-            <option value="pattern">Pattern</option>
+            <option value="regex">Regex</option>
             <option value="boolean">Boolean</option>
           </select>
 

@@ -19,15 +19,15 @@ Every exported or imported clause file is a `ViewerValidationConfig`.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `version` | `2` | The current clause-based format version. |
+| `version` | `3` | The current clause-based format version. |
 | `clauses` | array | Named groups of rules. |
 
 Version `1` files used a root `rules` array and are no longer accepted by manual
-import. Use version `2` with `clauses`.
+import. Version `2` clause files are migrated on import; new files use version `3`.
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "clauses": [
     {
       "id": "wall-basics",
@@ -95,7 +95,7 @@ All check kinds fail when the value is missing, empty, null, or undefined.
 | `empty` | `kind` | The value is present and not empty. |
 | `enum` | `kind`, `allowedValues` | The value matches one allowed value after trimming and case-insensitive comparison. |
 | `numberRange` | `kind`, `min`, `max` | The value can be read as a finite number and is within the provided bound or bounds. |
-| `pattern` | `kind`, `pattern`, `caseInsensitive` | The value matches the JavaScript regular expression pattern against the whole value. |
+| `regex` | `kind`, `regex`, `caseInsensitive` | The value matches the JavaScript regular expression against the whole value. |
 | `boolean` | `kind`, `expected` | The value can be read as a boolean and equals the expected value. |
 
 Boolean checks understand common IFC/table values such as `true`, `false`, `1`,
@@ -111,9 +111,9 @@ compiled for validation. A rule is runnable when:
 - property targets have non-blank `group` and `label`.
 - enum checks have at least one allowed value.
 - number range checks have at least one of `min` or `max`.
-- pattern checks have a non-blank valid JavaScript regular expression.
+- regex checks have a non-blank valid JavaScript regular expression.
 
-The JSON Schema at `/schemas/validation-config-v2.schema.json` documents the
+The JSON Schema at `/schemas/validation-config-v3.schema.json` documents the
 portable config shape. Runtime sanitizing and runnable-rule filtering remain in
 `src/features/rules/lib/validation.ts`.
 

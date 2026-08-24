@@ -11,7 +11,12 @@ import {
   Search,
 } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { filterTree, formatBytes, formatTreeNodeCount } from "@/features/viewer/lib/ifc-data";
+import {
+  collectViewerTreeLocalIds,
+  filterTree,
+  formatBytes,
+  formatTreeNodeCount,
+} from "@/features/viewer/lib/ifc-data";
 import {
   VIEWER_SEVERITY_FILTER_OPTIONS,
   collectViewerValidationLocalIds,
@@ -39,6 +44,7 @@ type ModelTreePanelProps = {
   onSelectNode: (localId: number) => void;
   onHideCategory: (category: string) => void;
   onIsolateCategory: (category: string) => void;
+  onIsolateSubtree: (localIds: number[]) => void;
   onSeverityFilterChange: (filter: ViewerValidationSeverityFilter) => void;
 };
 
@@ -68,6 +74,7 @@ type TreeNodeRowProps = {
   registerRowButton: (localId: number | null, element: HTMLButtonElement | null) => void;
   onToggle: (key: string) => void;
   onSelectNode: (localId: number) => void;
+  onIsolateSubtree: (localIds: number[]) => void;
 };
 
 function collectExpandableKeys(nodes: ViewerTreeNode[]) {
@@ -135,6 +142,7 @@ function TreeNodeRow({
   registerRowButton,
   onToggle,
   onSelectNode,
+  onIsolateSubtree,
 }: TreeNodeRowProps) {
   const hasChildren = node.children.length > 0;
   const expanded = hasChildren ? expandedKeys.has(node.key) : false;
@@ -192,6 +200,22 @@ function TreeNodeRow({
               </span>
             ) : null}
           </button>
+          {hasChildren ? (
+            <button
+              type="button"
+              aria-label={`Isolate ${node.label} and descendants`}
+              title={`Isolate ${node.label} and descendants`}
+              onClick={() => {
+                const localIds = collectViewerTreeLocalIds(node);
+                if (localIds.length > 0) {
+                  onIsolateSubtree(localIds);
+                }
+              }}
+              className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
+            >
+              <ScanSearch className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -215,6 +239,7 @@ function TreeNodeRow({
                 registerRowButton={registerRowButton}
                 onToggle={onToggle}
                 onSelectNode={onSelectNode}
+                onIsolateSubtree={onIsolateSubtree}
               />
             </div>
           ))
@@ -234,6 +259,7 @@ export function ModelTreePanel({
   onSelectNode,
   onHideCategory,
   onIsolateCategory,
+  onIsolateSubtree,
   onSeverityFilterChange,
 }: ModelTreePanelProps) {
   const [query, setQuery] = useState("");
@@ -738,6 +764,7 @@ export function ModelTreePanel({
                   registerRowButton={registerRowButton}
                   onToggle={toggleNode}
                   onSelectNode={onSelectNode}
+                  onIsolateSubtree={onIsolateSubtree}
                 />
               ))
             )}

@@ -4,7 +4,7 @@ description: How COREY's rule-based model checking works, in plain language.
 ---
 
 Checking a model means asking practical questions: "is the required data filled
-in?", "is this value allowed?", "does this code match the expected pattern?", or
+in?", "is this value allowed?", "does this code match the expected regular expression?", or
 "is this number within range?". COREY stores those checks as **clauses** and
 runs them across the whole IFC model.
 
@@ -68,12 +68,12 @@ COREY offers five kinds of check:
 | **Required value** | the field is filled in (not blank/missing) | making sure information isn't left empty |
 | **Allowed values (enum)** | the value is one of a list you provide | codes, classifications, fixed vocabularies |
 | **Number range** | the number is within a minimum and/or maximum | dimensions, ratings, counts |
-| **Pattern** | the value matches a text pattern | IDs, codes, or naming standards |
+| **Regex** | the value matches a regular expression | IDs, codes, or naming standards |
 | **Boolean** | the value means true or false as expected | flags such as load-bearing or external |
 
 <Callout type="info">
 Any check automatically fails if the value is missing or empty — so "Allowed
-values", "Number range", "Pattern", and "Boolean" also guarantee the field is
+values", "Number range", "Regex", and "Boolean" also guarantee the field is
 present.
 </Callout>
 

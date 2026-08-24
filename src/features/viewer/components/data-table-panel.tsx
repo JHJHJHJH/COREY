@@ -14,7 +14,17 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import {
+  memo,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import { StatusBar, type StatusSegment, type StatusTone } from "@/components/status-bar/status-bar";
 import { InspectorDetailList } from "@/components/status-bar/status-inspector";
 import {
@@ -63,6 +73,10 @@ type DataTablePanelProps = {
   onSeverityFilterChange?: (filter: ViewerValidationSeverityFilter) => void;
   onEditCell: (edit: ViewerDataTableCellEditRequest) => void;
   onSelectRow: (localId: number) => void;
+  onShownRowsChange?: (snapshot: {
+    data: NonNullable<ViewerDataTableState["data"]>;
+    rowKeys: string[];
+  }) => void;
   showMetaHeader?: boolean;
 };
 
@@ -507,6 +521,7 @@ const DataTablePanelComponent = function DataTablePanel({
   onSeverityFilterChange,
   onEditCell,
   onSelectRow,
+  onShownRowsChange,
   showMetaHeader = true,
 }: DataTablePanelProps) {
   const selectAllRef = useRef<HTMLInputElement | null>(null);
@@ -639,6 +654,17 @@ const DataTablePanelComponent = function DataTablePanel({
     () => sortViewerDataTableRows(filteredRows, activeUiState.sort),
     [activeUiState.sort, filteredRows],
   );
+
+  useLayoutEffect(() => {
+    if (!data) {
+      return;
+    }
+
+    onShownRowsChange?.({
+      data,
+      rowKeys: visibleRows.map((row) => row.key),
+    });
+  }, [data, onShownRowsChange, visibleRows]);
 
   const allVisibleSelected =
     visibleRows.length > 0 &&

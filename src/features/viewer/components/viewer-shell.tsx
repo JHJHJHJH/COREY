@@ -1046,6 +1046,10 @@ export function ViewerShell() {
   });
   const [dataTableVisibleRowKeysInView, setDataTableVisibleRowKeysInView] =
     useState<Set<string> | null>(null);
+  const [dataTableShownRows, setDataTableShownRows] = useState<{
+    data: NonNullable<ViewerDataTableState["data"]>;
+    rowKeys: string[];
+  } | null>(null);
   const [selectionDetails, setSelectionDetails] = useState<ViewerSelectionDetails>({
     selection: null,
     inspection: null,
@@ -1154,6 +1158,22 @@ export function ViewerShell() {
     }),
     [dataTableState, effectiveDataTableData],
   );
+  const dataTableExportData = useMemo(() => {
+    if (!effectiveDataTableData || dataTableShownRows?.data !== effectiveDataTableData) {
+      return null;
+    }
+
+    const rowByKey = new Map(effectiveDataTableData.rows.map((row) => [row.key, row]));
+    const rows = dataTableShownRows.rowKeys.flatMap((rowKey) => {
+      const row = rowByKey.get(rowKey);
+      return row ? [row] : [];
+    });
+
+    return {
+      ...effectiveDataTableData,
+      rows,
+    };
+  }, [dataTableShownRows, effectiveDataTableData]);
   const isDataTableSyncedToView = dataTableVisibleRowKeysInView !== null;
   const indexedIfcTypes = useMemo(() => effectiveDataTableData?.ifcTypes ?? [], [effectiveDataTableData]);
   const draftEditCount = dataTableDraft?.edits.length ?? 0;
@@ -2595,10 +2615,10 @@ export function ViewerShell() {
   };
 
   const handleExportExcel = useCallback(async () => {
-    if (!metadata?.sourceId || !effectiveDataTableData) {
+    if (!metadata?.sourceId || !dataTableExportData) {
       setDataTableActionStatus({
         phase: "error",
-        message: "Load and index a model before exporting Excel.",
+        message: "Open the indexed data table before exporting Excel.",
         issues: [],
       });
       return;
@@ -2616,12 +2636,12 @@ export function ViewerShell() {
       try {
         result = metadata.serverModelId
           ? await exportViewerDataTableToExcelViaApi({
-              data: effectiveDataTableData,
+              data: dataTableExportData,
               sourceId: metadata.sourceId,
               fileName,
             })
           : await exportViewerDataTableToExcel({
-              data: effectiveDataTableData,
+              data: dataTableExportData,
               sourceId: metadata.sourceId,
               fileName,
             });
@@ -2631,14 +2651,14 @@ export function ViewerShell() {
         }
 
         result = await exportViewerDataTableToExcel({
-          data: effectiveDataTableData,
+          data: dataTableExportData,
           sourceId: metadata.sourceId,
           fileName,
         });
       }
       setDataTableActionStatus({
         phase: "success",
-        message: `Exported ${effectiveDataTableData.rows.length} rows to ${result.fileName}.`,
+        message: `Exported ${dataTableExportData.rows.length} shown rows to ${result.fileName}.`,
         issues: [],
       });
     } catch (error) {
@@ -2648,7 +2668,7 @@ export function ViewerShell() {
         issues: [],
       });
     }
-  }, [effectiveDataTableData, metadata]);
+  }, [dataTableExportData, metadata]);
 
   const handleClearImportedEdits = useCallback(() => {
     const sourceId = metadata?.sourceId;
@@ -3173,7 +3193,7 @@ export function ViewerShell() {
           onClick={() => {
             void handleExportExcel();
           }}
-          disabled={!effectiveDataTableData || dataTableActionStatus.phase === "running"}
+          disabled={!dataTableExportData || dataTableActionStatus.phase === "running"}
         >
           <FileSpreadsheet className="h-4 w-4" />
         </HeaderActionButton>
@@ -3214,6 +3234,7 @@ export function ViewerShell() {
         onSeverityFilterChange={handleSeverityFilterChange}
         onEditCell={handleDataTableCellEdit}
         onSelectRow={handleDataTableRowSelect}
+        onShownRowsChange={setDataTableShownRows}
         showMetaHeader={false}
       />
     </div>
@@ -3532,6 +3553,11 @@ export function ViewerShell() {
                     onIsolateCategory={(category) => {
                       void runViewportVisibilityAction(async () => {
                         await viewportRef.current?.isolateCategory(category);
+                      });
+                    }}
+                    onIsolateSubtree={(localIds) => {
+                      void runViewportVisibilityAction(async () => {
+                        await viewportRef.current?.isolateElements(localIds);
                       });
                     }}
                   />

@@ -25,9 +25,10 @@ import type {
   ViewerValidationValue,
 } from "@/features/viewer/types";
 
-export const VIEWER_VALIDATION_CONFIG_VERSION = 2 as const;
+export const VIEWER_VALIDATION_CONFIG_VERSION = 3 as const;
 
 const LEGACY_VIEWER_VALIDATION_CONFIG_VERSION = 1 as const;
+const PREVIOUS_VIEWER_VALIDATION_CONFIG_VERSION = 2 as const;
 
 export const VIEWER_VALIDATION_STORAGE_KEY = "corey.validation-rules.v1";
 
@@ -135,9 +136,9 @@ function coerceBoolean(value: string): boolean | null {
   return null;
 }
 
-function compileAnchoredPattern(pattern: string, caseInsensitive: boolean): RegExp | null {
+function compileAnchoredRegex(regex: string, caseInsensitive: boolean): RegExp | null {
   try {
-    return new RegExp(`^(?:${pattern})$`, caseInsensitive ? "i" : "");
+    return new RegExp(`^(?:${regex})$`, caseInsensitive ? "i" : "");
   } catch {
     return null;
   }
@@ -378,10 +379,10 @@ function sanitizeCheck(check: unknown): ViewerValidationCheck {
     };
   }
 
-  if (check.kind === "pattern") {
+  if (check.kind === "regex") {
     return {
-      kind: "pattern",
-      pattern: normalizeStoredText(String(check.pattern ?? "")),
+      kind: "regex",
+      regex: normalizeStoredText(String(check.regex ?? "")),
       caseInsensitive: Boolean(check.caseInsensitive),
     };
   }
@@ -453,9 +454,9 @@ function isRunnableRule(rule: ViewerValidationRule) {
     return false;
   }
 
-  if (rule.check.kind === "pattern") {
-    const pattern = normalizeStoredText(rule.check.pattern);
-    if (!pattern || !compileAnchoredPattern(pattern, rule.check.caseInsensitive)) {
+  if (rule.check.kind === "regex") {
+    const regex = normalizeStoredText(rule.check.regex);
+    if (!regex || !compileAnchoredRegex(regex, rule.check.caseInsensitive)) {
       return false;
     }
   }
@@ -510,8 +511,8 @@ function evaluateRuleAgainstValue(
       : rule.failSeverity;
   }
 
-  if (rule.check.kind === "pattern") {
-    const regex = compileAnchoredPattern(rule.check.pattern, rule.check.caseInsensitive);
+  if (rule.check.kind === "regex") {
+    const regex = compileAnchoredRegex(rule.check.regex, rule.check.caseInsensitive);
     if (!regex) {
       return rule.failSeverity;
     }
@@ -862,6 +863,40 @@ function buildCompactRowValue(
   };
 }
 
+function migrateLegacyRegexCheck(check: unknown) {
+  if (!isRecord(check) || check.kind !== "pattern") {
+    return check;
+  }
+
+  return {
+    ...check,
+    kind: "regex",
+    regex: check.pattern,
+  };
+}
+
+function migrateLegacyRegexRule(rule: unknown) {
+  if (!isRecord(rule)) {
+    return rule;
+  }
+
+  return {
+    ...rule,
+    check: migrateLegacyRegexCheck(rule.check),
+  };
+}
+
+function migrateLegacyRegexClause(clause: unknown) {
+  if (!isRecord(clause)) {
+    return clause;
+  }
+
+  return {
+    ...clause,
+    rules: Array.isArray(clause.rules) ? clause.rules.map(migrateLegacyRegexRule) : clause.rules,
+  };
+}
+
 function migrateLegacyViewerValidationConfig(input: unknown): ViewerValidationConfig | null {
   if (!isRecord(input) || input.version !== LEGACY_VIEWER_VALIDATION_CONFIG_VERSION) {
     return null;
@@ -875,7 +910,7 @@ function migrateLegacyViewerValidationConfig(input: unknown): ViewerValidationCo
       {
         id: createClauseId(),
         title: LEGACY_MIGRATION_CLAUSE_TITLE,
-        rules: rules.map((rule) => sanitizeRule(rule)),
+        rules: rules.map((rule) => sanitizeRule(migrateLegacyRegexRule(rule))),
       },
     ],
   };
@@ -1021,8 +1056,8 @@ export function describeViewerValidationRule(rule: ViewerValidationRule) {
     return `${targetLabel} must be one of ${rule.check.allowedValues.join(", ")}`;
   }
 
-  if (rule.check.kind === "pattern") {
-    return `${targetLabel} must match /${rule.check.pattern}/${rule.check.caseInsensitive ? "i" : ""}`;
+  if (rule.check.kind === "regex") {
+    return `${targetLabel} must match /${rule.check.regex}/${rule.check.caseInsensitive ? "i" : ""}`;
   }
 
   if (rule.check.kind === "boolean") {
@@ -1060,6 +1095,17 @@ export function parseViewerValidationConfig(input: unknown): ViewerValidationCon
     throw new Error(
       `Rules JSON version ${LEGACY_VIEWER_VALIDATION_CONFIG_VERSION} is no longer supported. Import a version ${VIEWER_VALIDATION_CONFIG_VERSION} clause-based config.`,
     );
+  }
+
+  if (input.version === PREVIOUS_VIEWER_VALIDATION_CONFIG_VERSION) {
+    if (!Array.isArray(input.clauses)) {
+      throw new Error("Rules JSON must contain a clauses array.");
+    }
+
+    return sanitizeViewerValidationConfig({
+      version: VIEWER_VALIDATION_CONFIG_VERSION,
+      clauses: input.clauses.map((clause) => sanitizeClause(migrateLegacyRegexClause(clause))),
+    });
   }
 
   if (input.version !== VIEWER_VALIDATION_CONFIG_VERSION) {

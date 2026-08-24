@@ -39,8 +39,8 @@ export type ViewerValidationCheck =
       max: number | null;
     }
   | {
-      kind: "pattern";
-      pattern: string;
+      kind: "regex";
+      regex: string;
       caseInsensitive: boolean;
     }
   | {
@@ -68,7 +68,7 @@ export interface ViewerValidationClause {
 }
 
 export interface ViewerValidationConfig {
-  version: 2;
+  version: 3;
   clauses: ViewerValidationClause[];
 }
 
@@ -140,7 +140,7 @@ export interface ViewerValidationElementResult {
 }
 
 export interface ViewerValidationRunPayload {
-  version: number;
+  version: 3;
   sourceId: string;
   clauses: ViewerValidationClause[];
   rows: ViewerValidationRow[];

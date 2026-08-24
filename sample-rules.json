@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "clauses": [
     {
       "id": "sample-wall-basics",
@@ -25,8 +25,8 @@
             "name": "GlobalId"
           },
           "check": {
-            "kind": "pattern",
-            "pattern": "[0-9A-Za-z_$]{22}",
+            "kind": "regex",
+            "regex": "[0-9A-Za-z_$]{22}",
             "caseInsensitive": false
           },
           "failSeverity": "error"

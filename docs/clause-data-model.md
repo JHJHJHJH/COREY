@@ -7,13 +7,13 @@ and the parser, sanitizer, compiler, and evaluator live in
 
 ## Config shape
 
-Rule configuration uses `version: 2`. It is used by clause import/export,
+Rule configuration uses `version: 3`. It is used by clause import/export,
 backend rule config storage, rule templates, and the `clauses` portion of
 validation evaluation payloads.
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "clauses": [
     {
       "id": "wall-basics",
@@ -41,7 +41,7 @@ Top-level fields:
 
 | Field | Type | Notes |
 |---|---|---|
-| `version` | literal `2` | Current portable config version. |
+| `version` | literal `3` | Current portable config version. |
 | `clauses` | `ViewerValidationClause[]` | Named groups of rules. |
 
 ## Clause
@@ -131,18 +131,18 @@ Number range:
 `min` and `max` may be numbers or `null`. At least one bound is required for the
 rule to run. Values must parse to finite JavaScript numbers.
 
-Pattern:
+Regex:
 
 ```json
 {
-  "kind": "pattern",
-  "pattern": "[0-9A-Za-z_$]{22}",
+  "kind": "regex",
+  "regex": "[0-9A-Za-z_$]{22}",
   "caseInsensitive": false
 }
 ```
 
-`pattern` is JavaScript regular expression source text. The evaluator anchors it
-against the whole value as `^(?:pattern)$`. Invalid or blank patterns are not
+`regex` is JavaScript regular expression source text. The evaluator anchors it
+against the whole value as `^(?:regex)$`. Invalid or blank regular expressions are not
 runnable.
 
 Boolean:
@@ -195,7 +195,7 @@ A rule is runnable when:
 - property targets have non-blank `group` and `label`.
 - enum checks have at least one `allowedValues` entry after sanitization.
 - number range checks have `min` or `max`.
-- pattern checks have non-blank valid JavaScript regex source.
+- regex checks have non-blank valid JavaScript regular expression source.
 
 Boolean and required-value checks need no extra fields beyond their required
 shape.
@@ -206,7 +206,7 @@ shape.
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "sourceId": "model-123",
   "clauses": [],
   "rows": [
@@ -262,7 +262,7 @@ its failed rules.
 
 ## Public artifacts
 
-- JSON Schema: `public/schemas/validation-config-v2.schema.json`
+- JSON Schema: `public/schemas/validation-config-v3.schema.json`
 - LLM contract: `public/llms-validation-rules.md`
 - In-app docs: `content/docs/clause-data-model.mdx`
 - Example config: `sample-rules.json`

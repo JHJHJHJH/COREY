@@ -43,7 +43,7 @@ against the previous version.
 
 - `POST /api/models/[id]/compare`: diff two versions of a model. JSON body:
   `{ "baseVersion": 1, "targetVersion": 2, "clauses": [] }` where `clauses`
-  (optional) are version 2 validation clauses to re-evaluate against both
+  (optional) are version 3 validation clauses to re-evaluate against both
   versions. Returns added / removed / changed elements with per-field property
   diffs, a summary, and a validation diff when clauses were supplied. The two
   version numbers must differ.
@@ -66,5 +66,5 @@ against the previous version.
 - `POST /api/data-table/excel/export`
 - `POST /api/data-table/excel/import`
 
-Rules config and template config use the version 2 clause model documented in
+Rules config and template config use the version 3 clause model documented in
 [Clause data model](clause-data-model.md).
