@@ -1,9 +1,0 @@
-{
-	"servers": {
-		"corey-local": {
-			"url": "http://localhost:4001/mcp",
-			"type": "http"
-		}
-	},
-	"inputs": []
-}
