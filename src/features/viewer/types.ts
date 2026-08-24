@@ -364,6 +364,51 @@ export interface ViewerTreeNode {
   children: ViewerTreeNode[];
 }
 
+export type ViewerGraphNodeKind = "spatial" | "element" | "type" | "property" | "material" | "other";
+
+export type ViewerGraphRelationGroup = "spatial" | "definition" | "material" | "other";
+
+export interface ViewerGraphNode {
+  /** Model-scoped renderer id. Local ids are only stable inside one loaded model. */
+  id: string;
+  modelId: string;
+  localId: number;
+  globalId: string | null;
+  ifcType: string | null;
+  label: string;
+  kind: ViewerGraphNodeKind;
+  hasGeometry: boolean;
+}
+
+export interface ViewerGraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  sourceLocalId: number;
+  targetLocalId: number;
+  relation: string;
+  relationGroup: ViewerGraphRelationGroup;
+  /** Directional relation names observed while expanding either endpoint. */
+  rawRelations: string[];
+}
+
+export interface ViewerGraphNeighborhoodRequest {
+  /** `null` asks the viewport to use the model's first spatial root. */
+  anchorLocalId: number | null;
+  offset?: number;
+  limit?: number;
+}
+
+export interface ViewerGraphNeighborhood {
+  modelId: string;
+  anchorLocalId: number;
+  nodes: ViewerGraphNode[];
+  edges: ViewerGraphEdge[];
+  offset: number;
+  nextOffset: number | null;
+  totalRelationCount: number;
+}
+
 export interface ViewerCategorySummary {
   category: string;
   count: number;
@@ -576,6 +621,9 @@ export interface ViewerStatus {
 export interface ViewerViewportHandle {
   loadIfc(source: ModelSourceResult): Promise<void>;
   clearModel(): Promise<void>;
+  getGraphNeighborhood(
+    request: ViewerGraphNeighborhoodRequest,
+  ): Promise<ViewerGraphNeighborhood>;
   selectNode(localId: number): Promise<void>;
   selectElements(localIds: number[]): Promise<void>;
   getHiddenElements(): ViewerElementIdMap | null;

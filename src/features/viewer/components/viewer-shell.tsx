@@ -12,6 +12,7 @@ import {
   Import,
   Menu,
   Moon,
+  Network,
   PanelLeftOpen,
   PanelRightOpen,
   Sun,
@@ -21,6 +22,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   startTransition,
   useCallback,
@@ -162,6 +164,8 @@ const MIN_DRAWER_WIDTH = 240;
 const MIN_CONSTRAINED_DRAWER_WIDTH = 160;
 const MAX_DRAWER_WIDTH = 520;
 const MIN_VIEWPORT_WIDTH = 420;
+const MIN_GRAPH_WIDTH = 320;
+const GRAPH_RESIZE_HANDLE_WIDTH = 8;
 const DRAWER_HANDLE_WIDTH = 0;
 const COLLAPSED_DRAWER_WIDTH = 44;
 const DEFAULT_DATA_TABLE_DIALOG_WIDTH = 1120;
@@ -177,6 +181,21 @@ const VIEWER_THEME_STORAGE_KEY = "corey.viewer.theme";
 const validationWorkerUrl = new URL("../../rules/workers/validation-worker.ts", import.meta.url);
 const source = new LocalFileModelSource();
 const remoteSource = new RemoteModelSource();
+
+const LazyIfcGraphPanel = dynamic(
+  () =>
+    import("@/features/viewer/components/ifc-graph-panel").then(
+      (module) => module.IfcGraphPanel,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full items-center justify-center bg-[color:var(--panel-bg)] text-sm font-medium text-[color:var(--muted-ink)]">
+        Loading graph viewer…
+      </div>
+    ),
+  },
+);
 
 const emptyValidationHighlights: ViewerValidationHighlights = {};
 
@@ -289,6 +308,11 @@ const initialValidationState: ViewerValidationState = {
 
 type DrawerSide = "left" | "right";
 type ServerStorageStatus = "checking" | "available" | "unavailable";
+
+type GraphResizeState = {
+  startX: number;
+  startWidth: number;
+};
 type ViewerTheme = "light" | "dark";
 
 type DrawerDragState = {
@@ -348,6 +372,7 @@ function clampDrawerWidthToWorkspace(
   nextWidth: number,
   otherDrawerWidth: number,
   workspaceWidth: number,
+  minimumCenterWidth: number,
 ) {
   if (workspaceWidth === 0) {
     return clamp(nextWidth, MIN_DRAWER_WIDTH, MAX_DRAWER_WIDTH);
@@ -355,7 +380,7 @@ function clampDrawerWidthToWorkspace(
 
   const handleCount = 2;
   const availableWidth =
-    workspaceWidth - otherDrawerWidth - handleCount * DRAWER_HANDLE_WIDTH - MIN_VIEWPORT_WIDTH;
+    workspaceWidth - otherDrawerWidth - handleCount * DRAWER_HANDLE_WIDTH - minimumCenterWidth;
   const maxWidth = Math.min(
     MAX_DRAWER_WIDTH,
     Math.max(MIN_CONSTRAINED_DRAWER_WIDTH, availableWidth),
@@ -371,10 +396,12 @@ function clampWorkspaceDrawerWidths({
   showTree,
   showProperties,
   workspaceWidth,
+  minimumCenterWidth,
 }: WorkspaceDrawerWidths & {
   showTree: boolean;
   showProperties: boolean;
   workspaceWidth: number;
+  minimumCenterWidth: number;
 }) {
   if (workspaceWidth === 0) {
     return {
@@ -393,6 +420,7 @@ function clampWorkspaceDrawerWidths({
         treeDrawerWidth,
         COLLAPSED_DRAWER_WIDTH,
         workspaceWidth,
+        minimumCenterWidth,
       ),
       propertiesDrawerWidth,
     } satisfies WorkspaceDrawerWidths;
@@ -405,6 +433,7 @@ function clampWorkspaceDrawerWidths({
         propertiesDrawerWidth,
         COLLAPSED_DRAWER_WIDTH,
         workspaceWidth,
+        minimumCenterWidth,
       ),
     } satisfies WorkspaceDrawerWidths;
   }
@@ -415,7 +444,7 @@ function clampWorkspaceDrawerWidths({
 
   const handleCount = 2;
   const availableDrawerWidth =
-    workspaceWidth - handleCount * DRAWER_HANDLE_WIDTH - MIN_VIEWPORT_WIDTH;
+    workspaceWidth - handleCount * DRAWER_HANDLE_WIDTH - minimumCenterWidth;
   const minimumDrawerWidth =
     availableDrawerWidth >= MIN_DRAWER_WIDTH * 2
       ? MIN_DRAWER_WIDTH
@@ -996,6 +1025,8 @@ export function ViewerShell() {
   const viewportRef = useRef<ViewerViewportHandle | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
+  const centerWorkspaceRef = useRef<HTMLDivElement | null>(null);
+  const graphPaneRef = useRef<HTMLDivElement | null>(null);
   const treeDrawerRef = useRef<HTMLDivElement | null>(null);
   const propertiesDrawerRef = useRef<HTMLDivElement | null>(null);
   const dataTableDialogRef = useRef<HTMLDivElement | null>(null);
@@ -1074,6 +1105,11 @@ export function ViewerShell() {
   const [viewerThemeLoaded, setViewerThemeLoaded] = useState(false);
   const [showTree, setShowTree] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
+  const [showGraph, setShowGraph] = useState(false);
+  const [graphWasOpened, setGraphWasOpened] = useState(false);
+  const [graphModelRevision, setGraphModelRevision] = useState(0);
+  const [graphPaneWidth, setGraphPaneWidth] = useState<number | null>(null);
+  const [graphResizeState, setGraphResizeState] = useState<GraphResizeState | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mobileDrawer, setMobileDrawer] = useState<DrawerSide | null>(null);
   useEffect(() => {
@@ -1111,6 +1147,9 @@ export function ViewerShell() {
     useState<DataTableDialogResizeState | null>(null);
 
   const hasModel = Boolean(metadata && status.phase === "loaded");
+  const minimumCenterWidth = showGraph
+    ? MIN_VIEWPORT_WIDTH + MIN_GRAPH_WIDTH + GRAPH_RESIZE_HANDLE_WIDTH
+    : MIN_VIEWPORT_WIDTH;
   const isDataTableDetached = showDataTable && showDataTableInWindow;
   const activeDrawerResizeSide = drawerDragState?.side ?? null;
   const serverStorageAvailable = serverStorageStatus === "available";
@@ -1679,8 +1718,13 @@ export function ViewerShell() {
           ? treeDrawerWidthRef.current
           : COLLAPSED_DRAWER_WIDTH;
 
-    return clampDrawerWidthToWorkspace(nextWidth, otherDrawerWidth, workspaceWidth);
-  }, [showProperties, showTree]);
+    return clampDrawerWidthToWorkspace(
+      nextWidth,
+      otherDrawerWidth,
+      workspaceWidth,
+      minimumCenterWidth,
+    );
+  }, [minimumCenterWidth, showProperties, showTree]);
 
   const clampDataTableDialogLayout = useCallback((nextLayout: DataTableDialogLayout) => {
     const workspace = workspaceRef.current;
@@ -1702,6 +1746,7 @@ export function ViewerShell() {
       showTree,
       showProperties,
       workspaceWidth: workspaceRef.current?.clientWidth ?? 0,
+      minimumCenterWidth,
     });
 
     if (showTree && nextWidths.treeDrawerWidth !== treeDrawerWidthRef.current) {
@@ -1722,7 +1767,7 @@ export function ViewerShell() {
           : nextWidths.propertiesDrawerWidth,
       );
     }
-  }, [showProperties, showTree]);
+  }, [minimumCenterWidth, showProperties, showTree]);
 
   const stopDrawerResize = useCallback(() => {
     stopPendingDrawerPreview();
@@ -1745,6 +1790,26 @@ export function ViewerShell() {
     document.body.style.removeProperty("cursor");
     document.body.style.removeProperty("user-select");
   }, [applyDrawerWidth, stopPendingDrawerPreview]);
+
+  const clampGraphPaneWidth = useCallback((nextWidth: number) => {
+    const centerWidth = centerWorkspaceRef.current?.clientWidth ?? 0;
+    if (centerWidth === 0) return Math.max(MIN_GRAPH_WIDTH, nextWidth);
+    const maxWidth = Math.max(
+      MIN_GRAPH_WIDTH,
+      centerWidth - MIN_VIEWPORT_WIDTH - GRAPH_RESIZE_HANDLE_WIDTH,
+    );
+    return clamp(nextWidth, Math.min(MIN_GRAPH_WIDTH, maxWidth), maxWidth);
+  }, []);
+
+  const startGraphResize = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setGraphResizeState({
+      startX: event.clientX,
+      startWidth:
+        graphPaneRef.current?.getBoundingClientRect().width ??
+        (centerWorkspaceRef.current?.clientWidth ?? 0) * 0.45,
+    });
+  }, []);
 
   const stopDataTableDialogMove = useCallback(() => {
     stopPendingDataTableDialogPreview();
@@ -1870,6 +1935,42 @@ export function ViewerShell() {
       document.body.style.removeProperty("user-select");
     };
   }, [drawerDragState, stopDrawerResize, updateDraggedDrawerWidth]);
+
+  useEffect(() => {
+    if (!graphResizeState) return;
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const delta = event.clientX - graphResizeState.startX;
+      setGraphPaneWidth(clampGraphPaneWidth(graphResizeState.startWidth - delta));
+    };
+    const handlePointerUp = () => setGraphResizeState(null);
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+      document.body.style.removeProperty("cursor");
+      document.body.style.removeProperty("user-select");
+    };
+  }, [clampGraphPaneWidth, graphResizeState]);
+
+  useEffect(() => {
+    const centerWorkspace = centerWorkspaceRef.current;
+    if (!centerWorkspace || typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(() => {
+      setGraphPaneWidth((current) =>
+        current === null ? current : clampGraphPaneWidth(current),
+      );
+    });
+    observer.observe(centerWorkspace);
+    return () => observer.disconnect();
+  }, [clampGraphPaneWidth]);
 
   useEffect(() => {
     treeDrawerWidthRef.current = treeDrawerWidth;
@@ -2327,6 +2428,9 @@ export function ViewerShell() {
       commitDataTableDraft(null);
       setDataTableImportReport(null);
       setDataTableActionStatus(initialDataTableActionStatus);
+      setShowGraph(false);
+      setGraphWasOpened(false);
+      setGraphModelRevision((current) => current + 1);
     });
     await viewportRef.current?.loadIfc(sourceResult);
   }, [commitDataTableDraft]);
@@ -2918,6 +3022,27 @@ export function ViewerShell() {
     setShowDataTable(false);
     setShowDataTableInWindow(false);
   }, []);
+
+  const openGraph = useCallback(() => {
+    if (!hasModel) return;
+    setGraphWasOpened(true);
+    setShowGraph(true);
+  }, [hasModel]);
+
+  const closeGraph = useCallback(() => {
+    setShowGraph(false);
+  }, []);
+
+  const requestGraphNeighborhood = useCallback(
+    (request: Parameters<ViewerViewportHandle["getGraphNeighborhood"]>[0]) => {
+      const viewport = viewportRef.current;
+      if (!viewport) {
+        return Promise.reject(new Error("The IFC viewer is not ready."));
+      }
+      return viewport.getGraphNeighborhood(request);
+    },
+    [],
+  );
 
   const mcpRevision = useMemo(
     () =>
@@ -3638,116 +3763,223 @@ export function ViewerShell() {
                   }
                 />
 
-                <div className="relative min-h-0 flex-1">
-                  <IfcViewport
-                    ref={viewportRef}
-                    embedded
-                    theme={viewerTheme}
-                    status={status}
-                    activeTool={session.activeTool}
-                    validationHighlights={validationHighlights}
-                    onOpenFile={openFilePicker}
-                    openFileLabel={openFileLabel}
-                    filesButton={
-                      <ServerModelsMenu
-                        variant="empty-state"
-                        theme={viewerTheme}
-                        disabled={!serverStorageAvailable}
-                        disabledReason={filesDisabledReason}
-                        onLoadModel={(modelId) => {
-                          void loadModelById(modelId);
-                        }}
-                        onCompareModel={(model) => {
-                          setCompareModel({ modelId: model.modelId, name: model.name });
-                        }}
-                      />
-                    }
-                    onStatusChange={(nextStatus) => {
-                      startTransition(() => {
-                        setStatus(nextStatus);
-                        if (nextStatus.phase !== "loaded") {
-                          setMetadata((current) =>
-                            current ? { ...current, loadStatus: nextStatus.phase } : current,
-                          );
-                        }
-                      });
-                    }}
-                    onSessionChange={(nextSession) => {
-                      startTransition(() => {
-                        setSession(nextSession);
-                      });
-                    }}
-                    onModelLoaded={({
-                      metadata: nextMetadata,
-                      tree: nextTree,
-                      categories: nextCategories,
-                    }) => {
-                      startTransition(() => {
-                        setMetadata(nextMetadata);
-                        setTree(nextTree);
-                        setCategories(nextCategories);
-                        setSelectionDetails({ selection: null, inspection: null, loading: false });
-                        setDebugData(initialDebugData);
-                      });
-                    }}
-                    onDataTableChange={(nextDataTableState) => {
-                      startTransition(() => {
-                        setDataTableState(nextDataTableState);
-                      });
-                    }}
-                    onSelectionDetailsChange={(details) => {
-                      startTransition(() => {
-                        setSelectionDetails(details);
-                      });
-                    }}
-                    onDebugDataChange={(nextDebugData) => {
-                      startTransition(() => {
-                        setDebugData(nextDebugData);
-                      });
-                    }}
-                  />
-
-                  <ViewerToolbar
+                <div className="flex shrink-0 border-b border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] p-1 lg:hidden">
+                  <button
+                    type="button"
+                    aria-pressed={!showGraph}
+                    onClick={closeGraph}
+                    className={`flex h-8 flex-1 items-center justify-center gap-2 rounded-[var(--r-control)] text-xs font-semibold uppercase tracking-[0.08em] transition ${
+                      !showGraph
+                        ? "bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
+                        : "text-[color:var(--muted-ink)] hover:bg-[color:var(--surface-hover)]"
+                    }`}
+                  >
+                    3D
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={showGraph}
                     disabled={!hasModel}
-                    dataTableOpen={showDataTable}
-                    session={session}
-                    status={status}
-                    onToggleDataTable={() => {
-                      if (showDataTable) {
-                        hideDataTable();
-                      } else {
-                        showDataTableWindow();
+                    onClick={openGraph}
+                    className={`flex h-8 flex-1 items-center justify-center gap-2 rounded-[var(--r-control)] text-xs font-semibold uppercase tracking-[0.08em] transition disabled:opacity-40 ${
+                      showGraph
+                        ? "bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
+                        : "text-[color:var(--muted-ink)] hover:bg-[color:var(--surface-hover)]"
+                    }`}
+                  >
+                    <Network className="h-3.5 w-3.5" />
+                    Graph
+                  </button>
+                </div>
+
+                <div
+                  ref={centerWorkspaceRef}
+                  className="relative flex min-h-0 flex-1 overflow-hidden"
+                >
+                  <div
+                    className={`min-h-0 min-w-0 flex-1 ${
+                      showGraph
+                        ? "invisible absolute inset-0 lg:visible lg:relative"
+                        : "relative visible"
+                    }`}
+                  >
+                    <IfcViewport
+                      ref={viewportRef}
+                      embedded
+                      theme={viewerTheme}
+                      status={status}
+                      activeTool={session.activeTool}
+                      validationHighlights={validationHighlights}
+                      onOpenFile={openFilePicker}
+                      openFileLabel={openFileLabel}
+                      filesButton={
+                        <ServerModelsMenu
+                          variant="empty-state"
+                          theme={viewerTheme}
+                          disabled={!serverStorageAvailable}
+                          disabledReason={filesDisabledReason}
+                          onLoadModel={(modelId) => {
+                            void loadModelById(modelId);
+                          }}
+                          onCompareModel={(model) => {
+                            setCompareModel({ modelId: model.modelId, name: model.name });
+                          }}
+                        />
                       }
-                    }}
-                    onToolChange={(tool) => {
-                      setSession((current) => ({ ...current, activeTool: tool }));
-                      viewportRef.current?.setTool(tool);
-                    }}
-                    onFocusSelection={() => {
-                      void viewportRef.current?.focusSelection();
-                    }}
-                    onShowAll={() => {
-                      void runViewportVisibilityAction(async () => {
-                        await viewportRef.current?.showAll();
-                      });
-                    }}
-                    onHideSelection={() => {
-                      void runViewportVisibilityAction(async () => {
-                        await viewportRef.current?.hideSelection();
-                      });
-                    }}
-                    onIsolateSelection={() => {
-                      void runViewportVisibilityAction(async () => {
-                        await viewportRef.current?.isolateSelection();
-                      });
-                    }}
-                    onClearSections={() => {
-                      viewportRef.current?.clearSections();
-                    }}
-                    onClearMeasurements={() => {
-                      viewportRef.current?.clearMeasurements();
-                    }}
-                  />
+                      onStatusChange={(nextStatus) => {
+                        startTransition(() => {
+                          setStatus(nextStatus);
+                          if (nextStatus.phase !== "loaded") {
+                            setMetadata((current) =>
+                              current ? { ...current, loadStatus: nextStatus.phase } : current,
+                            );
+                          }
+                        });
+                      }}
+                      onSessionChange={(nextSession) => {
+                        startTransition(() => {
+                          setSession(nextSession);
+                        });
+                      }}
+                      onModelLoaded={({
+                        metadata: nextMetadata,
+                        tree: nextTree,
+                        categories: nextCategories,
+                      }) => {
+                        startTransition(() => {
+                          setMetadata(nextMetadata);
+                          setTree(nextTree);
+                          setCategories(nextCategories);
+                          setSelectionDetails({
+                            selection: null,
+                            inspection: null,
+                            loading: false,
+                          });
+                          setDebugData(initialDebugData);
+                        });
+                      }}
+                      onDataTableChange={(nextDataTableState) => {
+                        startTransition(() => {
+                          setDataTableState(nextDataTableState);
+                        });
+                      }}
+                      onSelectionDetailsChange={(details) => {
+                        startTransition(() => {
+                          setSelectionDetails(details);
+                        });
+                      }}
+                      onDebugDataChange={(nextDebugData) => {
+                        startTransition(() => {
+                          setDebugData(nextDebugData);
+                        });
+                      }}
+                    />
+
+                    <ViewerToolbar
+                      disabled={!hasModel}
+                      dataTableOpen={showDataTable}
+                      graphOpen={showGraph}
+                      session={session}
+                      status={status}
+                      onToggleGraph={() => {
+                        if (showGraph) {
+                          closeGraph();
+                        } else {
+                          openGraph();
+                        }
+                      }}
+                      onToggleDataTable={() => {
+                        if (showDataTable) {
+                          hideDataTable();
+                        } else {
+                          showDataTableWindow();
+                        }
+                      }}
+                      onToolChange={(tool) => {
+                        setSession((current) => ({ ...current, activeTool: tool }));
+                        viewportRef.current?.setTool(tool);
+                      }}
+                      onFocusSelection={() => {
+                        void viewportRef.current?.focusSelection();
+                      }}
+                      onShowAll={() => {
+                        void runViewportVisibilityAction(async () => {
+                          await viewportRef.current?.showAll();
+                        });
+                      }}
+                      onHideSelection={() => {
+                        void runViewportVisibilityAction(async () => {
+                          await viewportRef.current?.hideSelection();
+                        });
+                      }}
+                      onIsolateSelection={() => {
+                        void runViewportVisibilityAction(async () => {
+                          await viewportRef.current?.isolateSelection();
+                        });
+                      }}
+                      onClearSections={() => {
+                        viewportRef.current?.clearSections();
+                      }}
+                      onClearMeasurements={() => {
+                        viewportRef.current?.clearMeasurements();
+                      }}
+                    />
+                  </div>
+
+                  {showGraph ? (
+                    <div
+                      role="separator"
+                      aria-label="Resize graph panel"
+                      aria-orientation="vertical"
+                      tabIndex={0}
+                      onPointerDown={startGraphResize}
+                      onKeyDown={(event) => {
+                        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+                        event.preventDefault();
+                        const currentWidth =
+                          graphPaneRef.current?.getBoundingClientRect().width ??
+                          (centerWorkspaceRef.current?.clientWidth ?? 0) * 0.45;
+                        setGraphPaneWidth(
+                          clampGraphPaneWidth(
+                            currentWidth + (event.key === "ArrowLeft" ? 24 : -24),
+                          ),
+                        );
+                      }}
+                      className={`relative z-10 hidden w-2 shrink-0 cursor-col-resize touch-none border-x border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] outline-none transition hover:bg-[color:var(--accent-wash)] focus-visible:bg-[color:var(--accent-wash)] lg:block ${
+                        graphResizeState ? "bg-[color:var(--accent-wash)]" : ""
+                      }`}
+                    />
+                  ) : null}
+
+                  <div
+                    ref={graphPaneRef}
+                    style={
+                      {
+                        "--graph-pane-width": graphPaneWidth
+                          ? `${graphPaneWidth}px`
+                          : "45%",
+                      } as React.CSSProperties
+                    }
+                    className={`min-h-0 min-w-0 w-full lg:w-[var(--graph-pane-width)] lg:shrink-0 ${
+                      showGraph
+                        ? "visible absolute inset-0 lg:relative lg:inset-auto"
+                        : "invisible pointer-events-none absolute inset-0 lg:hidden"
+                    }`}
+                  >
+                    {graphWasOpened ? (
+                      <LazyIfcGraphPanel
+                        key={graphModelRevision}
+                        active={showGraph}
+                        theme={viewerTheme}
+                        selectedLocalId={session.selected?.localId ?? null}
+                        onRequestNeighborhood={requestGraphNeighborhood}
+                        onSelectNode={(localId) => {
+                          void viewportRef.current?.selectNode(localId);
+                        }}
+                        onClose={closeGraph}
+                      />
+                    ) : null}
+                  </div>
                 </div>
               </section>
 
