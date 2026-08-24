@@ -120,6 +120,61 @@
   background-color: var(--surface-hover) !important;
 }
 
+/* ------------------------------------------------------------------ *
+ * Configurable validation severities                                   *
+ *                                                                      *
+ * A severity carries a single user-chosen base colour; every tone is    *
+ * derived from it so light and dark stay readable without asking for    *
+ * a colour per theme. `--sev-base` MUST be set on the same element that *
+ * carries the class — a custom property is substituted at computed-     *
+ * value time, so declaring these on an ancestor would not pick up a     *
+ * base colour set further down.                                         *
+ * ------------------------------------------------------------------ */
+.sev-tone,
+.sev-fg,
+.sev-bg,
+.sev-dot,
+.sev-rail {
+  --sev-fg: color-mix(in srgb, var(--sev-base, currentColor) 78%, #000000);
+  --sev-bg: color-mix(in srgb, var(--sev-base, currentColor) 12%, var(--background));
+  --sev-border: color-mix(in srgb, var(--sev-base, currentColor) 45%, transparent);
+}
+
+[data-viewer-theme="dark"] .sev-tone,
+[data-viewer-theme="dark"] .sev-fg,
+[data-viewer-theme="dark"] .sev-bg,
+[data-viewer-theme="dark"] .sev-dot,
+[data-viewer-theme="dark"] .sev-rail {
+  --sev-fg: color-mix(in srgb, var(--sev-base, currentColor) 62%, #ffffff);
+  --sev-bg: color-mix(in srgb, var(--sev-base, currentColor) 26%, var(--background));
+  --sev-border: color-mix(in srgb, var(--sev-base, currentColor) 48%, transparent);
+}
+
+.sev-tone {
+  color: var(--sev-fg);
+  background-color: var(--sev-bg);
+  border-color: var(--sev-border);
+}
+
+.sev-fg {
+  color: var(--sev-fg);
+}
+
+.sev-bg {
+  background-color: var(--sev-bg);
+}
+
+.sev-dot {
+  background-color: var(--sev-base, currentColor);
+  border-color: var(--sev-border);
+}
+
+.sev-rail {
+  border-left-width: 3px;
+  border-left-style: solid;
+  border-left-color: var(--sev-border);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

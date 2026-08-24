@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { defaultViewerValidationSeverities } from "@/features/rules/lib/validation";
 import type {
   ViewerDataTableCell,
   ViewerDataTableColumn,
@@ -158,6 +159,7 @@ const errorClause = {
 
 const mixedValidationResult: ViewerValidationRunResult = {
   sourceId: "source",
+  severities: defaultViewerValidationSeverities(),
   failedClauseCount: 2,
   failedClauses: [warningClause, errorClause],
   results: [
@@ -222,6 +224,7 @@ test("validation issue pagination works without a Node Buffer global", () => {
   try {
     const result: ViewerValidationRunResult = {
       sourceId: "source",
+      severities: defaultViewerValidationSeverities(),
       failedClauseCount: 0,
       failedClauses: [],
       results: [
@@ -332,8 +335,12 @@ test("validation summaries count mixed severities independently and issues uniqu
   const summary = validationSummary(mixedValidationResult, data.rows.length);
   assert.equal(summary.evaluatedIssueCount, 1);
   assert.equal(summary.okCount, 1);
-  assert.equal(summary.warnCount, 1);
-  assert.equal(summary.errorCount, 1);
+  assert.equal(summary.countsBySeverity.warn, 1);
+  assert.equal(summary.countsBySeverity.error, 1);
+  assert.deepEqual(
+    summary.severities.map((severity) => severity.id),
+    ["warn", "error"],
+  );
 });
 
 test("element details use GlobalId and include normalized field bindings", () => {

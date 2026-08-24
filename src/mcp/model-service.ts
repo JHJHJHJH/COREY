@@ -73,6 +73,7 @@ export class StoredModelService {
     const validation = await evaluateViewerValidationPayload({
       version: VIEWER_VALIDATION_CONFIG_VERSION,
       sourceId: modelId,
+      severities: rules.severities,
       clauses: rules.clauses,
       rows,
     });
@@ -80,6 +81,7 @@ export class StoredModelService {
       metadata.latestVersion ?? 1,
       draft?.updatedAt ?? "no-draft",
       JSON.stringify(rules.clauses),
+      JSON.stringify(rules.severities),
     ].join(":");
 
     return {

@@ -25,13 +25,16 @@ import {
   getPrimarySelection,
   readNameMaps,
 } from "@/features/viewer/lib/ifc-data";
+import { useViewerSeverities } from "@/features/rules/rules-provider";
 import type {
   ViewerElementIdMap,
   ModelMetadata,
   ModelSourceResult,
   ViewerDataTableState,
   ViewerDebugData,
+  ViewerValidationElementMap,
   ViewerValidationHighlights,
+  ViewerValidationSeverity,
   ViewerSelectionDetails,
   ViewerSessionState,
   ViewerStatus,
@@ -76,18 +79,19 @@ type ViewerRuntime = {
 };
 
 const fragmentsWorkerUrl = new URL("@thatopen/fragments/worker", import.meta.url);
-const validationWarnMaterial = {
-  color: new THREE.Color("#d29a2f"),
-  opacity: 1,
-  transparent: false,
-  renderedFaces: 0,
-} satisfies Omit<FRAGS.MaterialDefinition, "customId">;
-const validationErrorMaterial = {
-  color: new THREE.Color("#bb5a36"),
-  opacity: 1,
-  transparent: false,
-  renderedFaces: 0,
-} satisfies Omit<FRAGS.MaterialDefinition, "customId">;
+/** Highlighter style id for a severity bucket. */
+function validationStyleId(severityId: string) {
+  return `validation-${severityId}`;
+}
+
+function validationMaterial(color: string) {
+  return {
+    color: new THREE.Color(color),
+    opacity: 1,
+    transparent: false,
+    renderedFaces: 0,
+  } satisfies Omit<FRAGS.MaterialDefinition, "customId">;
+}
 const viewportSceneThemes = {
   light: {
     background: "#ffffff",
@@ -113,24 +117,42 @@ function hasRenderableBox(box: THREE.Box3) {
   return Number.isFinite(box.min.x) && Number.isFinite(box.max.x) && !box.isEmpty();
 }
 
-function toModelIdMap(highlights: ViewerValidationHighlights["warn"]) {
+function toModelIdMap(highlights: ViewerValidationElementMap) {
   return Object.fromEntries(
     Object.entries(highlights).map(([modelId, ids]) => [modelId, new Set(ids)]),
   );
 }
 
-function buildValidationHighlightsSignature(highlights: ViewerValidationHighlights) {
-  return (["warn", "error"] as const)
-    .map((severity) =>
-      Object.entries(highlights[severity])
-        .sort(([leftModelId], [rightModelId]) => leftModelId.localeCompare(rightModelId))
-        .map(([modelId, localIds]) => {
-          const ids = [...localIds].sort((left, right) => left - right).join(",");
-          return `${modelId}:${ids}`;
-        })
-        .join("|"),
+/**
+ * Includes the severity colours, not just the memberships, so recolouring a severity repaints
+ * without needing validation to be re-run.
+ */
+function buildValidationHighlightsSignature(
+  highlights: ViewerValidationHighlights,
+  severities: ViewerValidationSeverity[],
+) {
+  const palette = severities
+    .map((severity) => `${severity.id}=${severity.color}`)
+    .sort()
+    .join(",");
+
+  const buckets = Object.keys(highlights)
+    .sort()
+    .map((severityId) =>
+      [
+        severityId,
+        Object.entries(highlights[severityId])
+          .sort(([leftModelId], [rightModelId]) => leftModelId.localeCompare(rightModelId))
+          .map(([modelId, localIds]) => {
+            const ids = [...localIds].sort((left, right) => left - right).join(",");
+            return `${modelId}:${ids}`;
+          })
+          .join("|"),
+      ].join("="),
     )
     .join("::");
+
+  return `${palette}##${buckets}`;
 }
 
 function cloneElementIdMap(map: ViewerElementIdMap | null): ViewerElementIdMap | null {
@@ -163,6 +185,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
   ref,
 ) {
   const OpenFileIcon = openFileLabel === "Open" ? FolderOpen : Upload;
+  const { severities } = useViewerSeverities();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const runtimeRef = useRef<ViewerRuntime | null>(null);
   const activeToolRef = useRef<ViewerTool>(activeTool);
@@ -173,7 +196,13 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
   const fragmentsUpdateFrameRef = useRef<number | null>(null);
   const pendingFragmentsForceRef = useRef(false);
   const validationHighlightsSignatureRef = useRef("");
+  /** Style ids currently registered on the highlighter, so stale ones can be cleaned up. */
+  const registeredValidationStylesRef = useRef<string[]>([]);
   const validationHighlightsSequenceRef = useRef(0);
+  // The runtime is built once, before the highlight effect runs, so the initial style
+  // registration reads the current severities through a ref.
+  const severitiesRef = useRef(severities);
+  severitiesRef.current = severities;
 
   const emitStatusChange = useEffectEvent(onStatusChange);
   const emitSelectionDetailsChange = useEffectEvent(onSelectionDetailsChange);
@@ -380,7 +409,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       return;
     }
 
-    const signature = buildValidationHighlightsSignature(validationHighlights);
+    const signature = buildValidationHighlightsSignature(validationHighlights, severities);
     if (validationHighlightsSignatureRef.current === signature) {
       return;
     }
@@ -388,31 +417,58 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
     validationHighlightsSignatureRef.current = signature;
     const updateSequence = ++validationHighlightsSequenceRef.current;
 
+    // Register a style per configured severity, replacing whatever the previous config left
+    // behind so a renamed, recoloured or deleted severity does not keep painting.
+    for (const severity of severities) {
+      runtime.highlighter.styles.set(
+        validationStyleId(severity.id),
+        validationMaterial(severity.color),
+      );
+    }
+
+    const staleStyleIds = registeredValidationStylesRef.current.filter(
+      (styleId) => !severities.some((severity) => validationStyleId(severity.id) === styleId),
+    );
+    const activeStyleIds = severities.map((severity) => validationStyleId(severity.id));
+    registeredValidationStylesRef.current = activeStyleIds;
+
     void (async () => {
-      await runtime.highlighter.clear("validation-warn");
-      await runtime.highlighter.clear("validation-error");
+      for (const styleId of [...activeStyleIds, ...staleStyleIds]) {
+        await runtime.highlighter.clear(styleId);
+      }
+
+      for (const styleId of staleStyleIds) {
+        runtime.highlighter.styles.delete(styleId);
+      }
 
       if (validationHighlightsSequenceRef.current !== updateSequence) {
         return;
       }
 
-      if (runtime.model) {
-        const warnMap = toModelIdMap(validationHighlights.warn);
-        if (!OBC.ModelIdMapUtils.isEmpty(warnMap)) {
-          await runtime.highlighter.highlightByID("validation-warn", warnMap, true, false);
+      if (!runtime.model) {
+        return;
+      }
+
+      // Painted least-severe first so the highest-order severity wins any overlap.
+      for (const severity of severities) {
+        const elementMap = toModelIdMap(validationHighlights[severity.id] ?? {});
+        if (OBC.ModelIdMapUtils.isEmpty(elementMap)) {
+          continue;
         }
+
+        await runtime.highlighter.highlightByID(
+          validationStyleId(severity.id),
+          elementMap,
+          true,
+          false,
+        );
 
         if (validationHighlightsSequenceRef.current !== updateSequence) {
           return;
         }
-
-        const errorMap = toModelIdMap(validationHighlights.error);
-        if (!OBC.ModelIdMapUtils.isEmpty(errorMap)) {
-          await runtime.highlighter.highlightByID("validation-error", errorMap, true, false);
-        }
       }
     })();
-  }, [validationHighlights]);
+  }, [severities, validationHighlights]);
 
   useImperativeHandle(ref, () => ({
     async loadIfc(source) {
@@ -1033,8 +1089,12 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
         },
       });
       highlighter.mouseMoveThreshold = 10;
-      highlighter.styles.set("validation-warn", validationWarnMaterial);
-      highlighter.styles.set("validation-error", validationErrorMaterial);
+      for (const severity of severitiesRef.current) {
+        highlighter.styles.set(
+          validationStyleId(severity.id),
+          validationMaterial(severity.color),
+        );
+      }
 
       highlighter.events.select.onHighlight.add((selectionMap) => {
         syncSelectionFromMap(selectionMap);

@@ -127,6 +127,7 @@ import type {
   ViewerSessionState,
   ViewerStatus,
   ViewerValidationHighlights,
+  ViewerValidationElementMap,
   ViewerValidationSeverityFilter,
   ViewerValidationClauseTableView,
   ViewerValidationRunPayload,
@@ -177,14 +178,11 @@ const validationWorkerUrl = new URL("../../rules/workers/validation-worker.ts", 
 const source = new LocalFileModelSource();
 const remoteSource = new RemoteModelSource();
 
-const emptyValidationHighlights: ViewerValidationHighlights = {
-  warn: {},
-  error: {},
-};
+const emptyValidationHighlights: ViewerValidationHighlights = {};
 
 function areValidationElementMapsEqual(
-  left: ViewerValidationHighlights["warn"],
-  right: ViewerValidationHighlights["warn"],
+  left: ViewerValidationElementMap,
+  right: ViewerValidationElementMap,
 ) {
   const leftModelIds = Object.keys(left);
   const rightModelIds = Object.keys(right);
@@ -214,9 +212,16 @@ function areValidationHighlightsEqual(
   left: ViewerValidationHighlights,
   right: ViewerValidationHighlights,
 ) {
-  return (
-    areValidationElementMapsEqual(left.warn, right.warn) &&
-    areValidationElementMapsEqual(left.error, right.error)
+  // Buckets are keyed by severity id, so a renamed or removed severity changes the key set.
+  const leftKeys = Object.keys(left);
+  if (leftKeys.length !== Object.keys(right).length) {
+    return false;
+  }
+
+  return leftKeys.every(
+    (severityId) =>
+      right[severityId] !== undefined &&
+      areValidationElementMapsEqual(left[severityId], right[severityId]),
   );
 }
 
@@ -1121,6 +1126,7 @@ export function ViewerShell() {
     setViewerTheme((current) => (current === "dark" ? "light" : "dark"));
   }, []);
   const deferredClauses = useDeferredValue(config.clauses);
+  const severities = config.severities;
   const compiledValidationRules = useMemo(
     () => compileViewerValidationRules(deferredClauses),
     [deferredClauses],
@@ -1194,9 +1200,10 @@ export function ViewerShell() {
       inspection: applyViewerValidationToInspection(
         applyViewerDataTableToInspection(selectionDetails.inspection, effectiveDataTableData),
         deferredClauses,
+        severities,
       ),
     }),
-    [deferredClauses, effectiveDataTableData, selectionDetails],
+    [deferredClauses, effectiveDataTableData, selectionDetails, severities],
   );
   const resolvePropertyPanelEdit = useCallback(
     (inspectionRow: ViewerInspectionRow): ResolvedPropertyPanelEdit | null => {
@@ -1242,8 +1249,8 @@ export function ViewerShell() {
     [effectiveDataTableData, validationResult],
   );
   const validationSeverityElements = useMemo(
-    () => buildViewerValidationSeverityElements(validationResult?.results ?? null),
-    [validationResult],
+    () => buildViewerValidationSeverityElements(severities, validationResult?.results ?? null),
+    [severities, validationResult],
   );
   const debugTreeSample = useMemo(
     () => (tree.length > 0 ? buildViewerTreeDebugSample(tree) : null),
@@ -1394,10 +1401,18 @@ export function ViewerShell() {
     return {
       version: VIEWER_VALIDATION_CONFIG_VERSION,
       sourceId: metadata.sourceId ?? metadata.name,
+      severities,
       clauses: deferredClauses,
       rows: buildViewerValidationRows(effectiveDataTableData, deferredClauses),
     };
-  }, [deferredClauses, effectiveDataTableData, metadata, runnableRuleCount, status.phase]);
+  }, [
+    deferredClauses,
+    effectiveDataTableData,
+    metadata,
+    runnableRuleCount,
+    severities,
+    status.phase,
+  ]);
 
   useEffect(() => {
     const persistedTheme = window.localStorage.getItem(VIEWER_THEME_STORAGE_KEY);
@@ -2084,7 +2099,10 @@ export function ViewerShell() {
       }
 
       startTransition(() => {
-        const nextHighlights = groupViewerValidationResultsBySeverity(result.results);
+        const nextHighlights = groupViewerValidationResultsBySeverity(
+          result.severities,
+          result.results,
+        );
         setValidationHighlights((current) =>
           areValidationHighlightsEqual(current, nextHighlights) ? current : nextHighlights,
         );
@@ -2859,7 +2877,11 @@ export function ViewerShell() {
           return;
         }
 
-        const localIds = collectViewerValidationLocalIds(validationSeverityElements, filter);
+        const localIds = collectViewerValidationLocalIds(
+          severities,
+          validationSeverityElements,
+          filter,
+        );
         // Isolating an empty set would blank the viewport with no visible cause; the panel's
         // own empty state already explains that nothing matched.
         if (!localIds || localIds.size === 0) {
@@ -2869,7 +2891,7 @@ export function ViewerShell() {
         await viewportRef.current?.isolateElements([...localIds]);
       });
     },
-    [runViewportVisibilityAction, validationSeverityElements],
+    [runViewportVisibilityAction, severities, validationSeverityElements],
   );
 
   // Highlights going empty (new model, cleared rules) makes both panels drop their severity

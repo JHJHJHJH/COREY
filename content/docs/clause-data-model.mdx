@@ -23,11 +23,15 @@ Every exported or imported clause file is a `ViewerValidationConfig`.
 | `clauses` | array | Named groups of rules. |
 
 Version `1` files used a root `rules` array and are no longer accepted by manual
-import. Version `2` clause files are migrated on import; new files use version `3`.
+import. Version `2` and `3` clause files are migrated on import; new files use version `4`.
 
 ```json
 {
-  "version": 3,
+  "version": 4,
+  "severities": [
+    { "id": "warn", "label": "Warn", "color": "#d29a2f", "order": 1 },
+    { "id": "error", "label": "Error", "color": "#bb5a36", "order": 2 }
+  ],
   "clauses": [
     {
       "id": "wall-basics",
@@ -51,6 +55,25 @@ import. Version `2` clause files are migrated on import; new files use version `
 }
 ```
 
+## Severities
+
+Severity levels are configurable. The root `severities` array defines them, and every
+`rule.failSeverity` references one by `id`.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | `string` | Stable slug referenced by `failSeverity`. `ok` is reserved. |
+| `label` | `string` | Display name shown in badges, filters and the rules grid. |
+| `color` | `string` | Base `#rrggbb` colour, also used to paint the element in the 3D view. |
+| `order` | `integer` | Rank; higher is more severe. |
+
+When an element fails several rules, the highest `order` wins — that is the severity reported for
+it and the colour it is painted with. Severity *filters* still match the element under every level
+it failed at, so per-severity counts can overlap.
+
+Configs at version `2` or `3` have no severity list; importing one seeds the defaults `warn`
+(`#d29a2f`, order 1) and `error` (`#bb5a36`, order 2).
+
 ## Clauses and rules
 
 A clause is a named group of rules. It exists so users can review failures by
@@ -72,7 +95,7 @@ it, and how serious a failed check is.
 | `subtype` | string (optional) | Predefined type, ANDed with `ifcType` — such as `FLOOR` for `IfcSlab`. Matching is case-insensitive. Omit or leave blank to apply the rule to every element of `ifcType`. |
 | `target` | object | The attribute or property to inspect. |
 | `check` | object | The requirement to apply. |
-| `failSeverity` | `error` or `warn` | Result severity when the rule fails. |
+| `failSeverity` | severity `id` | Result severity when the rule fails. Must match an entry in the root `severities` array. |
 
 ## Targets
 
@@ -113,7 +136,7 @@ compiled for validation. A rule is runnable when:
 - number range checks have at least one of `min` or `max`.
 - regex checks have a non-blank valid JavaScript regular expression.
 
-The JSON Schema at `/schemas/validation-config-v3.schema.json` documents the
+The JSON Schema at `/schemas/validation-config-v4.schema.json` documents the
 portable config shape. Runtime sanitizing and runnable-rule filtering remain in
 `src/features/rules/lib/validation.ts`.
 

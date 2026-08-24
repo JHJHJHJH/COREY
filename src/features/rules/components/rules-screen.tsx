@@ -12,13 +12,19 @@ import {
   LayoutTemplate,
   Plus,
   Search,
+  SlidersHorizontal,
   Trash2,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { StatusBar } from "@/components/status-bar/status-bar";
 import { InspectorDetailList } from "@/components/status-bar/status-inspector";
-import { useViewerRules } from "@/features/rules/rules-provider";
+import { useViewerRules, useViewerSeverities } from "@/features/rules/rules-provider";
+import {
+  SEVERITY_RAIL_CLASS,
+  SEVERITY_TONE_CLASS,
+  severityCssVars,
+} from "@/features/viewer/lib/severity-style";
 import {
   createEmptyViewerValidationConfig,
   parseViewerValidationConfigText,
@@ -34,6 +40,7 @@ import type {
   ViewerRuleTemplateSummary,
   ViewerValidationCheck,
   ViewerValidationRule,
+  ViewerValidationSeverity,
   ViewerValidationTarget,
 } from "@/features/viewer/types";
 
@@ -82,19 +89,7 @@ function filterSelectClassName() {
   return "h-9 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 text-sm text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent)]";
 }
 
-function severitySelectClassName(severity: ViewerValidationRule["failSeverity"]) {
-  const tone =
-    severity === "error"
-      ? "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]"
-      : "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
-  return `h-8 rounded-[var(--r-chip)] border px-2 text-[11px] font-semibold uppercase tracking-[0.08em] outline-none transition focus:border-[color:var(--accent)] ${tone}`;
-}
-
-function severityRailClassName(severity: ViewerValidationRule["failSeverity"]) {
-  return severity === "error"
-    ? "border-l-[3px] border-l-[color:var(--danger-border)]"
-    : "border-l-[3px] border-l-[color:var(--warning-border)]";
-}
+const severitySelectClassName = `h-8 rounded-[var(--r-chip)] border px-2 text-[11px] font-semibold uppercase tracking-[0.08em] outline-none transition focus:border-[color:var(--accent)] ${SEVERITY_TONE_CLASS}`;
 
 const headerCellClassName =
   "border-b border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] px-3 py-2 align-middle";
@@ -531,12 +526,14 @@ function RuleTableRow({
   onRemove: () => void;
 }) {
   const { rule } = row;
-  const railClassName = severityRailClassName(rule.failSeverity);
+  const { severities, color: severityColor } = useViewerSeverities();
+  const railStyle = severityCssVars(severityColor(rule.failSeverity));
+  const railClassName = SEVERITY_RAIL_CLASS;
 
   return (
     <tr className="transition hover:bg-[color:var(--surface-soft)]">
       {showClause ? (
-        <td className={`${bodyCellClassName} ${railClassName}`}>
+        <td className={`${bodyCellClassName} ${railClassName}`} style={railStyle}>
           <span className="block truncate px-1 text-[13px] font-medium text-[color:var(--foreground)]">
             {row.clauseTitle || "Untitled clause"}
           </span>
@@ -573,14 +570,18 @@ function RuleTableRow({
           onChange={(event) =>
             onChange({
               ...rule,
-              failSeverity: event.target.value as ViewerValidationRule["failSeverity"],
+              failSeverity: event.target.value,
             })
           }
-          className={severitySelectClassName(rule.failSeverity)}
+          className={severitySelectClassName}
+          style={severityCssVars(severityColor(rule.failSeverity))}
           aria-label="Fail severity"
         >
-          <option value="error">Error</option>
-          <option value="warn">Warn</option>
+          {[...severities].reverse().map((severity) => (
+            <option key={severity.id} value={severity.id}>
+              {severity.label}
+            </option>
+          ))}
         </select>
       </td>
       <td className={`${bodyCellClassName} text-right`}>
@@ -708,6 +709,173 @@ function TemplatesPopover({
 }
 
 /* ------------------------------------------------------------------ */
+/* Severity editor                                                      */
+/* ------------------------------------------------------------------ */
+
+function SeverityEditor({
+  severities,
+  ruleCounts,
+  onAdd,
+  onUpdate,
+  onRemove,
+  onMove,
+  onClose,
+}: {
+  severities: ViewerValidationSeverity[];
+  ruleCounts: Record<string, number>;
+  onAdd: () => void;
+  onUpdate: (severityId: string, next: Partial<ViewerValidationSeverity>) => void;
+  onRemove: (severityId: string, remapToId: string) => void;
+  onMove: (severityId: string, direction: "up" | "down") => void;
+  onClose: () => void;
+}) {
+  // Most severe first, matching how severities are presented everywhere else.
+  const ordered = [...severities].reverse();
+  const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null);
+  const pendingRemoval = ordered.find((severity) => severity.id === pendingRemovalId) ?? null;
+  const remapCandidates = ordered.filter((severity) => severity.id !== pendingRemovalId);
+  const [remapToId, setRemapToId] = useState("");
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4">
+      <section className="flex max-h-[min(40rem,calc(100vh-2rem))] w-[min(38rem,100%)] flex-col overflow-hidden rounded-2xl border border-[color:var(--viewer-border)] bg-[color:var(--panel-bg)] shadow-[var(--viewer-shadow)]">
+        <header className="flex items-start justify-between gap-3 border-b border-[color:var(--viewer-border)] px-4 py-3">
+          <div>
+            <h2 className="text-sm font-semibold text-[color:var(--foreground)]">Severities</h2>
+            <p className="mt-0.5 text-[11px] text-[color:var(--muted-ink)]">
+              Listed most severe first. An element failing at several levels is shown in the colour
+              of the highest one.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close severities"
+            className={compactButtonClassName()}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
+          <ul className="space-y-2">
+            {ordered.map((severity, index) => (
+              <li
+                key={severity.id}
+                className={`flex items-center gap-2 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 py-2 ${SEVERITY_RAIL_CLASS}`}
+                style={severityCssVars(severity.color)}
+              >
+                <input
+                  type="color"
+                  value={severity.color}
+                  onChange={(event) => onUpdate(severity.id, { color: event.target.value })}
+                  aria-label={`${severity.label} colour`}
+                  className="h-7 w-9 shrink-0 cursor-pointer rounded border border-[color:var(--viewer-border)] bg-transparent"
+                />
+                <input
+                  value={severity.label}
+                  onChange={(event) => onUpdate(severity.id, { label: event.target.value })}
+                  aria-label={`${severity.id} label`}
+                  className={cellInputClassName(true)}
+                />
+                <span className="w-20 shrink-0 text-right font-mono text-[11px] tabular-nums text-[color:var(--muted-ink)]">
+                  {ruleCounts[severity.id] ?? 0} rules
+                </span>
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onMove(severity.id, "up")}
+                    disabled={index === 0}
+                    aria-label={`Make ${severity.label} more severe`}
+                    className={`${compactButtonClassName()} disabled:cursor-not-allowed disabled:opacity-40`}
+                  >
+                    <ArrowUp className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onMove(severity.id, "down")}
+                    disabled={index === ordered.length - 1}
+                    aria-label={`Make ${severity.label} less severe`}
+                    className={`${compactButtonClassName()} disabled:cursor-not-allowed disabled:opacity-40`}
+                  >
+                    <ArrowDown className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPendingRemovalId(severity.id);
+                      setRemapToId(
+                        ordered.find((candidate) => candidate.id !== severity.id)?.id ?? "",
+                      );
+                    }}
+                    disabled={ordered.length <= 1}
+                    aria-label={`Remove ${severity.label}`}
+                    title={
+                      ordered.length <= 1 ? "At least one severity is required" : undefined
+                    }
+                    className={`${compactButtonClassName()} disabled:cursor-not-allowed disabled:opacity-40`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <button type="button" onClick={onAdd} className={`${secondaryButtonClassName()} mt-3`}>
+            <Plus className="h-4 w-4" />
+            Add severity
+          </button>
+
+          {pendingRemoval ? (
+            <div className="mt-3 rounded-[var(--r-control)] border border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] px-3 py-2.5 text-sm text-[color:var(--danger-fg)]">
+              <div className="font-medium">
+                Remove &ldquo;{pendingRemoval.label}&rdquo;?
+              </div>
+              <p className="mt-1 text-[12px]">
+                {ruleCounts[pendingRemoval.id] ?? 0} rules use it. Choose the severity they should
+                move to.
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <select
+                  value={remapToId}
+                  onChange={(event) => setRemapToId(event.target.value)}
+                  aria-label="Move rules to"
+                  className={filterSelectClassName()}
+                >
+                  {remapCandidates.map((severity) => (
+                    <option key={severity.id} value={severity.id}>
+                      {severity.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onRemove(pendingRemoval.id, remapToId);
+                    setPendingRemovalId(null);
+                  }}
+                  className={secondaryButtonClassName()}
+                >
+                  Remove and move rules
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingRemovalId(null)}
+                  className={compactButtonClassName()}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Main screen                                                          */
 /* ------------------------------------------------------------------ */
 
@@ -722,9 +890,16 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
     updateRule,
     removeRule,
     replaceConfig,
+    addSeverity,
+    updateSeverity,
+    removeSeverity,
+    moveSeverity,
+    countRulesBySeverity,
   } = useViewerRules();
+  const { severities, scale: severityScale } = useViewerSeverities();
 
   const [importError, setImportError] = useState<string | null>(null);
+  const [showSeverityEditor, setShowSeverityEditor] = useState(false);
   const [loadingTemplateId, setLoadingTemplateId] = useState<string | null>(null);
   const [starterTemplates, setStarterTemplates] = useState<ViewerRuleTemplateSummary[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(true);
@@ -783,14 +958,18 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
     if (!sort) {
       return matchedRows;
     }
+    // Severity sorts by configured rank, not alphabetically — "error" before "warn" is a
+    // coincidence of spelling that stops holding as soon as levels are user-named.
     const sorted = [...matchedRows].sort((a, b) =>
-      rowSortValue(a, sort.columnKey).localeCompare(rowSortValue(b, sort.columnKey), undefined, {
-        numeric: true,
-        sensitivity: "base",
-      }),
+      sort.columnKey === "severity"
+        ? severityScale.rank(a.rule.failSeverity) - severityScale.rank(b.rule.failSeverity)
+        : rowSortValue(a, sort.columnKey).localeCompare(rowSortValue(b, sort.columnKey), undefined, {
+            numeric: true,
+            sensitivity: "base",
+          }),
     );
     return sort.direction === "desc" ? sorted.reverse() : sorted;
-  }, [matchedRows, sort]);
+  }, [matchedRows, severityScale, sort]);
 
   const visibleClauses = useMemo(
     () =>
@@ -1002,8 +1181,11 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
             className={filterSelectClassName()}
           >
             <option value="all">Any severity</option>
-            <option value="error">Error</option>
-            <option value="warn">Warn</option>
+            {[...severities].reverse().map((severity) => (
+              <option key={severity.id} value={severity.id}>
+                {severity.label}
+              </option>
+            ))}
           </select>
 
           <select
@@ -1027,6 +1209,14 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
           ) : null}
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowSeverityEditor(true)}
+              className={secondaryButtonClassName()}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Severities
+            </button>
             <button type="button" onClick={addClause} className={secondaryButtonClassName()}>
               <Plus className="h-4 w-4" />
               Add clause
@@ -1057,6 +1247,18 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
           </div>
         ) : null}
       </div>
+
+      {showSeverityEditor ? (
+        <SeverityEditor
+          severities={severities}
+          ruleCounts={countRulesBySeverity()}
+          onAdd={addSeverity}
+          onUpdate={updateSeverity}
+          onRemove={removeSeverity}
+          onMove={moveSeverity}
+          onClose={() => setShowSeverityEditor(false)}
+        />
+      ) : null}
 
       {/* Grid */}
       <div className="min-h-0 flex-1 overflow-auto">

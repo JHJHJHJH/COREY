@@ -17,8 +17,13 @@ import {
   formatBytes,
   formatTreeNodeCount,
 } from "@/features/viewer/lib/ifc-data";
+import { useViewerSeverities } from "@/features/rules/rules-provider";
 import {
-  VIEWER_SEVERITY_FILTER_OPTIONS,
+  SEVERITY_TONE_CLASS,
+  severityCssVars,
+} from "@/features/viewer/lib/severity-style";
+import {
+  buildViewerSeverityFilterOptions,
   collectViewerValidationLocalIds,
   countViewerValidationSeverities,
   viewerSeverityFilterLabel,
@@ -48,20 +53,27 @@ type ModelTreePanelProps = {
   onSeverityFilterChange: (filter: ViewerValidationSeverityFilter) => void;
 };
 
-function severityOptionTone(value: ViewerValidationSeverityFilter, active: boolean) {
+function severityOptionTone(
+  value: ViewerValidationSeverityFilter,
+  active: boolean,
+  color: string | null,
+) {
   if (!active) {
-    return "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]";
+    return {
+      className:
+        "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:bg-[color:var(--surface-strong)]",
+      style: undefined,
+    };
   }
 
-  if (value === "error") {
-    return "border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] text-[color:var(--danger-fg)]";
+  if (value !== "all" && value !== "issues" && color) {
+    return { className: SEVERITY_TONE_CLASS, style: severityCssVars(color) };
   }
 
-  if (value === "warn") {
-    return "border-[color:var(--warning-border)] bg-[color:var(--warning-bg)] text-[color:var(--warning-fg)]";
-  }
-
-  return "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]";
+  return {
+    className: "border-[color:var(--accent)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]",
+    style: undefined,
+  };
 }
 
 type TreeNodeRowProps = {
@@ -332,16 +344,21 @@ export function ModelTreePanel({
 
   const hasActiveCategoryFilter = selectedCategories !== null;
   const activeCategoryCount = selectedCategories?.size ?? categories.length;
+  const { severities, color: severityColor } = useViewerSeverities();
+  const severityFilterOptions = useMemo(
+    () => buildViewerSeverityFilterOptions(severities),
+    [severities],
+  );
 
   const validationCounts = useMemo(
-    () => countViewerValidationSeverities(severityElements),
-    [severityElements],
+    () => countViewerValidationSeverities(severities, severityElements),
+    [severities, severityElements],
   );
   const hasValidationHighlights = validationCounts.issues > 0;
   const hasActiveSeverityFilter = severityFilter !== "all";
   const severityLocalIds = useMemo(
-    () => collectViewerValidationLocalIds(severityElements, severityFilter),
-    [severityElements, severityFilter],
+    () => collectViewerValidationLocalIds(severities, severityElements, severityFilter),
+    [severities, severityElements, severityFilter],
   );
 
   // Once validation has nothing to say, a severity filter can only hide everything.
@@ -412,7 +429,10 @@ export function ModelTreePanel({
     ? `${activeCategoryCount} of ${categories.length} categories`
     : "All categories";
   const filterSummary =
-    [hasActiveSeverityFilter ? viewerSeverityFilterLabel(severityFilter) : null, categorySummary]
+    [
+      hasActiveSeverityFilter ? viewerSeverityFilterLabel(severities, severityFilter) : null,
+      categorySummary,
+    ]
       .filter((part): part is string => part !== null)
       .join(" · ");
   const forceExpanded = hasActiveFilters;
@@ -562,7 +582,12 @@ export function ModelTreePanel({
               ) : null}
               {hasActiveSeverityFilter ? (
                 <span
-                  className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border ${severityOptionTone(severityFilter, true)}`}
+                  className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border ${
+                    severityOptionTone(severityFilter, true, severityColor(severityFilter)).className
+                  }`}
+                  style={
+                    severityOptionTone(severityFilter, true, severityColor(severityFilter)).style
+                  }
                   aria-hidden="true"
                 />
               ) : null}
@@ -596,15 +621,14 @@ export function ModelTreePanel({
                   {hasValidationHighlights ? (
                     <>
                       <div className="mt-1.5 flex flex-wrap gap-1">
-                        {VIEWER_SEVERITY_FILTER_OPTIONS.map((option) => {
+                        {severityFilterOptions.map((option) => {
                           const count =
-                            option.value === "error"
-                              ? validationCounts.error
-                              : option.value === "warn"
-                                ? validationCounts.warn
-                                : option.value === "issues"
-                                  ? validationCounts.issues
-                                  : null;
+                            option.value === "all" ? null : validationCounts[option.value] ?? 0;
+                          const tone = severityOptionTone(
+                            option.value,
+                            severityFilter === option.value,
+                            option.color,
+                          );
 
                           return (
                             <button
@@ -612,7 +636,8 @@ export function ModelTreePanel({
                               type="button"
                               onClick={() => selectSeverityFilter(option.value)}
                               aria-pressed={severityFilter === option.value}
-                              className={`cursor-pointer rounded-lg border px-2 py-1 text-[11px] font-medium transition ${severityOptionTone(option.value, severityFilter === option.value)}`}
+                              className={`cursor-pointer rounded-lg border px-2 py-1 text-[11px] font-medium transition ${tone.className}`}
+                              style={tone.style}
                             >
                               {option.value === "all" ? "Any" : option.label}
                               {count === null ? null : (
@@ -624,7 +649,7 @@ export function ModelTreePanel({
                       </div>
                       {severityIsolation !== severityFilter ? (
                         <div className="mt-1.5 text-[10px] text-[color:var(--muted-ink)]">
-                          3D isolated to {viewerSeverityFilterLabel(severityIsolation)}
+                          3D isolated to {viewerSeverityFilterLabel(severities, severityIsolation)}
                         </div>
                       ) : null}
                     </>

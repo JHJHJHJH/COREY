@@ -1,52 +1,83 @@
+import { buildViewerSeverityScale, type ViewerSeverityScale } from "@/features/viewer/lib/severity-scale";
 import type {
   ViewerElementIdMap,
   ViewerValidationElementResult,
   ViewerValidationFailureSeverity,
+  ViewerValidationSeverity,
   ViewerValidationSeverityElements,
   ViewerValidationSeverityFilter,
   ViewerValidationSeverityRowKeys,
 } from "@/features/viewer/types";
 
-export const VIEWER_SEVERITY_FILTER_OPTIONS: ReadonlyArray<{
+export interface ViewerSeverityFilterOption {
   value: ViewerValidationSeverityFilter;
   label: string;
   /** Short form used in the data table's active-filter chip strip. */
   chipLabel: string;
-}> = [
-  { value: "all", label: "Any severity", chipLabel: "Any severity" },
-  { value: "issues", label: "Any issue", chipLabel: "Any issue" },
-  { value: "error", label: "Error", chipLabel: "Errors" },
-  { value: "warn", label: "Warn", chipLabel: "Warnings" },
-];
+  /** Base colour for the option, or `null` for the aggregate options. */
+  color: string | null;
+}
 
-export function viewerSeverityFilterLabel(filter: ViewerValidationSeverityFilter) {
+/**
+ * Filter options for a configured severity list: the two aggregates first, then one option per
+ * severity most-severe first.
+ */
+export function buildViewerSeverityFilterOptions(
+  severities: ViewerValidationSeverity[],
+): ViewerSeverityFilterOption[] {
+  const scale = buildViewerSeverityScale(severities);
+
+  return [
+    { value: "all", label: "Any severity", chipLabel: "Any severity", color: null },
+    { value: "issues", label: "Any issue", chipLabel: "Any issue", color: null },
+    ...scale.descending.map((severity) => ({
+      value: severity.id,
+      label: severity.label,
+      chipLabel: severity.label,
+      color: severity.color,
+    })),
+  ];
+}
+
+export function viewerSeverityFilterLabel(
+  severities: ViewerValidationSeverity[],
+  filter: ViewerValidationSeverityFilter,
+) {
   return (
-    VIEWER_SEVERITY_FILTER_OPTIONS.find((option) => option.value === filter)?.label ??
+    buildViewerSeverityFilterOptions(severities).find((option) => option.value === filter)?.label ??
     "Any severity"
   );
 }
 
-export function viewerSeverityFilterChipLabel(filter: ViewerValidationSeverityFilter) {
+export function viewerSeverityFilterChipLabel(
+  severities: ViewerValidationSeverity[],
+  filter: ViewerValidationSeverityFilter,
+) {
   return (
-    VIEWER_SEVERITY_FILTER_OPTIONS.find((option) => option.value === filter)?.chipLabel ??
-    "Any severity"
+    buildViewerSeverityFilterOptions(severities).find((option) => option.value === filter)
+      ?.chipLabel ?? "Any severity"
   );
 }
 
-export function createEmptyViewerValidationSeverityElements(): ViewerValidationSeverityElements {
-  return { warn: {}, error: {} };
+export function createEmptyViewerValidationSeverityElements(
+  severities: ViewerValidationSeverity[],
+): ViewerValidationSeverityElements {
+  return Object.fromEntries(severities.map((severity) => [severity.id, {} as ViewerElementIdMap]));
 }
 
-export function createEmptyViewerValidationSeverityRowKeys(): ViewerValidationSeverityRowKeys {
-  return { warn: new Set(), error: new Set() };
+export function createEmptyViewerValidationSeverityRowKeys(
+  severities: ViewerValidationSeverity[],
+): ViewerValidationSeverityRowKeys {
+  return Object.fromEntries(severities.map((severity) => [severity.id, new Set<string>()]));
 }
 
-function severityBuckets(filter: ViewerValidationSeverityFilter) {
+/** The severity ids a filter selects. `"all"` is handled by callers, which skip filtering. */
+function severityBuckets(scale: ViewerSeverityScale, filter: ViewerValidationSeverityFilter) {
   if (filter === "issues") {
-    return ["error", "warn"] as const;
+    return scale.ids;
   }
 
-  return filter === "error" ? (["error"] as const) : (["warn"] as const);
+  return scale.ids.includes(filter) ? [filter] : [];
 }
 
 /**
@@ -79,9 +110,10 @@ export function collectElementResultSeverities(elementResult: ViewerValidationEl
 }
 
 export function buildViewerValidationSeverityElements(
+  severities: ViewerValidationSeverity[],
   results: ViewerValidationElementResult[] | null,
 ): ViewerValidationSeverityElements {
-  const elements = createEmptyViewerValidationSeverityElements();
+  const elements = createEmptyViewerValidationSeverityElements(severities);
   if (!results) {
     return elements;
   }
@@ -89,6 +121,12 @@ export function buildViewerValidationSeverityElements(
   for (const elementResult of results) {
     for (const severity of collectElementResultSeverities(elementResult)) {
       const bucket = elements[severity];
+      // A failure naming a severity the config no longer has is dropped from the filter buckets
+      // rather than folded into an unrelated one.
+      if (!bucket) {
+        continue;
+      }
+
       const existing = bucket[elementResult.modelId] ?? new Set<number>();
       existing.add(elementResult.localId);
       bucket[elementResult.modelId] = existing;
@@ -99,6 +137,7 @@ export function buildViewerValidationSeverityElements(
 }
 
 export function matchesViewerValidationSeverityRowKey(
+  severities: ViewerValidationSeverity[],
   rowKey: string,
   rowKeys: ViewerValidationSeverityRowKeys,
   filter: ViewerValidationSeverityFilter,
@@ -107,7 +146,8 @@ export function matchesViewerValidationSeverityRowKey(
     return true;
   }
 
-  return severityBuckets(filter).some((bucket) => rowKeys[bucket].has(rowKey));
+  const scale = buildViewerSeverityScale(severities);
+  return severityBuckets(scale, filter).some((bucket) => rowKeys[bucket]?.has(rowKey));
 }
 
 /**
@@ -119,6 +159,7 @@ export function matchesViewerValidationSeverityRowKey(
  * set is meaningful and distinct: the filter is on and nothing matches.
  */
 export function collectViewerValidationLocalIds(
+  severities: ViewerValidationSeverity[],
   elements: ViewerValidationSeverityElements,
   filter: ViewerValidationSeverityFilter,
 ): Set<number> | null {
@@ -126,9 +167,10 @@ export function collectViewerValidationLocalIds(
     return null;
   }
 
+  const scale = buildViewerSeverityScale(severities);
   const localIds = new Set<number>();
-  for (const bucket of severityBuckets(filter)) {
-    for (const ids of Object.values(elements[bucket])) {
+  for (const bucket of severityBuckets(scale, filter)) {
+    for (const ids of Object.values(elements[bucket] ?? {})) {
       for (const localId of ids) {
         localIds.add(localId);
       }
@@ -139,16 +181,19 @@ export function collectViewerValidationLocalIds(
 }
 
 /**
- * Element counts per severity. An element failing at both severities is counted under both, so
- * `warn + error` can exceed the "any issue" total — that is the point of the filter.
+ * Element counts per severity, plus the `issues` total. An element failing at several severities
+ * is counted under each, so the per-severity counts can sum to more than `issues` — that is the
+ * point of the filter.
  */
-export function countViewerValidationSeverities(elements: ViewerValidationSeverityElements) {
-  const count = (map: ViewerElementIdMap) =>
-    Object.values(map).reduce((total, ids) => total + ids.size, 0);
+export function countViewerValidationSeverities(
+  severities: ViewerValidationSeverity[],
+  elements: ViewerValidationSeverityElements,
+): Record<string, number> {
+  const count = (map: ViewerElementIdMap | undefined) =>
+    Object.values(map ?? {}).reduce((total, ids) => total + ids.size, 0);
 
   return {
-    warn: count(elements.warn),
-    error: count(elements.error),
-    issues: collectViewerValidationLocalIds(elements, "issues")?.size ?? 0,
+    ...Object.fromEntries(severities.map((severity) => [severity.id, count(elements[severity.id])])),
+    issues: collectViewerValidationLocalIds(severities, elements, "issues")?.size ?? 0,
   };
 }

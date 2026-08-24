@@ -6,7 +6,7 @@
 ## LLM References
 
 - [Validation rules contract](/llms-validation-rules.md): concise rules for generating COREY validation config JSON.
-- [Validation config JSON Schema](/schemas/validation-config-v3.schema.json): machine-readable schema for exported/imported rule config.
+- [Validation config JSON Schema](/schemas/validation-config-v4.schema.json): machine-readable schema for exported/imported rule config.
 - [User documentation](/docs/clauses): plain-language explanation of clauses and checks.
 - [Clause data model](/docs/clause-data-model): developer-facing rule model and API notes.
 
