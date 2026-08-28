@@ -6,6 +6,25 @@ This project uses semantic versioning once public releases begin.
 
 ## Unreleased
 
+## 0.3.0 - 2026-08-28
+
+- Relationship graph view: explore an element's IFC relationships as a graph,
+  expanding a node at a time, with search, relation-group filters, a legend,
+  and per-kind node shapes. Nodes can be focused, collapsed, removed, copied,
+  or isolated in the 3D viewport from a context menu.
+- Graph labels are placed by collision rather than spacing, the way map
+  renderers do it, so node and edge labels never overlap and more of them
+  appear the closer the view is zoomed in.
+- Relation groups widened from `spatial | definition | material | other` to
+  `spatial | type | property | association | connection | other`, with
+  association edges labelled from the IFC class of the resource endpoint.
+- Validation clause configuration upgraded to version 3: `pattern` checks are
+  replaced by `regex` checks, and existing pattern checks are migrated on load.
+- Configurable validation severity levels, with user-defined id, label, color,
+  and rank. Severity counts flow through validation summaries, the model tree,
+  the data table, and MCP validation queries.
+- Dependency updates, including deepmerge-ts 8.0.0.
+
 ## 0.2.0 - 2026-08-17
 
 - Model version history for server-backed models: upload new versions (with
