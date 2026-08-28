@@ -6,8 +6,8 @@
     {
       "splitTerminals": [
         {
-          "name": "bca-frontend",
-          "commands": ["pnpm dev"]
+          "name": "docker compose",
+          "commands": ["docker compose --env-file .env -f docker/docker-compose.dev.yml up --build"]
         }
       ]
     },
@@ -21,7 +21,7 @@
         }
       ]
     },
-        {
+    {
       "splitTerminals": [
         {
           "name": "claude",
