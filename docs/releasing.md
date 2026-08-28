@@ -34,11 +34,11 @@
 4. Merge the verified release candidate into `release`. The merge runs the
    Release workflow, which reads the version from `package.json`, publishes
    matching GHCR images, then creates the Git tag and GitHub Release. For
-   example, version `0.2.0` publishes:
+   example, version `0.3.0` publishes:
 
    ```text
-   ghcr.io/jhjhjhjh/corey:0.2.0
-   ghcr.io/jhjhjhjh/corey-mcp:0.2.0
+   ghcr.io/jhjhjhjh/corey:0.3.0
+   ghcr.io/jhjhjhjh/corey-mcp:0.3.0
    ```
 
    The workflow also publishes the matching minor, `release`, and `latest`
@@ -49,8 +49,8 @@
 5. Verify the published manifests:
 
    ```bash
-   docker buildx imagetools inspect ghcr.io/jhjhjhjh/corey:0.2.0
-   docker buildx imagetools inspect ghcr.io/jhjhjhjh/corey-mcp:0.2.0
+   docker buildx imagetools inspect ghcr.io/jhjhjhjh/corey:0.3.0
+   docker buildx imagetools inspect ghcr.io/jhjhjhjh/corey-mcp:0.3.0
    ```
 
    After the first MCP publication, set the `corey-mcp` package visibility to
