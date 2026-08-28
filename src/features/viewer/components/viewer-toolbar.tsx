@@ -7,6 +7,7 @@ import {
   LayoutGrid,
   type LucideIcon,
   MousePointer2,
+  Network,
   Ruler,
   ScanSearch,
   Slice,
@@ -17,9 +18,11 @@ import type { ViewerSessionState, ViewerStatus, ViewerTool } from "@/features/vi
 type ViewerToolbarProps = {
   disabled: boolean;
   dataTableOpen: boolean;
+  graphOpen: boolean;
   session: ViewerSessionState;
   status: ViewerStatus;
   onToggleDataTable: () => void;
+  onToggleGraph: () => void;
   onToolChange: (tool: ViewerTool) => void;
   onFocusSelection: () => void;
   onShowAll: () => void;
@@ -85,9 +88,11 @@ function ActionButton({
 export function ViewerToolbar({
   disabled,
   dataTableOpen,
+  graphOpen,
   session,
   status,
   onToggleDataTable,
+  onToggleGraph,
   onToolChange,
   onFocusSelection,
   onShowAll,
@@ -184,6 +189,16 @@ export function ViewerToolbar({
 
       <div className="pointer-events-none absolute bottom-0 right-3 z-20 sm:right-4">
         <div className="pointer-events-auto flex overflow-hidden rounded-t-[var(--r-panel)] border border-b-0 border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] shadow-[var(--viewer-shadow)] backdrop-blur">
+          <ActionButton
+            label={graphOpen ? "Hide graph" : "Open graph"}
+            active={graphOpen}
+            disabled={disabled}
+            className="h-11 w-auto gap-2 rounded-none border-r border-[color:var(--viewer-border)] px-4 hover:bg-[color:var(--surface-hover)]"
+            onClick={onToggleGraph}
+          >
+            <Network className="h-4 w-4" />
+            <span className="text-xs font-semibold uppercase tracking-[0.08em]">Graph</span>
+          </ActionButton>
           <ActionButton
             label={dataTableOpen ? "Hide data table" : "Open data table"}
             active={dataTableOpen}

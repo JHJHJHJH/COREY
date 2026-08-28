@@ -45,8 +45,9 @@
     "mcp:build": "tsup",
     "mcp:http": "tsx src/mcp/cli.ts",
     "mcp:test": "tsx --test src/features/viewer/mcp/*.test.ts src/features/rules/lib/*.test.ts src/server/*.test.ts src/mcp/*.test.ts",
+    "viewer:test": "tsx --test src/features/viewer/lib/*.test.ts",
     "audit:prod": "pnpm audit --prod",
-    "verify": "pnpm docs:generate && pnpm mcp:test && pnpm lint && pnpm check:assets && pnpm build && pnpm audit:prod",
+    "verify": "pnpm docs:generate && pnpm mcp:test && pnpm viewer:test && pnpm lint && pnpm check:assets && pnpm build && pnpm audit:prod",
     "postinstall": "prisma generate && fumadocs-mdx",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy"
@@ -69,6 +70,7 @@
     "pg": "^8.22.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "react-force-graph-2d": "1.29.1",
     "three": "^0.184.0",
     "web-ifc": "^0.0.77",
     "ws": "8.21.1",

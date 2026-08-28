@@ -25,9 +25,21 @@ import {
   getPrimarySelection,
   readNameMaps,
 } from "@/features/viewer/lib/ifc-data";
+import {
+  buildViewerGraphEdge,
+  classifyViewerGraphNode,
+  flattenViewerGraphRelations,
+  mergeViewerGraphEdge,
+  paginateViewerGraphRelations,
+  VIEWER_GRAPH_PAGE_SIZE,
+  viewerGraphNodeId,
+  type ViewerGraphRelationRecord,
+} from "@/features/viewer/lib/ifc-graph";
 import { useViewerSeverities } from "@/features/rules/rules-provider";
 import type {
   ViewerElementIdMap,
+  ViewerGraphEdge,
+  ViewerGraphNode,
   ModelMetadata,
   ModelSourceResult,
   ViewerDataTableState,
@@ -76,9 +88,112 @@ type ViewerRuntime = {
   labels: Map<number, string>;
   categories: Map<number, string | null>;
   hiddenItems: OBC.ModelIdMap | null;
+  graph: ViewerGraphRuntimeCache;
+};
+
+type ViewerGraphRuntimeCache = {
+  geometryLocalIds: Set<number> | null;
+  geometryLocalIdsPromise: Promise<Set<number>> | null;
+  nodes: Map<number, ViewerGraphNode>;
+  relations: Map<number, ViewerGraphRelationRecord[]>;
+  spatialRootLocalId: number | null | undefined;
 };
 
 const fragmentsWorkerUrl = new URL("@thatopen/fragments/worker", import.meta.url);
+
+function createViewerGraphRuntimeCache(): ViewerGraphRuntimeCache {
+  return {
+    geometryLocalIds: null,
+    geometryLocalIdsPromise: null,
+    nodes: new Map(),
+    relations: new Map(),
+    spatialRootLocalId: undefined,
+  };
+}
+
+function readGraphAttribute(data: FRAGS.ItemData, key: string) {
+  const attribute = data[key];
+  if (!attribute || Array.isArray(attribute) || typeof attribute !== "object") {
+    return null;
+  }
+
+  return "value" in attribute ? attribute.value : null;
+}
+
+function readGraphText(data: FRAGS.ItemData, keys: string[]) {
+  for (const key of keys) {
+    const value = readGraphAttribute(data, key);
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+function firstSpatialLocalId(node: FRAGS.SpatialTreeItem): number | null {
+  if (node.localId !== null) return node.localId;
+  for (const child of node.children ?? []) {
+    const localId = firstSpatialLocalId(child);
+    if (localId !== null) return localId;
+  }
+  return null;
+}
+
+async function getGraphGeometryLocalIds(runtime: ViewerRuntime) {
+  if (runtime.graph.geometryLocalIds) return runtime.graph.geometryLocalIds;
+  if (!runtime.model) return new Set<number>();
+
+  runtime.graph.geometryLocalIdsPromise ??= runtime.model
+    .getItemsIdsWithGeometry()
+    .then((localIds) => new Set(localIds));
+  const geometryLocalIds = await runtime.graph.geometryLocalIdsPromise;
+  runtime.graph.geometryLocalIds = geometryLocalIds;
+  return geometryLocalIds;
+}
+
+async function getGraphNodes(runtime: ViewerRuntime, requestedLocalIds: Iterable<number>) {
+  const model = runtime.model;
+  if (!model) return [];
+
+  const localIds = [...new Set(requestedLocalIds)];
+  const missingLocalIds = localIds.filter((localId) => !runtime.graph.nodes.has(localId));
+
+  if (missingLocalIds.length > 0) {
+    const [geometryLocalIds, items] = await Promise.all([
+      getGraphGeometryLocalIds(runtime),
+      model.getItemsData(missingLocalIds, {
+        attributesDefault: true,
+        relationsDefault: { attributes: false, relations: false },
+      }),
+    ]);
+    for (const [index, localId] of missingLocalIds.entries()) {
+      const item = items[index];
+      const ifcType = item ? readGraphText(item, ["_category", "type"]) : null;
+      const label =
+        (item ? readGraphText(item, ["Name", "ObjectType"]) : null) ??
+        ifcType ??
+        `#${localId}`;
+      const globalId = item ? readGraphText(item, ["_guid", "GlobalId"]) : null;
+
+      runtime.labels.set(localId, label);
+      runtime.categories.set(localId, ifcType);
+      runtime.graph.nodes.set(localId, {
+        id: viewerGraphNodeId(model.modelId, localId),
+        modelId: model.modelId,
+        localId,
+        globalId,
+        ifcType,
+        label,
+        kind: classifyViewerGraphNode(ifcType),
+        hasGeometry: geometryLocalIds.has(localId),
+      });
+    }
+  }
+
+  return localIds
+    .map((localId) => runtime.graph.nodes.get(localId))
+    .filter((node): node is ViewerGraphNode => Boolean(node));
+}
 /** Highlighter style id for a severity bucket. */
 function validationStyleId(severityId: string) {
   return `validation-${severityId}`;
@@ -479,6 +594,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
 
       await this.clearModel();
       const loadSequence = ++loadSequenceRef.current;
+      runtime.graph = createViewerGraphRuntimeCache();
       debugDataRef.current = {
         sampleItem: null,
         sampleLocalId: null,
@@ -772,6 +888,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       if (!runtime || !runtime.model) {
         void runtime?.highlighter.clear("select");
         if (runtime) {
+          runtime.graph = createViewerGraphRuntimeCache();
           syncSession(null);
           resetSelectionDetails();
         }
@@ -794,6 +911,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       runtime.world.scene.three.remove(runtime.model.object);
       await runtime.fragments.core.disposeModel(modelId);
       runtime.model = null;
+      runtime.graph = createViewerGraphRuntimeCache();
       runtime.hiddenItems = null;
       runtime.labels.clear();
       runtime.categories.clear();
@@ -816,9 +934,99 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
         data: null,
       });
     },
+    async getGraphNeighborhood(request) {
+      const runtime = runtimeRef.current;
+      const model = runtime?.model;
+      if (!runtime || !model) {
+        throw new Error("Load an IFC model before opening its graph.");
+      }
+
+      const loadSequence = loadSequenceRef.current;
+      let anchorLocalId = request.anchorLocalId;
+      if (anchorLocalId === null) {
+        if (runtime.graph.spatialRootLocalId === undefined) {
+          const spatialTree = await model.getSpatialStructure();
+          runtime.graph.spatialRootLocalId = firstSpatialLocalId(spatialTree);
+          if (runtime.graph.spatialRootLocalId === null) {
+            runtime.graph.spatialRootLocalId = (await model.getLocalIds())[0] ?? null;
+          }
+        }
+        anchorLocalId = runtime.graph.spatialRootLocalId;
+      }
+
+      if (anchorLocalId === null) {
+        throw new Error("The loaded model does not contain any graphable IFC entities.");
+      }
+
+      let relationRecords = runtime.graph.relations.get(anchorLocalId);
+      if (!relationRecords) {
+        const relations = await model.getRelations([anchorLocalId]);
+        relationRecords = flattenViewerGraphRelations(relations.get(anchorLocalId)?.data);
+        runtime.graph.relations.set(anchorLocalId, relationRecords);
+      }
+
+      const pagination = paginateViewerGraphRelations(
+        relationRecords,
+        request.offset ?? 0,
+        request.limit ?? VIEWER_GRAPH_PAGE_SIZE,
+      );
+      const { page } = pagination;
+      const nodes = await getGraphNodes(runtime, [
+        anchorLocalId,
+        ...page.map((entry) => entry.targetLocalId),
+      ]);
+
+      if (
+        loadSequenceRef.current !== loadSequence ||
+        runtimeRef.current !== runtime ||
+        runtime.model !== model
+      ) {
+        throw new Error("The active model changed while its graph was loading.");
+      }
+
+      // Association edges are labelled from the IFC class of whichever endpoint is the resource,
+      // so the edge builder needs both classes rather than just the local ids.
+      const ifcTypesByLocalId = new Map(nodes.map((node) => [node.localId, node.ifcType]));
+      const edgeMap = new Map<string, ViewerGraphEdge>();
+      for (const entry of page) {
+        const edge = buildViewerGraphEdge({
+          modelId: model.modelId,
+          anchorLocalId,
+          anchorIfcType: ifcTypesByLocalId.get(anchorLocalId) ?? null,
+          relation: entry.relation,
+          relatedLocalId: entry.targetLocalId,
+          relatedIfcType: ifcTypesByLocalId.get(entry.targetLocalId) ?? null,
+        });
+        edgeMap.set(edge.id, mergeViewerGraphEdge(edgeMap.get(edge.id), edge));
+      }
+
+      return {
+        modelId: model.modelId,
+        anchorLocalId,
+        nodes,
+        edges: [...edgeMap.values()],
+        offset: pagination.offset,
+        nextOffset: pagination.nextOffset,
+        totalRelationCount: pagination.totalRelationCount,
+      };
+    },
     async selectNode(localId) {
       const runtime = runtimeRef.current;
       if (!runtime?.model) {
+        return;
+      }
+
+      const graphNode = runtime.graph.nodes.get(localId);
+      if (graphNode && !graphNode.hasGeometry) {
+        await runtime.highlighter.clear("select");
+        const selection = {
+          modelId: runtime.model.modelId,
+          localId,
+          label: graphNode.label,
+          category: graphNode.ifcType,
+        };
+        syncSession(selection);
+        loadSelectionDetails(selection);
         return;
       }
 
@@ -1149,6 +1357,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
         labels: new Map(),
         categories: new Map(),
         hiddenItems: null,
+        graph: createViewerGraphRuntimeCache(),
       };
 
       if (cancelled) {
