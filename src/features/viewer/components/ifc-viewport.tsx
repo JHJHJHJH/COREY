@@ -984,13 +984,18 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
         throw new Error("The active model changed while its graph was loading.");
       }
 
+      // Association edges are labelled from the IFC class of whichever endpoint is the resource,
+      // so the edge builder needs both classes rather than just the local ids.
+      const ifcTypesByLocalId = new Map(nodes.map((node) => [node.localId, node.ifcType]));
       const edgeMap = new Map<string, ViewerGraphEdge>();
       for (const entry of page) {
         const edge = buildViewerGraphEdge({
           modelId: model.modelId,
           anchorLocalId,
+          anchorIfcType: ifcTypesByLocalId.get(anchorLocalId) ?? null,
           relation: entry.relation,
           relatedLocalId: entry.targetLocalId,
+          relatedIfcType: ifcTypesByLocalId.get(entry.targetLocalId) ?? null,
         });
         edgeMap.set(edge.id, mergeViewerGraphEdge(edgeMap.get(edge.id), edge));
       }

@@ -366,7 +366,13 @@ export interface ViewerTreeNode {
 
 export type ViewerGraphNodeKind = "spatial" | "element" | "type" | "property" | "material" | "other";
 
-export type ViewerGraphRelationGroup = "spatial" | "definition" | "material" | "other";
+export type ViewerGraphRelationGroup =
+  | "spatial"
+  | "type"
+  | "property"
+  | "association"
+  | "connection"
+  | "other";
 
 export interface ViewerGraphNode {
   /** Model-scoped renderer id. Local ids are only stable inside one loaded model. */

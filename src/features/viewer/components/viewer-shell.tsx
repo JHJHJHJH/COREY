@@ -3976,6 +3976,11 @@ export function ViewerShell() {
                         onSelectNode={(localId) => {
                           void viewportRef.current?.selectNode(localId);
                         }}
+                        onIsolateNodes={(localIds) => {
+                          void runViewportVisibilityAction(async () => {
+                            await viewportRef.current?.isolateElements(localIds);
+                          });
+                        }}
                         onClose={closeGraph}
                       />
                     ) : null}
