@@ -6,6 +6,16 @@ This project uses semantic versioning once public releases begin.
 
 ## Unreleased
 
+## 1.0.0 - 2026-08-29
+
+- First stable COREY release, establishing the local-first IFC review,
+  validation, Excel round-trip, optional model history and comparison, and MCP
+  workflows as the supported baseline.
+- Added a step-by-step guide for connecting a self-hosted COREY MCP server to
+  VS Code and GitHub Copilot, including deployment and authentication setup.
+- Aligned the clause data model documentation, LLM guidance, legacy schema
+  labels, and sample configuration with the current version 4 format.
+
 ## 0.3.0 - 2026-08-28
 
 - Relationship graph view: explore an element's IFC relationships as a graph,

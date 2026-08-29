@@ -1,7 +1,7 @@
 {
   "name": "corey",
   "description": "Local-first IFC review app with an optional self-hosted backend.",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "private": true,
   "license": "MIT",
   "repository": {

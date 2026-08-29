@@ -1,5 +1,19 @@
 {
-  "version": 3,
+  "version": 4,
+  "severities": [
+    {
+      "id": "warn",
+      "label": "Warn",
+      "color": "#d29a2f",
+      "order": 1
+    },
+    {
+      "id": "error",
+      "label": "Error",
+      "color": "#bb5a36",
+      "order": 2
+    }
+  ],
   "clauses": [
     {
       "id": "sample-wall-basics",

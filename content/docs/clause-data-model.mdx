@@ -19,7 +19,8 @@ Every exported or imported clause file is a `ViewerValidationConfig`.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `version` | `3` | The current clause-based format version. |
+| `version` | `4` | The current clause-based format version. |
+| `severities` | array | Configurable failure levels referenced by rules. |
 | `clauses` | array | Named groups of rules. |
 
 Version `1` files used a root `rules` array and are no longer accepted by manual
