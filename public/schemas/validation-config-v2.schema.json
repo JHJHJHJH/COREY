@@ -2,14 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "/schemas/validation-config-v2.schema.json",
   "title": "COREY Validation Config v2",
-  "description": "Portable clause and rule configuration used by COREY validation import/export, templates, and rules config APIs.",
+  "description": "Legacy portable clause and rule configuration accepted by COREY for migration to the current format.",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "clauses"],
   "properties": {
     "version": {
       "const": 2,
-      "description": "Current clause-based validation config version."
+      "description": "Legacy clause-based validation config version."
     },
     "clauses": {
       "type": "array",

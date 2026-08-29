@@ -12,5 +12,5 @@
 
 ## Notes
 
-Generate validation configs as JSON with root `version: 3` and `clauses`.
+Generate validation configs as JSON with root `version: 4`, `severities`, and `clauses`.
 Do not generate legacy root `rules` files.
