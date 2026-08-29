@@ -7,7 +7,7 @@ and the parser, sanitizer, compiler, and evaluator live in
 
 ## Config shape
 
-Rule configuration uses `version: 3`. It is used by clause import/export,
+Rule configuration uses `version: 4`. It is used by clause import/export,
 backend rule config storage, rule templates, and the `clauses` portion of
 validation evaluation payloads.
 
@@ -45,7 +45,8 @@ Top-level fields:
 
 | Field | Type | Notes |
 |---|---|---|
-| `version` | literal `3` | Current portable config version. |
+| `version` | literal `4` | Current portable config version. |
+| `severities` | `ViewerValidationSeverity[]` | Configurable failure levels referenced by rules. |
 | `clauses` | `ViewerValidationClause[]` | Named groups of rules. |
 
 ## Severities

@@ -12,7 +12,7 @@
 
 **[🚀 Try COREY online](https://coreyifc.com)** · **[📖 Docs](https://coreyifc.com/docs)**
 
-[Watch the full demo video](https://github.com/user-attachments/assets/eb3162f5-1aa9-489b-b0a7-f8d6d3b4a2e2)
+[Watch the full demo video](https://github.com/user-attachments/assets/71168112-08a9-4187-9774-8aa3e643453f)
 
 </div>
 
