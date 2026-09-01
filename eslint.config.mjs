@@ -14,6 +14,7 @@ const eslintConfig = defineConfig([
     "build/**",
     "dist/**",
     "next-env.d.ts",
+    "public/pdfjs/**",
     "public/workers/**",
   ]),
 ]);

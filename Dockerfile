@@ -29,6 +29,7 @@ FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml prisma.config.ts source.config.ts tsconfig.json ./
 COPY content ./content
 COPY prisma ./prisma
+COPY scripts/prepare-pdf-assets.mjs ./scripts/prepare-pdf-assets.mjs
 
 RUN mkdir -p src && pnpm install --frozen-lockfile
 

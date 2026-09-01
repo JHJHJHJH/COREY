@@ -18,6 +18,13 @@ export type S3Env = {
   s3Bucket: string;
 };
 
+export type KnowledgeEnv = {
+  openAiApiKey: string;
+  embeddingModel: string;
+  embeddingDimensions: number;
+  chatModel: string;
+};
+
 const DISABLED_S3_VALUES = new Set(["disabled", "false", "none", "off"]);
 
 function readOptionalEnv(name: string) {
@@ -58,6 +65,26 @@ export function getBackendEnv(): BackendEnv {
 
 export function getDatabaseUrl() {
   return readRequiredEnv("DATABASE_URL");
+}
+
+export function getOptionalKnowledgeEnv(): KnowledgeEnv | null {
+  const openAiApiKey = readOptionalEnv("OPENAI_API_KEY");
+  if (!openAiApiKey) return null;
+  return {
+    openAiApiKey,
+    embeddingModel: readOptionalEnv("OPENAI_EMBEDDING_MODEL") ?? "text-embedding-3-small",
+    embeddingDimensions: readPositiveIntegerEnv("OPENAI_EMBEDDING_DIMENSIONS", 1536),
+    chatModel: readOptionalEnv("OPENAI_CHAT_MODEL") ?? "gpt-5.4-mini",
+  };
+}
+
+export function getKnowledgeEnv(): KnowledgeEnv {
+  const env = getOptionalKnowledgeEnv();
+  if (!env) throw new Error("OPENAI_API_KEY is not set. See .env.example.");
+  if (env.embeddingDimensions !== 1536) {
+    throw new Error("OPENAI_EMBEDDING_DIMENSIONS must be 1536 for the current pgvector schema.");
+  }
+  return env;
 }
 
 export function getS3Env(): S3Env {

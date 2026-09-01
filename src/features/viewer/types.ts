@@ -596,6 +596,92 @@ export interface ViewerSelectionDetails {
   loading: boolean;
 }
 
+export interface ViewerKnowledgeProperty {
+  group: string | null;
+  name: string;
+  value: string;
+}
+
+/** Serializable IFC context only; no That Open or WebGL objects cross the API boundary. */
+export interface ViewerKnowledgeContext {
+  modelId: string | null;
+  expressId: number | null;
+  label: string | null;
+  ifcType: string | null;
+  subtype: string | null;
+  properties: ViewerKnowledgeProperty[];
+}
+
+export interface KnowledgeChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface KnowledgeChatRequest {
+  question: string;
+  history: KnowledgeChatTurn[];
+  context?: ViewerKnowledgeContext;
+}
+
+export type KnowledgeSourceRole =
+  | "requirement"
+  | "glossary"
+  | "ifc_property_guidance"
+  | "preparation_guidance"
+  | "mapping_guidance"
+  | "controlled_value"
+  | "change_log"
+  | "source_note";
+
+export interface KnowledgeEvidenceLocator {
+  page?: number;
+  bbox?: [number, number, number, number];
+  sheet?: string;
+  rowStart?: number;
+  rowEnd?: number;
+  cells?: string;
+}
+
+export interface KnowledgeStructuredField {
+  label: string;
+  value: string;
+}
+
+export interface KnowledgeCitation {
+  id: string;
+  evidenceId: string;
+  documentId: string;
+  title: string;
+  edition: string | null;
+  sourceKind: string;
+  sourceRole: KnowledgeSourceRole;
+  locator: KnowledgeEvidenceLocator;
+  sectionPath: string[];
+  excerpt: string;
+  officialUrl: string | null;
+  structuredFields?: KnowledgeStructuredField[];
+  score: number;
+}
+
+export type KnowledgeChatStreamEvent =
+  | { type: "status"; phase: "retrieving" | "generating" }
+  | { type: "sources"; citations: KnowledgeCitation[] }
+  | { type: "delta"; text: string }
+  | { type: "done" }
+  | { type: "error"; message: string };
+
+export interface KnowledgeStatus {
+  available: boolean;
+  configured: boolean;
+  revisionId: string | null;
+  activatedAt: string | null;
+  embeddingModel: string | null;
+  documentCount: number;
+  chunkCount: number;
+  sources: Array<{ title: string; fileName: string; sha256: string; edition: string | null }>;
+  message: string;
+}
+
 export type ViewerDebugValue =
   | null
   | boolean

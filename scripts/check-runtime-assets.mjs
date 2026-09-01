@@ -17,6 +17,10 @@ const checks = [
     source: "node_modules/web-ifc/web-ifc-mt.wasm",
     target: "public/wasm/web-ifc-mt.wasm",
   },
+  {
+    source: "node_modules/pdfjs-dist/build/pdf.worker.min.mjs",
+    target: "public/pdfjs/pdf.worker.min.mjs",
+  },
 ];
 
 async function digest(path) {

@@ -39,6 +39,7 @@ const nextConfig = {
       "./node_modules/web-ifc/web-ifc-node.wasm",
       "./node_modules/.pnpm/web-ifc@*/node_modules/web-ifc/web-ifc-node.wasm",
     ],
+    "/api/knowledge/documents/**": ["./docs/official-cx/*.pdf"],
   },
 };
 

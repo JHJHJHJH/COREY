@@ -20,6 +20,10 @@ services:
       COREY_APP_PUBLIC_URL: ${COREY_APP_PUBLIC_URL:-http://localhost:4000}
       COREY_MCP_INTERNAL_URL: http://mcp:4001
       COREY_MCP_ADMIN_USERS: ${COREY_MCP_ADMIN_USERS:-local}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      OPENAI_EMBEDDING_DIMENSIONS: ${OPENAI_EMBEDDING_DIMENSIONS:-1536}
+      OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-gpt-5.4-mini}
       NEXT_TELEMETRY_DISABLED: "1"
       NEXT_WATCH_POLL_INTERVAL_MS: ${NEXT_WATCH_POLL_INTERVAL_MS:-1000}
       WATCHPACK_POLLING: ${WATCHPACK_POLLING:-true}
@@ -42,7 +46,7 @@ services:
       CI=true pnpm install --frozen-lockfile --ignore-scripts &&
       pnpm prisma generate &&
       pnpm db:deploy &&
-      pnpm dev --webpack"
+      pnpm dev"
     healthcheck:
       test:
         [
@@ -80,7 +84,7 @@ services:
         condition: service_healthy
 
   postgres:
-    image: postgres:17-alpine
+    image: pgvector/pgvector:0.8.6-pg17
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-corey}

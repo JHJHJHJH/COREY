@@ -125,6 +125,7 @@ import type {
   ViewerDataTableImportReport,
   ViewerDataTableState,
   ViewerInspectionRow,
+  ViewerKnowledgeContext,
   ViewerSelectionDetails,
   ViewerSessionState,
   ViewerStatus,
@@ -195,6 +196,14 @@ const LazyIfcGraphPanel = dynamic(
       </div>
     ),
   },
+);
+
+const LazyCoreyAssistant = dynamic(
+  () =>
+    import("@/features/viewer/components/corey-assistant").then(
+      (module) => module.CoreyAssistant,
+    ),
+  { ssr: false },
 );
 
 const emptyValidationHighlights: ViewerValidationHighlights = {};
@@ -1105,6 +1114,7 @@ export function ViewerShell() {
   const [viewerThemeLoaded, setViewerThemeLoaded] = useState(false);
   const [showTree, setShowTree] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
+  const [coreyAssistantOpen, setCoreyAssistantOpen] = useState(false);
   const [showGraph, setShowGraph] = useState(false);
   const [graphWasOpened, setGraphWasOpened] = useState(false);
   const [graphModelRevision, setGraphModelRevision] = useState(0);
@@ -1244,6 +1254,31 @@ export function ViewerShell() {
     }),
     [deferredClauses, effectiveDataTableData, selectionDetails, severities],
   );
+  const knowledgeContext = useMemo<ViewerKnowledgeContext | null>(() => {
+    const selected = session.selected;
+    if (!selected) return null;
+    const row = effectiveDataTableData?.rows.find(
+      (candidate) => candidate.modelId === selected.modelId && candidate.localId === selected.localId,
+    );
+    const properties = row
+      ? (effectiveDataTableData?.columns ?? [])
+          .filter((column) => column.kind === "property")
+          .flatMap((column) => {
+            const cell = row.cells[column.key];
+            if (!cell || cell.state !== "present" || !cell.text.trim()) return [];
+            return [{ group: column.group, name: column.label, value: cell.text.trim() }];
+          })
+          .slice(0, 50)
+      : [];
+    return {
+      modelId: metadata?.sourceId ?? selected.modelId,
+      expressId: selected.localId,
+      label: selected.label,
+      ifcType: row?.ifcType ?? selected.category,
+      subtype: row?.subtype ?? null,
+      properties,
+    };
+  }, [effectiveDataTableData, metadata?.sourceId, session.selected]);
   const resolvePropertyPanelEdit = useCallback(
     (inspectionRow: ViewerInspectionRow): ResolvedPropertyPanelEdit | null => {
       const inspection = validatedSelectionDetails.inspection;
@@ -4049,6 +4084,12 @@ export function ViewerShell() {
           </div>
         </main>
       </div>
+      <LazyCoreyAssistant
+        open={coreyAssistantOpen}
+        context={knowledgeContext}
+        onOpen={() => setCoreyAssistantOpen(true)}
+        onClose={() => setCoreyAssistantOpen(false)}
+      />
       {serverNotice ? (
         <div
           role="status"

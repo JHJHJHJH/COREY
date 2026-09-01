@@ -46,12 +46,14 @@ next-env.d.ts
 # local IFC fixtures. Public sample models must have explicit provenance before
 # being committed; see public/resources/README.md.
 /public/resources/*.ifc
+/public/pdfjs/
 
 #videos
 /playwright-artifacts/*
 
 # server model store (local filesystem backend)
 /.data
+/.cache/knowledge
 /src/generated/prisma
 
 # local env (use .env.example as the template)

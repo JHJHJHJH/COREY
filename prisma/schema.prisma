@@ -155,3 +155,156 @@ model McpOAuthToken {
   @@index([clientId, refreshExpiresAt])
   @@map("mcp_oauth_tokens")
 }
+
+/// An immutable build of the deployment-wide knowledge corpus. A completed
+/// revision is activated only after every chunk has an embedding.
+model KnowledgeCorpusRevision {
+  id                  String              @id
+  sourceFingerprint   String              @unique
+  status              String
+  embeddingModel      String
+  embeddingDimensions Int
+  manifest            Json
+  createdAt           DateTime            @default(now())
+  activatedAt         DateTime?
+  documents           KnowledgeDocument[]
+  chunks              KnowledgeChunk[]
+  evidences           KnowledgeEvidence[]
+  nodes               KnowledgeNode[]
+  edges               KnowledgeEdge[]
+  ingestRuns           KnowledgeIngestRun[]
+
+  @@index([status, activatedAt])
+  @@map("knowledge_corpus_revisions")
+}
+
+model KnowledgeDocument {
+  id         String                  @id
+  revisionId String
+  sourceKey  String
+  sourceKind String
+  title      String
+  fileName   String
+  sha256     String
+  edition    String?
+  metadata   Json
+  revision   KnowledgeCorpusRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  chunks     KnowledgeChunk[]
+  evidences  KnowledgeEvidence[]
+
+  @@unique([revisionId, sourceKey])
+  @@index([revisionId, sourceKind])
+  @@map("knowledge_documents")
+}
+
+model KnowledgeChunk {
+  id             String                  @id
+  revisionId     String
+  documentId     String
+  stableKey      String
+  contentHash    String
+  content        String
+  sourceKind     String
+  sourceRole     String
+  locator        String
+  pageNumber     Int?
+  sheetName      String?
+  rowStart       Int?
+  rowEnd         Int?
+  tokenCount     Int
+  metadata       Json
+  embeddingModel String
+  embedding      Unsupported("vector(1536)")?
+  searchVector   Unsupported("tsvector")? @map("search_vector")
+  revision       KnowledgeCorpusRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  document       KnowledgeDocument       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  evidenceLinks  KnowledgeChunkEvidence[]
+
+  @@unique([revisionId, stableKey])
+  @@index([revisionId, sourceKind, sourceRole])
+  @@index([documentId, pageNumber])
+  @@index([documentId, sheetName, rowStart])
+  @@map("knowledge_chunks")
+}
+
+/// An immutable, source-local passage used to explain exactly where a
+/// retrieved chunk came from. PDF locators include page geometry; workbook
+/// locators retain their sheet and row provenance.
+model KnowledgeEvidence {
+  id             String                   @id
+  revisionId     String
+  documentId     String
+  ordinal        Int
+  sectionPath    String[]                 @default([])
+  locator        Json
+  rawText        String
+  normalizedText String
+  contentHash    String
+  metadata       Json
+  revision       KnowledgeCorpusRevision  @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  document       KnowledgeDocument        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  chunkLinks     KnowledgeChunkEvidence[]
+
+  @@unique([documentId, ordinal])
+  @@index([revisionId, documentId, ordinal])
+  @@index([contentHash])
+  @@map("knowledge_evidence")
+}
+
+model KnowledgeChunkEvidence {
+  chunkId    String
+  evidenceId String
+  chunk      KnowledgeChunk    @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  evidence   KnowledgeEvidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@id([chunkId, evidenceId])
+  @@index([evidenceId])
+  @@map("knowledge_chunk_evidence")
+}
+
+model KnowledgeNode {
+  id           String                  @id
+  revisionId   String
+  canonicalKey String
+  nodeType     String
+  label        String
+  properties   Json
+  revision     KnowledgeCorpusRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@unique([revisionId, canonicalKey])
+  @@index([revisionId, nodeType, label])
+  @@map("knowledge_nodes")
+}
+
+model KnowledgeEdge {
+  id              String                  @id
+  revisionId      String
+  fromNodeId      String
+  toNodeId        String
+  relationType    String
+  evidenceChunkId String?
+  assertionKind   String
+  properties      Json
+  revision        KnowledgeCorpusRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@unique([revisionId, fromNodeId, toNodeId, relationType, assertionKind])
+  @@index([revisionId, fromNodeId])
+  @@index([revisionId, toNodeId])
+  @@index([evidenceChunkId])
+  @@map("knowledge_edges")
+}
+
+model KnowledgeIngestRun {
+  id            String                  @id @default(uuid())
+  revisionId    String
+  status        String
+  embeddedCount Int                     @default(0)
+  failedCount   Int                     @default(0)
+  error         String?
+  startedAt     DateTime                @default(now())
+  completedAt   DateTime?
+  revision      KnowledgeCorpusRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@index([revisionId, startedAt])
+  @@map("knowledge_ingest_runs")
+}
