@@ -142,7 +142,22 @@ After you run validation, COREY:
 
 You can **export** your clauses and **import** them later or on another project.
 This lets a team agree on one standard set of checks and apply it consistently.
-With the optional backend, clause sets can also be saved as shared templates.
+
+With the optional backend, clause sets are also saved as shared templates. Use
+**Save as template** in the toolbar to keep the whole set under a name, or the
+**Template** button on a clause header to keep just that clause. Both appear
+under *Your templates* in the Templates menu, where everyone on the deployment
+can reach them.
+
+Loading a whole-set template *replaces* your clauses; inserting a clause
+template *appends* it, so you can build a set up from saved pieces and insert
+the same one more than once. Any template can be deleted from that menu, the
+built-in starters included.
+
+As the library grows, search by name or description and filter by where a
+template came from. Each row carries a coloured band showing how its rules split
+across severities, so you can tell a set that mostly warns from one that mostly
+blocks before you load it.
 
 <Callout title="For developers">
 Clauses are stored as a small JSON document (a `version` plus a `clauses` array,

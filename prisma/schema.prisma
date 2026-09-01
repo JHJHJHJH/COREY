@@ -62,21 +62,31 @@ model RuleConfig {
   @@map("rule_configs")
 }
 
-/// Server-managed validation template catalog. Built-in starter templates are
-/// seeded from the existing resource files, then served through API routes so
-/// clients no longer fetch validation catalogs directly from public assets.
+/// Validation template catalog. Built-in starter templates are seeded from the
+/// existing resource files, then served through API routes so clients no longer
+/// fetch validation catalogs directly from public assets. Users add their own
+/// templates on top (`sourceKind` "user"), shared across the deployment.
+///
+/// `templateKind` separates a whole-config template (loading it replaces the
+/// user's clauses) from a single-clause template (inserting it appends one
+/// clause). Both store a `ViewerValidationConfig` in `config`.
+///
+/// `deletedAt` is a soft delete: a built-in the user removed must not be
+/// resurrected by the seeder, which upserts the built-ins on every read.
 model RuleTemplateRecord {
-  id             String   @id
+  id             String    @id
   name           String
   description    String
-  sourceKind     String   @default("starter")
+  sourceKind     String    @default("starter")
+  templateKind   String    @default("config")
   sourceFileName String?
   sourceText     String?
   config         Json
   ruleCount      Int
-  sortOrder      Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  sortOrder      Int       @default(0)
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@index([sortOrder, name])
   @@map("rule_template_records")

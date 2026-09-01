@@ -11,6 +11,7 @@ import {
 } from "react";
 import {
   VIEWER_VALIDATION_STORAGE_KEY,
+  cloneViewerValidationClauses,
   createViewerValidationClause,
   createViewerValidationRule,
   createViewerValidationSeverity,
@@ -48,6 +49,12 @@ type ViewerRulesContextValue = {
    * definitions — an incoming config only contributes severity ids they do not already have.
    */
   replaceConfig: (config: ViewerValidationConfig) => void;
+  /**
+   * Appends the clauses of a clause template instead of replacing the clause set. The
+   * incoming clauses are re-identified, so the same template can be inserted more than
+   * once, and any severity they reference that the user does not have is merged in.
+   */
+  insertClauses: (config: ViewerValidationConfig) => void;
 };
 
 const ViewerRulesContext = createContext<ViewerRulesContextValue | null>(null);
@@ -298,6 +305,13 @@ export function ViewerRulesProvider({ children }: PropsWithChildren) {
         persist({
           ...nextConfig,
           severities: mergeViewerValidationSeverities(config.severities, nextConfig.severities),
+        });
+      },
+      insertClauses(nextConfig) {
+        persist({
+          ...config,
+          severities: mergeViewerValidationSeverities(config.severities, nextConfig.severities),
+          clauses: [...config.clauses, ...cloneViewerValidationClauses(nextConfig.clauses)],
         });
       },
     }),

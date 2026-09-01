@@ -98,13 +98,35 @@ export interface ViewerValidationConfig {
   clauses: ViewerValidationClause[];
 }
 
-export type ViewerRuleTemplateSourceKind = "starter" | "industry-mapping";
+export type ViewerRuleTemplateSourceKind = "starter" | "industry-mapping" | "user";
+
+/**
+ * What a template holds. A `config` template carries a whole clause set and
+ * replaces the user's clauses when loaded; a `clause` template carries exactly
+ * one clause and is appended to them instead.
+ */
+export type ViewerRuleTemplateKind = "config" | "clause";
+
+/**
+ * How many rules a config assigns to each severity, carrying the colour the config itself
+ * defines so a template renders in its own severity language rather than the reader's.
+ */
+export interface ViewerValidationSeverityTally {
+  id: string;
+  label: string;
+  color: string;
+  count: number;
+}
 
 export interface ViewerRuleTemplateSummary {
   templateId: string;
   name: string;
   description: string;
   ruleCount: number;
+  clauseCount: number;
+  /** Most severe first, severities with no rules omitted. */
+  severityTally: ViewerValidationSeverityTally[];
+  kind: ViewerRuleTemplateKind;
   sourceKind: ViewerRuleTemplateSourceKind;
   sourceFileName: string | null;
   updatedAt: string;

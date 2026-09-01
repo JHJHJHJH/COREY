@@ -9,7 +9,9 @@ import {
   ChevronRight,
   ChevronsUpDown,
   CircleAlert,
+  Download,
   LayoutTemplate,
+  Loader2,
   Plus,
   Search,
   SlidersHorizontal,
@@ -31,14 +33,19 @@ import {
   serializeViewerValidationConfig,
 } from "@/features/rules/lib/validation";
 import {
+  deleteRuleTemplate,
   listRuleTemplates,
   readRuleTemplate,
   ruleTemplateConfigEndpoint,
   ruleTemplateSourceEndpoint,
+  saveRuleTemplate,
 } from "@/features/rules/lib/rule-template-api";
 import type {
+  ViewerRuleTemplateKind,
+  ViewerRuleTemplateSourceKind,
   ViewerRuleTemplateSummary,
   ViewerValidationCheck,
+  ViewerValidationClause,
   ViewerValidationRule,
   ViewerValidationSeverity,
   ViewerValidationTarget,
@@ -61,6 +68,17 @@ type RuleRow = {
   rule: ViewerValidationRule;
 };
 
+/**
+ * An in-progress "save as template" entry. `clause` is set when the user is saving one
+ * clause rather than the whole set, and is what the saved config is built from.
+ */
+type TemplateDraft = {
+  kind: ViewerRuleTemplateKind;
+  clause: ViewerValidationClause | null;
+  name: string;
+  description: string;
+};
+
 /* ------------------------------------------------------------------ */
 /* Token-driven class helpers — the workspace leans on the precise      */
 /* engineering identity (mono spec data, hairlines, tight radii).       */
@@ -79,6 +97,12 @@ function secondaryButtonClassName() {
 
 function compactButtonClassName() {
   return "inline-flex h-8 items-center gap-1 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-2.5 text-xs font-medium text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-strong)]";
+}
+
+// Quiet square control for a row's secondary actions — present, but never competing with
+// the one worded button that does the main thing.
+function iconButtonClassName() {
+  return "inline-flex h-7 w-7 items-center justify-center rounded-[var(--r-control)] border border-transparent text-[color:var(--muted-ink)] transition hover:border-[color:var(--viewer-border)] hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)] focus-visible:border-[color:var(--accent)]";
 }
 
 function destructiveButtonClassName() {
@@ -603,27 +627,285 @@ function RuleTableRow({
 /* Templates popover                                                    */
 /* ------------------------------------------------------------------ */
 
+type TemplateSourceFilter = "all" | ViewerRuleTemplateSourceKind;
+
+const TEMPLATE_SOURCE_FILTERS: { id: TemplateSourceFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "user", label: "Yours" },
+  { id: "starter", label: "Starter" },
+  { id: "industry-mapping", label: "Industry" },
+];
+
+function countLabel(count: number, noun: string) {
+  return `${count} ${count === 1 ? noun : `${noun}s`}`;
+}
+
+function templateMatchesQuery(template: ViewerRuleTemplateSummary, query: string) {
+  return (
+    template.name.toLowerCase().includes(query) ||
+    template.description.toLowerCase().includes(query)
+  );
+}
+
+/**
+ * The rule mix as a hairline band. Two templates of the same size behave very differently
+ * depending on how much of them is an error rather than a warning, and no count shows that —
+ * so the library is scannable by shape before it is read. Each band is coloured by the
+ * template's own severity definitions, not the reader's.
+ */
+function SeveritySpine({ template }: { template: ViewerRuleTemplateSummary }) {
+  if (template.severityTally.length === 0 || template.ruleCount === 0) {
+    return null;
+  }
+
+  const label = template.severityTally
+    .map((tally) => `${tally.count} ${tally.label.toLowerCase()}`)
+    .join(", ");
+
+  return (
+    <div
+      className="flex h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-[color:var(--viewer-border)]"
+      title={label}
+      role="img"
+      aria-label={`Rule mix: ${label}`}
+    >
+      {template.severityTally.map((tally) => (
+        <span
+          key={tally.id}
+          style={{
+            backgroundColor: tally.color,
+            width: `${(tally.count / template.ruleCount) * 100}%`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function TemplateRow({
+  template,
+  busy,
+  pendingDelete,
+  onApply,
+  onRequestDelete,
+  onCancelDelete,
+  onConfirmDelete,
+}: {
+  template: ViewerRuleTemplateSummary;
+  busy: "apply" | "delete" | null;
+  pendingDelete: boolean;
+  onApply: () => void;
+  onRequestDelete: () => void;
+  onCancelDelete: () => void;
+  onConfirmDelete: () => void;
+}) {
+  // A clause template joins the clauses already there; a config template stands in for all of
+  // them. "Load" stays the word for the config case — it is what the button has always said.
+  const applyLabel = template.kind === "clause" ? "Insert" : "Load";
+  const scale = `${countLabel(
+    template.kind === "clause" ? 1 : template.clauseCount,
+    "clause",
+  )} · ${countLabel(template.ruleCount, "rule")}`;
+
+  if (pendingDelete) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 border-b border-[color:var(--hairline)] bg-[color:var(--danger-bg)] px-3 py-2.5 text-[color:var(--danger-fg)]">
+        <span className="min-w-0 flex-1 truncate text-[13px]">
+          Delete &ldquo;{template.name}&rdquo;? This cannot be undone.
+        </span>
+        <button
+          type="button"
+          onClick={onConfirmDelete}
+          disabled={busy === "delete"}
+          className={`${compactButtonClassName()} disabled:cursor-wait disabled:opacity-60`}
+        >
+          {busy === "delete" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+          Delete
+        </button>
+        <button
+          type="button"
+          onClick={onCancelDelete}
+          disabled={busy === "delete"}
+          className={compactButtonClassName()}
+        >
+          Keep
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="group flex items-center gap-3 border-b border-[color:var(--hairline)] px-3 py-1.5 transition hover:bg-[color:var(--surface-hover)] focus-within:bg-[color:var(--surface-hover)]">
+      <div className="min-w-0 flex-1">
+        {/* No "clause" badge: the Insert/Load button already carries that distinction, and
+            says it where the reader acts on it. */}
+        <div className="truncate text-[13px] font-semibold text-[color:var(--foreground)]">
+          {template.name}
+        </div>
+        {template.description ? (
+          <p className="mt-0.5 truncate text-[11px] leading-4 text-[color:var(--muted-ink)]">
+            {template.description}
+          </p>
+        ) : null}
+        <div className="mt-1 flex items-center gap-2 sm:hidden">
+          <SeveritySpine template={template} />
+          <span className="font-mono text-[11px] tabular-nums text-[color:var(--muted-ink)]">
+            {scale}
+          </span>
+        </div>
+      </div>
+
+      <div className="hidden shrink-0 items-center gap-2.5 sm:flex">
+        <SeveritySpine template={template} />
+        <span className="w-[8.5rem] text-right font-mono text-[11px] tabular-nums text-[color:var(--muted-ink)]">
+          {scale}
+        </span>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          onClick={onApply}
+          disabled={busy !== null}
+          className={`${compactButtonClassName()} w-[4.25rem] justify-center disabled:cursor-wait disabled:opacity-60`}
+        >
+          {busy === "apply" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : applyLabel}
+        </button>
+        <a
+          href={ruleTemplateConfigEndpoint(template.templateId)}
+          download
+          aria-label={`Download ${template.name} as JSON`}
+          title="Download JSON"
+          className={`${iconButtonClassName()} opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100`}
+        >
+          <Download className="h-3.5 w-3.5" />
+        </a>
+        {canDownloadTemplateSource(template) ? (
+          <a
+            href={ruleTemplateSourceEndpoint(template.templateId)}
+            download
+            aria-label={`Download ${template.name} as CSV`}
+            title="Download CSV"
+            className={`${iconButtonClassName()} font-mono text-[9px] font-semibold opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100`}
+          >
+            CSV
+          </a>
+        ) : null}
+        <button
+          type="button"
+          onClick={onRequestDelete}
+          aria-label={`Delete ${template.name}`}
+          title="Delete template"
+          className={`${iconButtonClassName()} opacity-0 transition hover:border-[color:var(--danger-border)] hover:bg-[color:var(--danger-bg)] hover:text-[color:var(--danger-fg)] group-hover:opacity-100 focus-visible:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100`}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function TemplatesPopover({
   templates,
   loading,
   error,
   loadingTemplateId,
-  onLoad,
+  deletingTemplateId,
+  onApply,
+  onDelete,
 }: {
   templates: ViewerRuleTemplateSummary[];
   loading: boolean;
   error: string | null;
   loadingTemplateId: string | null;
-  onLoad: (template: ViewerRuleTemplateSummary) => void;
+  deletingTemplateId: string | null;
+  onApply: (template: ViewerRuleTemplateSummary) => void;
+  onDelete: (template: ViewerRuleTemplateSummary) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [sourceFilter, setSourceFilter] = useState<TemplateSourceFilter>("all");
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
+
+  const close = () => {
+    setOpen(false);
+    setPendingDeleteId(null);
+  };
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    searchRef.current?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        setPendingDeleteId(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open]);
+
+  const sourceCounts = useMemo(() => {
+    const counts: Record<TemplateSourceFilter, number> = {
+      all: templates.length,
+      user: 0,
+      starter: 0,
+      "industry-mapping": 0,
+    };
+    for (const template of templates) {
+      counts[template.sourceKind] += 1;
+    }
+    return counts;
+  }, [templates]);
+
+  const matched = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return templates.filter(
+      (template) =>
+        (sourceFilter === "all" || template.sourceKind === sourceFilter) &&
+        (!needle || templateMatchesQuery(template, needle)),
+    );
+  }, [templates, query, sourceFilter]);
+
+  // Yours first: the library grows fastest at the end you authored.
+  const groups = useMemo(
+    () =>
+      [
+        { id: "user", label: "Yours", items: matched.filter((t) => t.sourceKind === "user") },
+        {
+          id: "starter",
+          label: "Starter",
+          items: matched.filter((t) => t.sourceKind === "starter"),
+        },
+        {
+          id: "industry-mapping",
+          label: "Industry mapping",
+          items: matched.filter((t) => t.sourceKind === "industry-mapping"),
+        },
+      ].filter((group) => group.items.length > 0),
+    [matched],
+  );
+
+  const busyFor = (template: ViewerRuleTemplateSummary) => {
+    if (loadingTemplateId === template.templateId) return "apply" as const;
+    if (deletingTemplateId === template.templateId) return "delete" as const;
+    return null;
+  };
 
   return (
     <div className="relative">
       <button
         type="button"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => (open ? close() : setOpen(true))}
         aria-expanded={open}
+        aria-haspopup="dialog"
         className={secondaryButtonClassName()}
       >
         <LayoutTemplate className="h-4 w-4" />
@@ -636,71 +918,135 @@ function TemplatesPopover({
           <button
             type="button"
             aria-label="Close templates"
-            onClick={() => setOpen(false)}
+            onClick={close}
             className="fixed inset-0 z-40 cursor-default"
           />
-          <div className="absolute right-0 z-50 mt-2 w-[min(92vw,30rem)] rounded-[var(--r-panel)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] p-2.5 shadow-[var(--viewer-shadow-lift)]">
-            <div className="px-1 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
-              Starter Templates
-            </div>
-            {loading ? (
-              <div className="px-1 py-2 text-xs text-[color:var(--muted-ink)]">Loading templates…</div>
-            ) : error ? (
-              <div className="rounded-[var(--r-control)] border border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] px-2.5 py-2 text-xs text-[color:var(--danger-fg)]">
-                {error}
-              </div>
-            ) : templates.length === 0 ? (
-              <div className="px-1 py-2 text-xs text-[color:var(--muted-ink)]">No templates available.</div>
-            ) : (
-              <div className="grid max-h-[60vh] gap-1.5 overflow-auto sm:grid-cols-2">
-                {templates.map((template) => {
-                  const isLoading = loadingTemplateId === template.templateId;
-                  return (
-                    <section
-                      key={template.templateId}
-                      className="rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] p-2.5"
+          <div
+            ref={panelRef}
+            role="dialog"
+            aria-label="Clause templates"
+            className="fixed inset-x-3 bottom-3 z-50 flex max-h-[72vh] flex-col overflow-hidden rounded-[var(--r-panel)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] shadow-[var(--viewer-shadow-lift)] sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:mt-2 sm:max-h-[min(32rem,70vh)] sm:w-[min(94vw,46rem)]"
+          >
+            {/* Sticky control deck — the library scrolls beneath it. */}
+            <div className="shrink-0 border-b border-[color:var(--viewer-border)] bg-[image:var(--viewer-header-bg)] px-3 py-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative min-w-[10rem] flex-1">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[color:var(--muted-ink)]" />
+                  <input
+                    ref={searchRef}
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search templates"
+                    aria-label="Search templates"
+                    className="h-8 w-full rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] pl-8 pr-8 text-[13px] text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent)]"
+                  />
+                  {query ? (
+                    <button
+                      type="button"
+                      onClick={() => setQuery("")}
+                      aria-label="Clear search"
+                      className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-[var(--r-chip)] text-[color:var(--muted-ink)] transition hover:bg-[color:var(--surface-soft)] hover:text-[color:var(--foreground)]"
                     >
-                      <h2 className="text-sm font-semibold text-[color:var(--foreground)]">{template.name}</h2>
-                      <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-[color:var(--muted-ink)]">
-                        {template.description}
-                      </p>
-                      <p className="mt-1 font-mono text-[11px] tabular-nums text-[color:var(--muted-ink)]">
-                        {template.ruleCount} rules
-                      </p>
-                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onLoad(template);
-                            setOpen(false);
-                          }}
-                          disabled={loadingTemplateId !== null}
-                          className={`${compactButtonClassName()} disabled:cursor-wait disabled:opacity-60`}
-                        >
-                          {isLoading ? "Loading…" : "Load"}
-                        </button>
-                        <a
-                          href={ruleTemplateConfigEndpoint(template.templateId)}
-                          download
-                          className={compactButtonClassName()}
-                        >
-                          JSON
-                        </a>
-                        {canDownloadTemplateSource(template) ? (
-                          <a
-                            href={ruleTemplateSourceEndpoint(template.templateId)}
-                            download
-                            className={compactButtonClassName()}
-                          >
-                            CSV
-                          </a>
-                        ) : null}
-                      </div>
-                    </section>
-                  );
-                })}
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+
+                <div className="flex items-center gap-0.5 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] p-0.5">
+                  {TEMPLATE_SOURCE_FILTERS.map((filter) => {
+                    const active = sourceFilter === filter.id;
+                    return (
+                      <button
+                        key={filter.id}
+                        type="button"
+                        onClick={() => setSourceFilter(filter.id)}
+                        aria-pressed={active}
+                        disabled={filter.id !== "all" && sourceCounts[filter.id] === 0}
+                        className={`rounded-[var(--r-chip)] px-2 py-1 text-[11px] font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                          active
+                            ? "bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
+                            : "text-[color:var(--muted-ink)] hover:bg-[color:var(--surface-strong)] hover:text-[color:var(--foreground)]"
+                        }`}
+                      >
+                        {filter.label}
+                        <span className="ml-1 font-mono tabular-nums opacity-70">
+                          {sourceCounts[filter.id]}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            )}
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-auto">
+              {loading ? (
+                <div className="px-3 py-8 text-center text-xs text-[color:var(--muted-ink)]">
+                  Loading templates…
+                </div>
+              ) : error ? (
+                <div className="m-3 rounded-[var(--r-control)] border border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] px-3 py-2.5 text-xs text-[color:var(--danger-fg)]">
+                  {error}
+                </div>
+              ) : templates.length === 0 ? (
+                <div className="px-3 py-10 text-center">
+                  <div className="text-[13px] font-semibold text-[color:var(--foreground)]">
+                    No templates yet
+                  </div>
+                  <p className="mx-auto mt-1 max-w-[22rem] text-[11px] leading-4 text-[color:var(--muted-ink)]">
+                    Save the clauses you are working on to start the library. Saved sets are
+                    shared with everyone on this deployment.
+                  </p>
+                </div>
+              ) : matched.length === 0 ? (
+                <div className="px-3 py-10 text-center">
+                  <div className="text-[13px] font-semibold text-[color:var(--foreground)]">
+                    Nothing matches that search
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuery("");
+                      setSourceFilter("all");
+                    }}
+                    className={`${compactButtonClassName()} mx-auto mt-3`}
+                  >
+                    Show all templates
+                  </button>
+                </div>
+              ) : (
+                groups.map((group) => (
+                  <section key={group.id}>
+                    <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-[color:var(--hairline)] bg-[color:var(--panel-bg)] px-3 py-1.5">
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--muted-ink)]">
+                        {group.label}
+                      </span>
+                      <span className="font-mono text-[10px] tabular-nums text-[color:var(--muted-ink)]">
+                        {group.items.length}
+                      </span>
+                    </div>
+                    {group.items.map((template) => (
+                      <TemplateRow
+                        key={template.templateId}
+                        template={template}
+                        busy={busyFor(template)}
+                        pendingDelete={pendingDeleteId === template.templateId}
+                        onApply={() => {
+                          onApply(template);
+                          close();
+                        }}
+                        onRequestDelete={() => setPendingDeleteId(template.templateId)}
+                        onCancelDelete={() => setPendingDeleteId(null)}
+                        onConfirmDelete={() => {
+                          onDelete(template);
+                          setPendingDeleteId(null);
+                        }}
+                      />
+                    ))}
+                  </section>
+                ))
+              )}
+            </div>
           </div>
         </>
       ) : null}
@@ -890,6 +1236,7 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
     updateRule,
     removeRule,
     replaceConfig,
+    insertClauses,
     addSeverity,
     updateSeverity,
     removeSeverity,
@@ -901,9 +1248,14 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
   const [importError, setImportError] = useState<string | null>(null);
   const [showSeverityEditor, setShowSeverityEditor] = useState(false);
   const [loadingTemplateId, setLoadingTemplateId] = useState<string | null>(null);
+  const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
   const [starterTemplates, setStarterTemplates] = useState<ViewerRuleTemplateSummary[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(true);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
+  const [templatesRefreshKey, setTemplatesRefreshKey] = useState(0);
+  const [templateDraft, setTemplateDraft] = useState<TemplateDraft | null>(null);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [templateNotice, setTemplateNotice] = useState<string | null>(null);
 
   const [searchText, setSearchText] = useState("");
   const [clauseFilter, setClauseFilter] = useState("");
@@ -982,6 +1334,8 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
     [config.clauses, matchedRows, hasActiveFilters],
   );
 
+  // Re-runs whenever a save or delete bumps the key, so the popover reflects the
+  // server-derived counts rather than a locally patched copy of the list.
   useEffect(() => {
     const controller = new AbortController();
 
@@ -996,7 +1350,7 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
           return;
         }
         setTemplatesError(
-          error instanceof Error ? error.message : "Starter templates could not be listed.",
+          error instanceof Error ? error.message : "Templates could not be listed.",
         );
       })
       .finally(() => {
@@ -1006,7 +1360,7 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
       });
 
     return () => controller.abort();
-  }, []);
+  }, [templatesRefreshKey]);
 
   const handleExport = () => {
     const blob = new Blob([serializeViewerValidationConfig(config)], { type: "application/json" });
@@ -1034,18 +1388,79 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
     }
   };
 
-  const handleLoadStarterTemplate = async (template: ViewerRuleTemplateSummary) => {
+  const handleApplyTemplate = async (template: ViewerRuleTemplateSummary) => {
     try {
       setLoadingTemplateId(template.templateId);
       const importedTemplate = await readRuleTemplate(template.templateId);
-      replaceConfig(importedTemplate.config);
+
+      // A clause template joins what is already there; a config template replaces it.
+      if (importedTemplate.kind === "clause") {
+        insertClauses(importedTemplate.config);
+      } else {
+        replaceConfig(importedTemplate.config);
+      }
+
       setImportError(null);
+      setTemplateNotice(null);
     } catch (error) {
-      setImportError(
-        error instanceof Error ? error.message : "Starter template could not be loaded.",
-      );
+      setImportError(error instanceof Error ? error.message : "Template could not be loaded.");
     } finally {
       setLoadingTemplateId(null);
+    }
+  };
+
+  const handleDeleteTemplate = async (template: ViewerRuleTemplateSummary) => {
+    try {
+      setDeletingTemplateId(template.templateId);
+      await deleteRuleTemplate(template.templateId);
+      setImportError(null);
+      setTemplateNotice(`Deleted "${template.name}".`);
+      setTemplatesRefreshKey((key) => key + 1);
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : "Template could not be deleted.");
+    } finally {
+      setDeletingTemplateId(null);
+    }
+  };
+
+  const openTemplateDraft = (clause: ViewerValidationClause | null) => {
+    setTemplateNotice(null);
+    setTemplateDraft({
+      kind: clause ? "clause" : "config",
+      clause,
+      name: clause
+        ? clause.title || "Untitled clause"
+        : `Clauses — ${new Date().toLocaleDateString()}`,
+      description: "",
+    });
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!templateDraft || !templateDraft.name.trim()) {
+      return;
+    }
+
+    // A clause template is just a config holding that one clause, so the stored shape,
+    // the JSON download and the parser stay the same for both kinds.
+    const clauses = templateDraft.clause ? [templateDraft.clause] : config.clauses;
+
+    try {
+      setSavingTemplate(true);
+      const saved = await saveRuleTemplate({
+        name: templateDraft.name.trim(),
+        description: templateDraft.description.trim(),
+        kind: templateDraft.kind,
+        config: { ...config, clauses },
+      });
+
+      setTemplateDraft(null);
+      setImportError(null);
+      setTemplateNotice(`Saved "${saved.name}" to templates.`);
+      setTemplatesRefreshKey((key) => key + 1);
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : "Template could not be saved.");
+    } finally {
+      setSavingTemplate(false);
     }
   };
 
@@ -1108,7 +1523,9 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
             loading={templatesLoading}
             error={templatesError}
             loadingTemplateId={loadingTemplateId}
-            onLoad={(template) => void handleLoadStarterTemplate(template)}
+            deletingTemplateId={deletingTemplateId}
+            onApply={(template) => void handleApplyTemplate(template)}
+            onDelete={(template) => void handleDeleteTemplate(template)}
           />
           {mode === "page" ? (
             <Link href="/" className={secondaryButtonClassName()}>
@@ -1233,6 +1650,15 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
             </button>
             <button
               type="button"
+              onClick={() => openTemplateDraft(null)}
+              disabled={config.clauses.length === 0}
+              className={`${secondaryButtonClassName()} disabled:cursor-not-allowed disabled:opacity-50`}
+            >
+              <LayoutTemplate className="h-4 w-4" />
+              Save as template
+            </button>
+            <button
+              type="button"
               onClick={() => replaceConfig(createEmptyViewerValidationConfig())}
               className={secondaryButtonClassName()}
             >
@@ -1240,6 +1666,64 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
             </button>
           </div>
         </div>
+
+        {templateDraft ? (
+          <div className="mt-3 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 py-2.5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted-ink)]">
+              {templateDraft.kind === "clause"
+                ? "Save clause as template"
+                : `Save ${config.clauses.length} clauses as template`}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <input
+                value={templateDraft.name}
+                onChange={(event) =>
+                  setTemplateDraft((draft) =>
+                    draft ? { ...draft, name: event.target.value } : draft,
+                  )
+                }
+                placeholder="Template name"
+                aria-label="Template name"
+                autoFocus
+                className="h-9 min-w-[12rem] flex-1 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-2.5 text-sm text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent)]"
+              />
+              <input
+                value={templateDraft.description}
+                onChange={(event) =>
+                  setTemplateDraft((draft) =>
+                    draft ? { ...draft, description: event.target.value } : draft,
+                  )
+                }
+                placeholder="Description (optional)"
+                aria-label="Template description"
+                className="h-9 min-w-[12rem] flex-[2] rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-2.5 text-sm text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent)]"
+              />
+              <button
+                type="button"
+                onClick={() => void handleSaveTemplate()}
+                disabled={savingTemplate || !templateDraft.name.trim()}
+                className={`${secondaryButtonClassName()} disabled:cursor-not-allowed disabled:opacity-60`}
+              >
+                {savingTemplate ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => setTemplateDraft(null)}
+                disabled={savingTemplate}
+                className={compactButtonClassName()}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {templateNotice && !importError ? (
+          <div className="mt-3 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] px-3 py-2 text-sm text-[color:var(--muted-ink)]">
+            {templateNotice}
+          </div>
+        ) : null}
 
         {importError ? (
           <div className="mt-3 rounded-[var(--r-control)] border border-[color:var(--danger-border)] bg-[color:var(--danger-bg)] px-3 py-2 text-sm text-[color:var(--danger-fg)]">
@@ -1410,6 +1894,16 @@ export function RulesScreen({ mode, onClose }: RulesScreenProps) {
                           >
                             <Plus className="h-3.5 w-3.5" />
                             Rule
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openTemplateDraft(clause)}
+                            aria-label="Save clause as template"
+                            title="Save clause as template"
+                            className={compactButtonClassName()}
+                          >
+                            <LayoutTemplate className="h-3.5 w-3.5" />
+                            Template
                           </button>
                           <button
                             type="button"

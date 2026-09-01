@@ -21,6 +21,7 @@ import type {
   ViewerValidationRunPayload,
   ViewerValidationRunResult,
   ViewerValidationSeverity,
+  ViewerValidationSeverityTally,
   ViewerValidationSummary,
   ViewerValidationTarget,
   ViewerValidationValue,
@@ -1083,6 +1084,48 @@ export function createViewerValidationClause(): ViewerValidationClause {
     title: "New clause",
     rules: [createViewerValidationRule()],
   };
+}
+
+/**
+ * Counts a config's rules per severity, most severe first, dropping severities nothing uses.
+ *
+ * Each entry carries the colour the config itself defines, so a template can be rendered in its
+ * own severity language rather than being recoloured by whoever is reading it.
+ */
+export function countViewerValidationRulesBySeverity(
+  config: ViewerValidationConfig,
+): ViewerValidationSeverityTally[] {
+  const counts = new Map<string, number>();
+  for (const clause of config.clauses) {
+    for (const rule of clause.rules) {
+      counts.set(rule.failSeverity, (counts.get(rule.failSeverity) ?? 0) + 1);
+    }
+  }
+
+  return [...config.severities]
+    .sort((left, right) => right.order - left.order)
+    .map((severity) => ({
+      id: severity.id,
+      label: severity.label,
+      color: severity.color,
+      count: counts.get(severity.id) ?? 0,
+    }))
+    .filter((tally) => tally.count > 0);
+}
+
+/**
+ * Re-identifies clauses that are about to be inserted into an existing config. A clause
+ * template inserted twice, or a clause saved from the very config it is going back into,
+ * would otherwise collide with the copy already there.
+ */
+export function cloneViewerValidationClauses(
+  clauses: ViewerValidationClause[],
+): ViewerValidationClause[] {
+  return clauses.map((clause) => ({
+    ...clause,
+    id: createClauseId(),
+    rules: clause.rules.map((rule) => ({ ...rule, id: createRuleId() })),
+  }));
 }
 
 export function normalizeIfcType(value: string) {
