@@ -6,10 +6,22 @@ This project uses semantic versioning once public releases begin.
 
 ## Unreleased
 
+## 1.1.0 - 2026-09-01
+
 - Clause templates can now be saved and deleted, not just loaded. Save the whole
   clause set or a single clause under a name, insert a saved clause alongside the
   ones you already have, and delete any template — the built-in starters
   included. The catalog is shared across the deployment.
+- 3D navigation reworked to a Revit/Navisworks mapping: left click selects,
+  middle or right drag pans, the wheel zooms toward the cursor, and Shift turns a
+  left or middle drag into an orbit. An amber pivot marker shows the centre of
+  rotation while orbiting, and orbits anchor on the current selection.
+- Camera clipping planes and dolly range are now derived from each model's own
+  bounding box instead of the library's fixed `near: 1 / far: 1000` and
+  `maxDistance: 300` defaults, so zoom and rotate keep working at close range on
+  a detail and still pull back past a whole site without geometry clipping away.
+- Added the `camera-controls` dependency, which the viewport now configures
+  directly.
 
 ## 1.0.0 - 2026-08-29
 
