@@ -59,10 +59,18 @@ against the previous version.
 - `GET /api/rules/config`: read the current user's validation config.
 - `PUT /api/rules/config`: save a validation config.
 - `POST /api/rules/evaluate`: evaluate validation rows against a config.
-- `GET /api/rule-templates`: list available validation templates.
+- `GET /api/rule-templates`: list available validation templates. Each template
+  reports a `kind`: `config` (a whole clause set) or `clause` (a single clause).
+- `POST /api/rule-templates`: save a template. JSON body: `{ "name", "description",
+  "kind", "config" }` where `config` is a version 4 validation config. A `clause`
+  template must hold exactly one clause. Returns the template with status `201`.
 - `GET /api/rule-templates/[id]`: read one validation template.
 - `GET /api/rule-templates/[id]?format=config`: download a template config.
 - `GET /api/rule-templates/[id]?format=source`: download a template source file when available.
+- `DELETE /api/rule-templates/[id]`: delete a template, built-in starters included.
+  Returns `204`, or `404` when no live template has that id.
+
+The template catalog is shared across the deployment rather than scoped per user.
 - `POST /api/data-table/excel/export`
 - `POST /api/data-table/excel/import`
 

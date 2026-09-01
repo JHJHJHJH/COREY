@@ -6,6 +6,11 @@ This project uses semantic versioning once public releases begin.
 
 ## Unreleased
 
+- Clause templates can now be saved and deleted, not just loaded. Save the whole
+  clause set or a single clause under a name, insert a saved clause alongside the
+  ones you already have, and delete any template — the built-in starters
+  included. The catalog is shared across the deployment.
+
 ## 1.0.0 - 2026-08-29
 
 - First stable COREY release, establishing the local-first IFC review,

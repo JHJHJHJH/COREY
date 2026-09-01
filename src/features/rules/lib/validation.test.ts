@@ -7,6 +7,8 @@ import type {
 } from "@/features/viewer/types";
 import {
   buildViewerValidationRuleKey,
+  cloneViewerValidationClauses,
+  countViewerValidationRulesBySeverity,
   defaultViewerValidationSeverities,
   evaluateViewerValidationPayload,
   groupViewerValidationResultsBySeverity,
@@ -546,4 +548,135 @@ test("importing keeps the user's severity definitions and appends unknown ones",
     { id: "error", label: "Renamed error", color: "#222222", order: 2 },
     { id: "blocker", label: "Blocker", color: "#333333", order: 3 },
   ]);
+});
+
+function templateClause(): ViewerValidationClause {
+  return {
+    id: "clause-source",
+    title: "Fire rating",
+    rules: [
+      {
+        id: "rule-source-1",
+        ifcType: "IFCWALL",
+        target: { kind: "attribute", name: "Name" },
+        check: { kind: "empty" },
+        failSeverity: "error",
+      },
+      {
+        id: "rule-source-2",
+        ifcType: "IFCWALL",
+        target: { kind: "property", group: "Pset_WallCommon", label: "FireRating" },
+        check: { kind: "enum", allowedValues: ["60", "120"] },
+        failSeverity: "warn",
+      },
+    ],
+  };
+}
+
+test("cloning clauses gives every clause and rule a fresh id", () => {
+  const source = templateClause();
+  const [cloned] = cloneViewerValidationClauses([source]);
+
+  assert.notEqual(cloned.id, source.id);
+  assert.equal(cloned.rules.length, 2);
+  for (const [index, rule] of cloned.rules.entries()) {
+    assert.notEqual(rule.id, source.rules[index].id);
+  }
+});
+
+test("cloning clauses leaves everything but the ids untouched", () => {
+  const source = templateClause();
+  const [cloned] = cloneViewerValidationClauses([source]);
+
+  assert.equal(cloned.title, source.title);
+  for (const [index, rule] of cloned.rules.entries()) {
+    const original = source.rules[index];
+    assert.equal(rule.ifcType, original.ifcType);
+    assert.deepEqual(rule.target, original.target);
+    assert.deepEqual(rule.check, original.check);
+    assert.equal(rule.failSeverity, original.failSeverity);
+  }
+});
+
+test("cloning the same clause twice yields disjoint ids, so a template can be inserted repeatedly", () => {
+  const source = templateClause();
+  const [first] = cloneViewerValidationClauses([source]);
+  const [second] = cloneViewerValidationClauses([source]);
+
+  assert.notEqual(first.id, second.id);
+
+  const ids = new Set([
+    first.id,
+    second.id,
+    ...first.rules.map((rule) => rule.id),
+    ...second.rules.map((rule) => rule.id),
+  ]);
+  assert.equal(ids.size, 6);
+});
+
+test("cloning an empty clause list is a no-op", () => {
+  assert.deepEqual(cloneViewerValidationClauses([]), []);
+});
+
+test("the severity tally counts rules per severity, most severe first", () => {
+  const tally = countViewerValidationRulesBySeverity({
+    version: 4,
+    severities: defaultViewerValidationSeverities(),
+    clauses: [
+      {
+        id: "c1",
+        title: "Mixed",
+        rules: [
+          { ...templateClause().rules[0], id: "a", failSeverity: "warn" },
+          { ...templateClause().rules[0], id: "b", failSeverity: "error" },
+          { ...templateClause().rules[0], id: "c", failSeverity: "error" },
+        ],
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    tally.map(({ id, count }) => ({ id, count })),
+    [
+      { id: "error", count: 2 },
+      { id: "warn", count: 1 },
+    ],
+  );
+});
+
+test("the severity tally carries each severity's own label and colour", () => {
+  const [top] = countViewerValidationRulesBySeverity({
+    version: 4,
+    severities: [{ id: "blocker", label: "Blocker", color: "#112233", order: 9 }],
+    clauses: [
+      { id: "c1", title: "One", rules: [{ ...templateClause().rules[0], failSeverity: "blocker" }] },
+    ],
+  });
+
+  assert.equal(top.label, "Blocker");
+  assert.equal(top.color, "#112233");
+  assert.equal(top.count, 1);
+});
+
+test("the severity tally omits severities no rule uses", () => {
+  const tally = countViewerValidationRulesBySeverity({
+    version: 4,
+    severities: defaultViewerValidationSeverities(),
+    clauses: [
+      { id: "c1", title: "Warnings only", rules: [{ ...templateClause().rules[0], failSeverity: "warn" }] },
+    ],
+  });
+
+  assert.deepEqual(tally.map((entry) => entry.id), ["warn"]);
+});
+
+test("the severity tally of an empty config is empty", () => {
+  assert.deepEqual(
+    countViewerValidationRulesBySeverity({
+      version: 4,
+      severities: defaultViewerValidationSeverities(),
+      clauses: [],
+    }),
+    [],
+  );
 });
