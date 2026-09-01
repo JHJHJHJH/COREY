@@ -45,6 +45,9 @@ importers:
       '@thatopen/fragments':
         specifier: ^3.4.7
         version: 3.4.7(three@0.184.0)(web-ifc@0.0.77)
+      camera-controls:
+        specifier: 3.1.2
+        version: 3.1.2(three@0.184.0)
       exceljs:
         specifier: 4.4.0
         version: 4.4.0

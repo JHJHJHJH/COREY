@@ -1,7 +1,7 @@
 {
   "name": "corey",
   "description": "Local-first IFC review app with an optional self-hosted backend.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "license": "MIT",
   "repository": {
@@ -60,6 +60,7 @@
     "@thatopen/components": "^3.4.8",
     "@thatopen/components-front": "^3.4.4",
     "@thatopen/fragments": "^3.4.7",
+    "camera-controls": "3.1.2",
     "exceljs": "4.4.0",
     "express": "5.2.1",
     "fumadocs-core": "16.14.0",

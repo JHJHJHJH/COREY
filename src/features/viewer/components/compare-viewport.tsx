@@ -5,9 +5,14 @@ import * as OBC from "@thatopen/components";
 import * as OBF from "@thatopen/components-front";
 import * as FRAGS from "@thatopen/fragments";
 import * as THREE from "three";
+import {
+  configureViewportCamera,
+  hasRenderableBox,
+  type ViewportCameraController,
+} from "@/features/viewer/lib/camera-setup";
 import { elementInspectionDataConfig } from "@/features/viewer/lib/ifc-data";
 
-/** camera-controls instance type, derived so we don't import the transitive package. */
+/** camera-controls instance type, derived from the camera rather than re-imported. */
 export type CompareCameraControls = NonNullable<OBC.OrthoPerspectiveCamera["controls"]>;
 
 /**
@@ -42,6 +47,7 @@ type CompareViewportProps = {
 type CompareRuntime = {
   components: OBC.Components;
   world: OBC.World;
+  camera: ViewportCameraController;
   fragments: OBC.FragmentsManager;
   model: FRAGS.FragmentsModel | null;
 };
@@ -87,10 +93,6 @@ const removedMaterial = {
   transparent: false,
   renderedFaces: FRAGS.RenderedFaces.ONE,
 } satisfies FRAGS.MaterialDefinition;
-
-function hasRenderableBox(box: THREE.Box3) {
-  return Number.isFinite(box.min.x) && Number.isFinite(box.max.x) && !box.isEmpty();
-}
 
 /**
  * Minimal single-model 3D pane for the visual compare overlay. Unlike
@@ -187,6 +189,7 @@ export const CompareViewport = forwardRef<CompareViewportHandle, CompareViewport
 
         const controls = runtime.world.camera.controls;
         const modelBox = model.box.clone();
+        runtime.camera.applyModelLimits(modelBox);
         if (controls && hasRenderableBox(modelBox)) {
           await controls.fitToBox(modelBox, false, {
             paddingBottom: 0.2,
@@ -333,6 +336,9 @@ export const CompareViewport = forwardRef<CompareViewportHandle, CompareViewport
         world.scene.three.background = new THREE.Color(sceneTheme.background);
         world.renderer = new OBF.PostproductionRenderer(components, container);
         world.camera = new OBC.OrthoPerspectiveCamera(components);
+        // Anchored orbit is off here: it works by writing a focal offset, which the
+        // pane-to-pane camera link in `visual-compare-overlay.tsx` does not mirror.
+        const viewportCamera = configureViewportCamera(world);
         await world.camera.controls?.setLookAt(18, 16, 18, 0, 0, 0);
 
         components.init();
@@ -372,6 +378,7 @@ export const CompareViewport = forwardRef<CompareViewportHandle, CompareViewport
         runtimeRef.current = {
           components,
           world,
+          camera: viewportCamera,
           fragments,
           model: null,
         };
@@ -391,6 +398,7 @@ export const CompareViewport = forwardRef<CompareViewportHandle, CompareViewport
           window.cancelAnimationFrame(fragmentsUpdateFrameRef.current);
           fragmentsUpdateFrameRef.current = null;
         }
+        runtimeRef.current?.camera.dispose();
         runtimeRef.current?.components.dispose();
         runtimeRef.current = null;
       };

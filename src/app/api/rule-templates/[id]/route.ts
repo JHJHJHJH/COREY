@@ -1,4 +1,9 @@
-import { getRuleTemplate, getRuleTemplateSource } from "@/server/rule-template-store";
+import { getUserIdOrResponse } from "@/server/identity";
+import {
+  deleteRuleTemplate,
+  getRuleTemplate,
+  getRuleTemplateSource,
+} from "@/server/rule-template-store";
 
 type RuleTemplateRouteContext = {
   params: Promise<{ id: string }>;
@@ -63,6 +68,27 @@ export async function GET(request: Request, { params }: RuleTemplateRouteContext
     return Response.json({ template });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Rule template could not be read.";
+    return Response.json({ error: message }, { status: 500 });
+  }
+}
+
+// Built-in templates are deletable too — the store tombstones them so the built-in seeder
+// does not bring them back.
+export async function DELETE(request: Request, { params }: RuleTemplateRouteContext) {
+  try {
+    const userId = getUserIdOrResponse(request);
+    if (userId instanceof Response) return userId;
+
+    const { id } = await params;
+    const deleted = await deleteRuleTemplate(id);
+
+    if (!deleted) {
+      return Response.json({ error: "Rule template not found." }, { status: 404 });
+    }
+
+    return new Response(null, { status: 204 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Rule template could not be deleted.";
     return Response.json({ error: message }, { status: 500 });
   }
 }

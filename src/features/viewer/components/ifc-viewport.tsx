@@ -26,6 +26,11 @@ import {
   readNameMaps,
 } from "@/features/viewer/lib/ifc-data";
 import {
+  configureViewportCamera,
+  hasRenderableBox,
+  type ViewportCameraController,
+} from "@/features/viewer/lib/camera-setup";
+import {
   buildViewerGraphEdge,
   classifyViewerGraphNode,
   flattenViewerGraphRelations,
@@ -78,6 +83,7 @@ type IfcViewportProps = {
 type ViewerRuntime = {
   components: OBC.Components;
   world: OBC.World;
+  camera: ViewportCameraController;
   fragments: OBC.FragmentsManager;
   ifcLoader: OBC.IfcLoader;
   highlighter: OBF.Highlighter;
@@ -228,10 +234,6 @@ function toBox(boxes: THREE.Box3[]) {
   return aggregate;
 }
 
-function hasRenderableBox(box: THREE.Box3) {
-  return Number.isFinite(box.min.x) && Number.isFinite(box.max.x) && !box.isEmpty();
-}
-
 function toModelIdMap(highlights: ViewerValidationElementMap) {
   return Object.fromEntries(
     Object.entries(highlights).map(([modelId, ids]) => [modelId, new Set(ids)]),
@@ -314,6 +316,8 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
   /** Style ids currently registered on the highlighter, so stale ones can be cleaned up. */
   const registeredValidationStylesRef = useRef<string[]>([]);
   const validationHighlightsSequenceRef = useRef(0);
+  /** Guards the async bbox lookup behind selection-driven pivoting against stale resolves. */
+  const pivotAnchorSequenceRef = useRef(0);
   // The runtime is built once, before the highlight effect runs, so the initial style
   // registration reads the current severities through a ref.
   const severitiesRef = useRef(severities);
@@ -489,6 +493,34 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
     const selection = getPrimarySelection(selectionMap, runtime.labels, runtime.categories);
     syncSession(selection);
     loadSelectionDetails(selection);
+  });
+
+  /**
+   * Move the orbit pivot onto whatever is selected, so rotating swings the view around
+   * the element the user is looking at rather than around the whole model. Passing no
+   * selection puts it back on the model centre.
+   */
+  const anchorPivot = useEffectEvent((selectionMap: OBC.ModelIdMap | null) => {
+    const runtime = runtimeRef.current;
+    if (!runtime) return;
+
+    const sequence = ++pivotAnchorSequenceRef.current;
+
+    if (!selectionMap || OBC.ModelIdMapUtils.isEmpty(selectionMap)) {
+      if (runtime.model) runtime.camera.setAnchor(runtime.model.box.clone());
+      return;
+    }
+
+    void (async () => {
+      const boxes = await runtime.fragments.getBBoxes(selectionMap);
+      // A newer selection resolved while this one was in flight, or the viewport went
+      // away — either way this answer is no longer the one to act on.
+      if (sequence !== pivotAnchorSequenceRef.current || !runtimeRef.current) return;
+      if (boxes.length === 0) return;
+      // setAnchor ignores an unusable box, so an element with no geometry (a space, a
+      // grouping node) simply leaves the pivot where it was.
+      runtimeRef.current.camera.setAnchor(toBox(boxes));
+    })();
   });
 
   useEffect(() => {
@@ -672,7 +704,12 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
 
         const controls = runtime.world.camera.controls;
         const modelBox = model.box.clone();
+        // Re-derive the frustum and dolly range before framing: the library's defaults
+        // clamp `fitToBox` to 300 units, which puts the camera inside anything larger.
+        runtime.camera.applyModelLimits(modelBox);
+        runtime.camera.setAnchor(modelBox);
         if (controls && hasRenderableBox(modelBox)) {
+          runtime.camera.prepareFit();
           await controls.fitToBox(modelBox, true, {
             paddingBottom: 0.2,
             paddingTop: 0.2,
@@ -682,6 +719,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
         } else {
           console.warn("Loaded IFC model has an empty bounding box; skipping automatic framing.");
         }
+        scheduleFragmentsUpdate(true);
 
         void (async () => {
           let lastDataTableProgress = -1;
@@ -1152,6 +1190,8 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
         if (runtime.model && controls) {
           const modelBox = runtime.model.box.clone();
           if (hasRenderableBox(modelBox)) {
+            runtime.camera.setAnchor(modelBox);
+            runtime.camera.prepareFit();
             await controls.fitToBox(modelBox, true);
           }
         }
@@ -1166,12 +1206,12 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       const controls = runtime.world.camera.controls;
       const box = toBox(boxes);
       if (controls && hasRenderableBox(box)) {
-        await controls.fitToBox(toBox(boxes), true, {
-          paddingBottom: 0.25,
-          paddingTop: 0.25,
-          paddingLeft: 0.25,
-          paddingRight: 0.25,
-        });
+        runtime.camera.setAnchor(box);
+        runtime.camera.prepareFit();
+        // `fitToBox` snaps the orbit angles to the nearest 90°, so focusing an element
+        // used to throw away whatever angle the user had set up. `fitToSphere` frames the
+        // same extent from the direction they are already looking.
+        await controls.fitToSphere(box.getBoundingSphere(new THREE.Sphere()), true);
       }
     },
     async fitModel() {
@@ -1180,6 +1220,8 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       if (!runtime?.model || !controls) return;
       const modelBox = runtime.model.box.clone();
       if (hasRenderableBox(modelBox)) {
+        runtime.camera.setAnchor(modelBox);
+        runtime.camera.prepareFit();
         await controls.fitToBox(modelBox, true, {
           paddingBottom: 0.2,
           paddingTop: 0.2,
@@ -1245,6 +1287,9 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       world.scene.three.background = new THREE.Color(sceneTheme.background);
       world.renderer = new OBF.PostproductionRenderer(components, container);
       world.camera = new OBC.OrthoPerspectiveCamera(components);
+      // Assigning the camera to the world is what builds its controls and applies the
+      // library's demo-scale defaults, so our own configuration has to come after it.
+      const viewportCamera = configureViewportCamera(world, { anchoredOrbit: true });
       await world.camera.controls?.setLookAt(18, 16, 18, 0, 0, 0);
 
       components.init();
@@ -1306,11 +1351,13 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
 
       highlighter.events.select.onHighlight.add((selectionMap) => {
         syncSelectionFromMap(selectionMap);
+        anchorPivot(selectionMap);
       });
 
       highlighter.events.select.onClear.add(() => {
         syncSession(null);
         resetSelectionDetails();
+        anchorPivot(null);
       });
 
       const hider = components.get(OBC.Hider);
@@ -1347,6 +1394,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       runtimeRef.current = {
         components,
         world,
+        camera: viewportCamera,
         fragments,
         ifcLoader,
         highlighter,
@@ -1424,6 +1472,7 @@ export const IfcViewport = forwardRef<ViewerViewportHandle, IfcViewportProps>(fu
       clearQueuedFragmentsUpdate();
       container.removeEventListener("dblclick", handleDoubleClick);
       window.removeEventListener("keydown", handleKeyDown);
+      runtimeRef.current?.camera.dispose();
       runtimeRef.current?.components.dispose();
       runtimeRef.current = null;
     };
