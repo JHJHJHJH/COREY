@@ -28,12 +28,14 @@ one replaces the current clause set using the existing template workflow.
 **Review before use:** component names do not scope rule applicability. Some
 source requirements overlap or conflict on the same IFC entity/subtype. These
 checks are deliberately retained for manual review. The
-[coverage report](./industry-mapping-coverage.md) documents skipped records,
+[review notes](../../content/docs/industry-mapping-review.mdx) document skipped records,
 missing accepted-value references, broad subtype matching, overlapping clauses,
-and the source record(s) behind every generated rule. It is also downloadable
-from each new template's review-notes button.
+and the source record(s) behind every generated rule. Each template's review-notes
+button opens `/docs/industry-mapping-review` in a new tab. The page is also listed
+in the Docs user guides.
 
-To regenerate the JSON configs, catalog manifest, and coverage report, supply
+To regenerate the JSON configs and catalog manifest in this directory and the
+review notes page in `content/docs`, supply
 the original CSV separately from outside the repository:
 
 ```bash

@@ -159,6 +159,17 @@ template came from. Each row carries a coloured band showing how its rules split
 across severities, so you can tell a set that mostly warns from one that mostly
 blocks before you load it.
 
+### Industry mapping starter templates
+
+The agency templates cover BCA, SCDF, URA, NEA, PUB, LTA, and NParks, with shared
+requirements included in each. A separate Shared Requirements template contains
+just the shared clauses.
+
+Read the [Industry mapping review notes](./industry-mapping-review) before using
+these starters. They explain skipped checks, missing accepted-value lists, and
+component requirements that can overlap or conflict. Each agency template's
+review-notes button opens this guide in a new tab so you can keep your model open.
+
 <Callout title="For developers">
 Clauses are stored as a small JSON document (a `version` plus a `clauses` array,
 each clause holding `rules`). The repository includes a starter file,

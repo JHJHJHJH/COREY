@@ -777,10 +777,11 @@ function TemplateRow({
         </a>
         {INDUSTRY_MAPPING_TEMPLATE_IDS.has(template.templateId) ? (
           <a
-            href="/resources/industry-mapping-coverage.md"
-            download
-            aria-label={`Download review notes for ${template.name}`}
-            title="Download review notes"
+            href="/docs/industry-mapping-review"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Read review notes for ${template.name} in Docs (opens in a new tab)`}
+            title="Read review notes in Docs (opens in a new tab)"
             className={`${iconButtonClassName()} transition hover:border-[color:var(--accent)]`}
           >
             <FileText className="h-3.5 w-3.5" />

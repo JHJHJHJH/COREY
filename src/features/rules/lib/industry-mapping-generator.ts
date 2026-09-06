@@ -17,6 +17,7 @@ import type {
 } from "@/features/viewer/types";
 
 export const INDUSTRY_MAPPING_SOURCE = "industry-mapping-4-dec-csv.csv";
+export const INDUSTRY_MAPPING_REVIEW_PATH = "content/docs/industry-mapping-review.mdx";
 const AGENCIES = ["BCA", "SCDF", "URA", "NEA", "PUB", "LTA", "NParks", "All"];
 const HEADERS = {
   serial: "S/N",
@@ -268,7 +269,7 @@ export async function generateIndustryMapping(csv: string): Promise<GeneratedInd
       manifest: {
         id,
         name: shared ? "Shared Requirements - Industry Mapping" : `${agency} - Industry Mapping`,
-        description: `Manual review required. ${shared ? "Shared All-agency requirements" : `${agency} requirements, including shared All-agency clauses`} from the 4 Dec CSV. Component applicability can overlap or conflict, and referenced value lists are incomplete. Download the review notes for details.`,
+        description: `Manual review required. ${shared ? "Shared All-agency requirements" : `${agency} requirements, including shared All-agency clauses`} from the 4 Dec CSV. Component applicability can overlap or conflict, and referenced value lists are incomplete. Read the review notes in Docs for details.`,
         sourceKind: "industry-mapping",
         configFileName: `${id}.json`,
         sourceFileName: null,
@@ -281,13 +282,18 @@ export async function generateIndustryMapping(csv: string): Promise<GeneratedInd
 }
 
 function tableCell(value: string) {
-  return value.replace(/\|/g, "\\|").replace(/[\r\n]+/g, " ");
+  return value.replace(/&/g, "&amp;").replace(/[<>{}]/g, (character) => `&#${character.charCodeAt(0)};`)
+    .replace(/\|/g, "\\|").replace(/[\r\n]+/g, " ");
 }
 
-function coverageMarkdown(result: GeneratedIndustryMapping) {
+function coverageMdx(result: GeneratedIndustryMapping) {
   const mapped = result.records.filter((record) => record.ruleIds.length > 0).length;
   const lines = [
-    "# Industry mapping coverage and manual review", "",
+    "---",
+    "title: Industry mapping review notes",
+    "description: Source coverage, skipped checks, and applicability conflicts in the agency starter templates.",
+    "full: true",
+    "---", "",
     `Generated from \`${INDUSTRY_MAPPING_SOURCE}\`. The source CSV is not distributed with COREY. Regeneration requires a separately supplied file: \`pnpm templates:generate --source /path/to/mapping.csv\`. Do not edit generated artifacts.`, "",
     `Source SHA-256: \`${result.sourceHash}\`.`, "",
     `${result.records.length} source records: ${mapped} mapped, ${result.records.length - mapped} skipped. Identical checks are deduplicated within a component; subtype lists expand into multiple rules. Shared clauses appear in every agency template and in the standalone shared template.`, "",
@@ -296,7 +302,7 @@ function coverageMarkdown(result: GeneratedIndustryMapping) {
     "N.A means any subtype, including mixed N.A/subtype lists. The unavailable COP subtype list also becomes any subtype. A leading * is removed to match the runtime's resolved USERDEFINED/ObjectType value. Missing Space Values lists become presence checks. Sample values and property units do not create constraints; material-set metadata does not add material relationship checks. Positive numbers use decimal/scientific text syntax. Enum comparisons are case-insensitive, with both boolean values accepted in the runtime's supported spellings.", "",
     "The overlap table identifies shared targets across component clauses, including unrestricted rules overlapping a specific subtype. Different checks may conflict; equal checks can still have overly broad component applicability. This is a review aid, not proof that other mappings apply to every project.", "",
     "## Templates", "", "| Template | Clauses | Rules |", "| --- | ---: | ---: |",
-    ...result.templates.map(({ manifest, config }) => `| [${manifest.name}](./${manifest.configFileName}) | ${config.clauses.length} | ${config.clauses.reduce((sum, clause) => sum + clause.rules.length, 0)} |`),
+    ...result.templates.map(({ manifest, config }) => `| [${manifest.name}](/resources/${manifest.configFileName}) | ${config.clauses.length} | ${config.clauses.reduce((sum, clause) => sum + clause.rules.length, 0)} |`),
     "", "## Component overlaps", "",
     "| Template | Entity / target / subtype | Clauses | Checks | Rule IDs |", "| --- | --- | --- | --- | --- |",
     ...result.overlaps.map((overlap) => `| ${overlap.templateId} | ${tableCell(overlap.target)} | ${overlap.clauseTitles.map(tableCell).join("; ")} | ${overlap.differentChecks ? "Different — review for conflicts" : "Equal — review applicability"} | ${overlap.ruleIds.map((id) => `\`${id}\``).join("; ")} |`),
@@ -311,8 +317,8 @@ function coverageMarkdown(result: GeneratedIndustryMapping) {
 
 export function industryMappingArtifacts(result: GeneratedIndustryMapping): Map<string, string> {
   return new Map([
-    ...result.templates.map(({ manifest, config }): [string, string] => [manifest.configFileName, `${serializeViewerValidationConfig(config)}\n`]),
-    ["industry-mapping-manifest.json", `${JSON.stringify(result.templates.map(({ manifest }) => manifest), null, 2)}\n`],
-    ["industry-mapping-coverage.md", coverageMarkdown(result)],
+    ...result.templates.map(({ manifest, config }): [string, string] => [`public/resources/${manifest.configFileName}`, `${serializeViewerValidationConfig(config)}\n`]),
+    ["public/resources/industry-mapping-manifest.json", `${JSON.stringify(result.templates.map(({ manifest }) => manifest), null, 2)}\n`],
+    [INDUSTRY_MAPPING_REVIEW_PATH, coverageMdx(result)],
   ]);
 }

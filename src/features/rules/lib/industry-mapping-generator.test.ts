@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   generateIndustryMapping,
   industryMappingArtifacts,
+  INDUSTRY_MAPPING_REVIEW_PATH,
   type GeneratedIndustryMapping,
 } from "@/features/rules/lib/industry-mapping-generator";
 import {
@@ -23,7 +24,7 @@ const bundled = (async () => {
     manifest: entry,
     config: parseViewerValidationConfigText(await readFile(resolve(resources, entry.configFileName), "utf8")),
   })));
-  const report = await readFile(resolve(resources, "industry-mapping-coverage.md"), "utf8");
+  const report = await readFile(resolve(process.cwd(), INDUSTRY_MAPPING_REVIEW_PATH), "utf8");
   const records = report.split("## Source record coverage")[1].split("\n")
     .filter((line) => /^\| \d+ \|/.test(line))
     .map((line) => ({
@@ -96,6 +97,7 @@ test("bundled agency/shared configs are complete, runnable and traceable without
     assert.equal(manifest.sourceFileName, null);
     assert.equal(manifest.sourceKind, "industry-mapping");
     assert.match(manifest.description, /^Manual review required\./);
+    assert.ok(result.report.includes(`](/resources/${manifest.configFileName})`));
     const rules = config.clauses.flatMap((clause) => clause.rules);
     assert.equal(new Set(rules.map((rule) => rule.id)).size, rules.length);
     let compiledCount = 0;
@@ -114,7 +116,7 @@ test("bundled agency/shared configs are complete, runnable and traceable without
 });
 
 test("generation is reproducible with synthetic input and never adds a source download", async () => {
-  const csv = csvFixture([{ accepted: "First, Second" }, { label: "Other", subtype: "*CUSTOM" }]);
+  const csv = csvFixture([{ component: "Beam <tag> {review} & checks", accepted: "First, Second" }, { label: "Other", subtype: "*CUSTOM" }]);
   const artifacts = industryMappingArtifacts(await generateIndustryMapping(csv));
   assert.deepEqual(artifacts, industryMappingArtifacts(await generateIndustryMapping(csv)));
   for (const [name, text] of artifacts) {
@@ -123,8 +125,12 @@ test("generation is reproducible with synthetic input and never adds a source do
     }
   }
   assert.ok(![...artifacts.keys()].some((name) => name.endsWith(".csv")));
-  assert.ok(JSON.parse(artifacts.get("industry-mapping-manifest.json")!).every((entry: { sourceFileName: unknown }) => entry.sourceFileName === null));
-  assert.match(artifacts.get("industry-mapping-coverage.md")!, /source CSV is not distributed/);
+  assert.ok(JSON.parse(artifacts.get("public/resources/industry-mapping-manifest.json")!).every((entry: { sourceFileName: unknown }) => entry.sourceFileName === null));
+  const report = artifacts.get(INDUSTRY_MAPPING_REVIEW_PATH)!;
+  assert.match(report, /^---\ntitle: Industry mapping review notes\n/);
+  assert.match(report, /source CSV is not distributed/);
+  assert.ok(report.includes("Beam &#60;tag&#62; &#123;review&#125; &amp; checks"));
+  assert.ok(![...artifacts.keys()].some((name) => name.startsWith("public/") && !name.endsWith(".json")));
 });
 
 test("CSV parsing handles BOM, multiline headers, quotes and commas without using sample/annotation values", async () => {
