@@ -6,6 +6,20 @@ This project uses semantic versioning once public releases begin.
 
 ## Unreleased
 
+## 1.2.0 - 2026-09-06
+
+- Added eight industry mapping starter templates for BCA, SCDF, URA, NEA,
+  PUB, LTA, NParks, and shared requirements. Each agency template includes
+  the shared clauses, with property presence, accepted-value, and subtype checks.
+- Added downloadable review notes with source-record coverage and component
+  applicability conflicts. The templates retain ambiguous source requirements
+  for manual review before use.
+- Removed CSV downloads from the template menu. The original mapping CSV is
+  not bundled or required at runtime; templates and tests use the generated
+  JSON assets. Offline regeneration accepts a separately supplied source file.
+- Updated transitive Browserslist, fast-uri, MySQL2, and qs dependencies to
+  patched releases identified by the production audit.
+
 ## 1.1.0 - 2026-09-01
 
 - Clause templates can now be saved and deleted, not just loaded. Save the whole

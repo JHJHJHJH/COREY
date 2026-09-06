@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import industryMappingManifest from "../../public/resources/industry-mapping-manifest.json";
 import type { ParsedRuleTemplateInput } from "@/features/rules/lib/rule-template-input";
 import {
   countViewerValidationRulesBySeverity,
@@ -47,7 +48,7 @@ export type RuleTemplateSource = {
 
 const RESOURCE_DIR = join(process.cwd(), "public", "resources");
 
-// User templates sort below every built-in (10/20/30) so the starters stay put.
+// User templates sort below every built-in, including the generated agency catalog (40–47).
 const USER_TEMPLATE_SORT_ORDER = 100;
 
 // Soft-deleted rows are tombstones, never served.
@@ -81,6 +82,10 @@ const BUILT_IN_RULE_TEMPLATES = [
     sourceFileName: null,
     sortOrder: 30,
   },
+  ...industryMappingManifest.map((template) => ({
+    ...template,
+    sourceKind: "industry-mapping" as const,
+  })),
 ] satisfies BuiltInRuleTemplate[];
 
 let seedPromise: Promise<void> | null = null;

@@ -15,6 +15,7 @@ npm-debug.log*
 out
 dist
 playwright-artifacts
+public/resources/industry-mapping-4-dec-csv.csv
 src/generated/prisma
 yarn-debug.log*
 yarn-error.log*

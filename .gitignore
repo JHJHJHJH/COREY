@@ -47,6 +47,9 @@ next-env.d.ts
 # being committed; see public/resources/README.md.
 /public/resources/*.ifc
 
+# Industry templates ship as JSON; keep the original source CSV out of releases.
+/public/resources/industry-mapping-4-dec-csv.csv
+
 #videos
 /playwright-artifacts/*
 

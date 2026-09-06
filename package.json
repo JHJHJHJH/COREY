@@ -1,7 +1,7 @@
 {
   "name": "corey",
   "description": "Local-first IFC review app with an optional self-hosted backend.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "license": "MIT",
   "repository": {
@@ -20,11 +20,14 @@
       "brace-expansion@^1": "1.1.18",
       "brace-expansion@^2": "2.1.4",
       "brace-expansion@^5": "5.0.8",
+      "browserslist": "4.28.7",
       "esbuild": "0.28.1",
-      "fast-uri": "3.1.5",
+      "fast-uri": "3.1.6",
       "hono": "4.12.34",
       "js-yaml": "4.3.1",
+      "mysql2": "3.23.1",
       "postcss": "8.5.26",
+      "qs": "6.16.0",
       "sharp": "0.35.0",
       "uuid": "11.1.1",
       "valibot": "1.4.2"
@@ -42,6 +45,8 @@
     "lint": "eslint",
     "docs:generate": "fumadocs-mdx",
     "check:assets": "node scripts/check-runtime-assets.mjs",
+    "templates:generate": "tsx scripts/generate-industry-templates.ts",
+    "templates:check": "tsx --test src/features/rules/lib/industry-mapping-generator.test.ts",
     "mcp:build": "tsup",
     "mcp:http": "tsx src/mcp/cli.ts",
     "mcp:test": "tsx --test src/features/viewer/mcp/*.test.ts src/features/rules/lib/*.test.ts src/server/*.test.ts src/mcp/*.test.ts",
