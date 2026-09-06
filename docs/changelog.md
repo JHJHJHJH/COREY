@@ -17,6 +17,8 @@ This project uses semantic versioning once public releases begin.
 - Removed CSV downloads from the template menu. The original mapping CSV is
   not bundled or required at runtime; templates and tests use the generated
   JSON assets. Offline regeneration accepts a separately supplied source file.
+- Updated transitive Browserslist, fast-uri, MySQL2, and qs dependencies to
+  patched releases identified by the production audit.
 
 ## 1.1.0 - 2026-09-01
 
