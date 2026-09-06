@@ -41,7 +41,7 @@ async function main() {
   if (stale.length) {
     throw new Error(`Generated templates are stale: ${stale.join(", ")}. Regenerate with the same --source file.`);
   }
-  console.log(`${check ? "Verified" : "Generated"} ${generated.templates.length} templates, their manifest, and the review notes docs page from ${generated.records.length} CSV records.`);
+  console.log(`${check ? "Verified" : "Generated"} ${generated.templates.length} templates and their manifest from ${generated.records.length} CSV records.`);
 }
 
 main().catch((error: unknown) => {

@@ -5,7 +5,6 @@ import test from "node:test";
 import {
   generateIndustryMapping,
   industryMappingArtifacts,
-  INDUSTRY_MAPPING_REVIEW_PATH,
   type GeneratedIndustryMapping,
 } from "@/features/rules/lib/industry-mapping-generator";
 import {
@@ -24,14 +23,7 @@ const bundled = (async () => {
     manifest: entry,
     config: parseViewerValidationConfigText(await readFile(resolve(resources, entry.configFileName), "utf8")),
   })));
-  const report = await readFile(resolve(process.cwd(), INDUSTRY_MAPPING_REVIEW_PATH), "utf8");
-  const records = report.split("## Source record coverage")[1].split("\n")
-    .filter((line) => /^\| \d+ \|/.test(line))
-    .map((line) => ({
-      ruleIds: [...line.matchAll(/`(industry-[a-z0-9-]+)`/g)].map((match) => match[1]),
-      notes: [line.split("|").at(-2)!.trim()],
-    }));
-  return { templates, records, report };
+  return { templates };
 })();
 
 const fixtureHeaders = [
@@ -77,11 +69,8 @@ async function passes(rule: ViewerValidationRule, text: string, state: ViewerIns
   return result.results.length === 0;
 }
 
-test("bundled agency/shared configs are complete, runnable and traceable without the source CSV", async () => {
+test("bundled agency/shared configs are complete and runnable without the source CSV", async () => {
   const result = await bundled;
-  assert.equal(result.records.length, 833);
-  assert.equal(result.records.filter((record) => record.ruleIds.length > 0).length, 671);
-  assert.equal(result.records.filter((record) => record.ruleIds.length === 0).length, 162);
   assert.deepEqual(result.templates.map(({ manifest, config }) => [
     manifest.id, config.clauses.length, config.clauses.reduce((sum, clause) => sum + clause.rules.length, 0),
   ]), [
@@ -91,13 +80,10 @@ test("bundled agency/shared configs are complete, runnable and traceable without
     ["industry-mapping-nparks", 12, 132], ["industry-mapping-shared", 5, 74],
   ]);
   const shared = result.templates.at(-1)!.config.clauses;
-  const referenced = new Set(result.records.flatMap((record) => record.ruleIds));
-  const emitted = new Set<string>();
   for (const { manifest, config } of result.templates) {
     assert.equal(manifest.sourceFileName, null);
-    assert.equal(manifest.sourceKind, "industry-mapping");
+    assert.equal(manifest.sourceKind, "starter");
     assert.match(manifest.description, /^Manual review required\./);
-    assert.ok(result.report.includes(`](/resources/${manifest.configFileName})`));
     const rules = config.clauses.flatMap((clause) => clause.rules);
     assert.equal(new Set(rules.map((rule) => rule.id)).size, rules.length);
     let compiledCount = 0;
@@ -107,12 +93,9 @@ test("bundled agency/shared configs are complete, runnable and traceable without
     assert.equal(compiledCount, rules.length);
     assert.deepEqual(config.clauses.filter((clause) => clause.id.startsWith("industry-all-")), shared);
     for (const rule of rules) {
-      emitted.add(rule.id);
-      assert.ok(referenced.has(rule.id), `Missing source for ${rule.id}`);
       assert.equal(rule.failSeverity, "error");
     }
   }
-  assert.deepEqual(emitted, referenced);
 });
 
 test("generation is reproducible with synthetic input and never adds a source download", async () => {
@@ -126,11 +109,8 @@ test("generation is reproducible with synthetic input and never adds a source do
   }
   assert.ok(![...artifacts.keys()].some((name) => name.endsWith(".csv")));
   assert.ok(JSON.parse(artifacts.get("public/resources/industry-mapping-manifest.json")!).every((entry: { sourceFileName: unknown }) => entry.sourceFileName === null));
-  const report = artifacts.get(INDUSTRY_MAPPING_REVIEW_PATH)!;
-  assert.match(report, /^---\ntitle: Industry mapping review notes\n/);
-  assert.match(report, /source CSV is not distributed/);
-  assert.ok(report.includes("Beam &#60;tag&#62; &#123;review&#125; &amp; checks"));
-  assert.ok(![...artifacts.keys()].some((name) => name.startsWith("public/") && !name.endsWith(".json")));
+  assert.equal(artifacts.size, 9);
+  assert.ok([...artifacts.keys()].every((name) => name.startsWith("public/resources/") && name.endsWith(".json")));
 });
 
 test("CSV parsing handles BOM, multiline headers, quotes and commas without using sample/annotation values", async () => {
@@ -213,18 +193,26 @@ test("agency casing, attribute targets, repeated S/N and semantic deduplication 
   assert.deepEqual(result.templates, reversed.templates, "Config IDs and ordering must survive source reordering");
 });
 
-test("missing external lists and component conflicts remain visible for manual review", async () => {
-  const result = await bundled;
+test("missing external lists become presence checks while component conflicts are retained", async () => {
+  const target = { entity: "IfcSpace", subtype: "SPACE", group: "SGPset_Space", label: "SpaceName" };
+  const { result } = await fixtureRules([
+    { ...target, component: "Household Shelter", accepted: "HOUSEHOLDSHELTER" },
+    { ...target, component: "Refuse Chute / Recyclables Chute", accepted: "REFUSECHUTE" },
+    { ...target, component: "Staircase", accepted: "STAIRCASE" },
+    { ...target, agency: "All", component: "Space (Usage)", accepted: "Refer to Space Values" },
+  ]);
   const unresolved = result.records.filter((record) => record.notes.some((note) => note.startsWith("Unresolved accepted values")));
-  assert.equal(unresolved.length, 10);
+  assert.equal(unresolved.length, 1);
   const rules = new Map(result.templates.flatMap(({ config }) => config.clauses.flatMap((clause) => clause.rules)).map((rule) => [rule.id, rule]));
   for (const record of unresolved) {
     for (const id of record.ruleIds) assert.deepEqual(rules.get(id)!.check, { kind: "empty" });
   }
-  const conflict = result.report.split("\n").find((line) => line.startsWith("| industry-mapping-bca | IfcSpace / property:sgpset_space::spacename / SPACE |"));
-  assert.ok(conflict?.includes("Different — review for conflicts"));
+  const conflict = result.overlaps.find((overlap) =>
+    overlap.templateId === "industry-mapping-bca" && overlap.target === "IfcSpace / property:sgpset_space::spacename / SPACE",
+  );
+  assert.ok(conflict?.differentChecks);
   for (const title of ["BCA - Household Shelter", "BCA - Refuse Chute / Recyclables Chute", "BCA - Staircase", "Shared - Space (Usage)"]) {
-    assert.ok(conflict.includes(title));
+    assert.ok(conflict.clauseTitles.includes(title));
   }
 });
 

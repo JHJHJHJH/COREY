@@ -20,7 +20,7 @@ type StoredRow = {
 };
 type SeedData = Omit<StoredRow, "id" | "updatedAt" | "deletedAt">;
 
-test("generated templates seed, load and download through the API while preserving user rows and deletion tombstones", async (t) => {
+test("agency templates become starters and the obsolete BCA template retires while preserving user rows and tombstones", async (t) => {
   // The store uses Prisma's existing delegate boundary. Supply a memory delegate before
   // importing db.ts so this exercises the real store/routes without any database connection.
   const prismaGlobal = globalThis as unknown as { prisma?: unknown };
@@ -38,6 +38,10 @@ test("generated templates seed, load and download through the API while preservi
   rows.set("industry-mapping-bca", {
     ...userRow, id: "industry-mapping-bca", sourceKind: "industry-mapping",
     sourceFileName: "industry-mapping-4-dec-csv.csv", sourceText: "Previously stored source",
+  });
+  const retiredId = "industry-mapping-bca-column-beam";
+  rows.set(retiredId, {
+    ...userRow, id: retiredId, name: "BCA - Column + Beam", sourceKind: "industry-mapping",
   });
   const seededIds: string[] = [];
   prismaGlobal.prisma = {
@@ -87,12 +91,22 @@ test("generated templates seed, load and download through the API while preservi
   const generatedIds = new Set(manifest.map((entry) => entry.id));
   const generated = templates.filter((template) => generatedIds.has(template.templateId));
   assert.equal(generated.length, 8);
-  assert.ok(generated.every((template) => template.kind === "config" && template.sourceKind === "industry-mapping"));
+  assert.ok(generated.every((template) => template.kind === "config" && template.sourceKind === "starter"));
+  assert.ok(generated.every((template) => rows.get(template.templateId)!.sourceKind === "starter"));
   assert.equal(templates.at(-1)!.templateId, userRow.id);
   assert.strictEqual(rows.get(userRow.id), userRow);
   assert.strictEqual(rows.get(tombstone.id), tombstone);
   assert.ok(!seededIds.includes(tombstone.id));
-  assert.ok(templates.some((template) => template.templateId === "industry-mapping-bca-column-beam"));
+  assert.ok(!templates.some((template) => template.templateId === retiredId));
+  assert.ok(!seededIds.includes(retiredId));
+  assert.ok(rows.get(retiredId)!.deletedAt instanceof Date);
+  assert.equal(await store.getRuleTemplate(retiredId), null);
+  for (const format of ["", "?format=config", "?format=source"]) {
+    const response = await itemRoute.GET(new Request(`http://localhost/api/rule-templates/${retiredId}${format}`), {
+      params: Promise.resolve({ id: retiredId }),
+    });
+    assert.equal(response.status, 404);
+  }
 
   for (const template of generated) {
     assert.equal(template.sourceFileName, null);
@@ -121,6 +135,7 @@ test("generated templates seed, load and download through the API while preservi
   assert.equal(await store.deleteRuleTemplate(deletedId), true);
   const seedCount = seededIds.filter((id) => id === deletedId).length;
   const afterDelete = await store.listRuleTemplates();
+  assert.ok(!afterDelete.some((template) => template.templateId === retiredId));
   assert.ok(!afterDelete.some((template) => template.templateId === deletedId));
   assert.equal(seededIds.filter((id) => id === deletedId).length, seedCount);
   assert.equal(await store.getRuleTemplate(deletedId), null);
