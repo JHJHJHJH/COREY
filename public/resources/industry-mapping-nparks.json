@@ -1,0 +1,2558 @@
+{
+  "version": 4,
+  "severities": [
+    {
+      "id": "warn",
+      "label": "Warn",
+      "color": "#d29a2f",
+      "order": 1
+    },
+    {
+      "id": "error",
+      "label": "Error",
+      "color": "#bb5a36",
+      "order": 2
+    }
+  ],
+  "clauses": [
+    {
+      "id": "industry-nparks-green-verge",
+      "title": "NParks - Green Verge",
+      "rules": [
+        {
+          "id": "industry-nparks-green-verge-approvedsoilmixture-b042782014b8",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "GREENVERGES",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "ApprovedSoilMixture"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-green-verge-approvedturfspecies-e0551dad4697",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "GREENVERGES",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "ApprovedTurfSpecies"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-green-verge-shrubspecies-f3bb5fcd47f8",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "GREENVERGES",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "ShrubSpecies"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-green-verge-status-159c5cfe105e",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "GREENVERGES",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "Status"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Existing",
+              "Proposed",
+              "To be Removed"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-green-verge-area-2b42201706fd",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "GREENVERGES",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElementDimension",
+            "label": "Area"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-green-verge-als-greeneryfeatures-616602d69b82",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_Landscape",
+            "label": "ALS_GreeneryFeatures"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Green Verge"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-green-verge-als-landscapetype-81ea60461f1d",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_Landscape",
+            "label": "ALS_LandscapeType"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Turfing",
+              "Groundcover",
+              "Shrubs"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-green-verge-als-status-b78be9d2cfac",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_Landscape",
+            "label": "ALS_Status"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Existing",
+              "Proposed",
+              "To be Removed"
+            ]
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "industry-nparks-landscape-plants",
+      "title": "NParks - Landscape Plants",
+      "rules": [
+        {
+          "id": "industry-nparks-landscape-plants-hedgenumber-a2102b7d91c8",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_HEDGE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "HedgeNumber"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-species-ac68e3427c1c",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_HEDGE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "Species"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-status-1d6664899405",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_HEDGE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "Status"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Existing",
+              "Proposed",
+              "To be Removed",
+              "To be Transplanted"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-turf-6eaba5a1234e",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_HEDGE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "Turf"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-height-d6bcfc1f9f6f",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_HEDGE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElementDimension",
+            "label": "Height"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-reasonforremoval-afc6a4818ff5",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_PALM",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "ReasonForRemoval"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-roadside-1a3dd3f795c3",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_PALM",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "Roadside"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-singlestem-59faae097f48",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_PALM",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "SingleStem"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-species-9a132cf8eb04",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_PALM",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "Species"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-status-c5c66a8c1dcd",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_PALM",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "Status"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Existing",
+              "Proposed",
+              "To be Removed",
+              "To be Transplanted"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-treenumber-7a2a280a0cb2",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_PALM",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "TreeNumber"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-treesize-0dec614419fe",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_PALM",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "TreeSize"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-turf-abf41dd971c6",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_PALM",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "Turf"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-girth-9f9bf0d36df4",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_PALM",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElementDimension",
+            "label": "Girth"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-height-fe9c6c2ed1a0",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_PALM",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElementDimension",
+            "label": "Height"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-reasonforremoval-5799609a46ec",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_TREE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "ReasonForRemoval"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-roadside-a9798520274b",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_TREE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "Roadside"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-singlestem-2fd59cd5c632",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_TREE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "SingleStem"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-species-21551bac5770",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_TREE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "Species"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-status-bf4aab9c3ecb",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_TREE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "Status"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Existing",
+              "Proposed",
+              "To be Removed",
+              "To be Transplanted"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-treenumber-0b61a87e0d51",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_TREE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "TreeNumber"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-treesize-be6a9f5e3590",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_TREE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "TreeSize"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-turf-bb4f8a22fbce",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_TREE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "Turf"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-girth-69eadfb08189",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_TREE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElementDimension",
+            "label": "Girth"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-landscape-plants-height-70fc80c74885",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "LANDSCAPE_TREE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElementDimension",
+            "label": "Height"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "industry-nparks-parking-lot",
+      "title": "NParks - Parking Lot",
+      "rules": [
+        {
+          "id": "industry-nparks-parking-lot-openatgrade-acb4291761b1",
+          "ifcType": "IfcBuildingElementProxy",
+          "subtype": "ARTICULATEDVEHICLELOT",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BuildingElementProxy",
+            "label": "OpenAtGrade"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-parking-lot-perforated-b68f16383db2",
+          "ifcType": "IfcBuildingElementProxy",
+          "subtype": "ARTICULATEDVEHICLELOT",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BuildingElementProxy",
+            "label": "Perforated"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-parking-lot-openatgrade-26e1b38a0207",
+          "ifcType": "IfcBuildingElementProxy",
+          "subtype": "CARLOT",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BuildingElementProxy",
+            "label": "OpenAtGrade"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-parking-lot-perforated-c23a92cf15f2",
+          "ifcType": "IfcBuildingElementProxy",
+          "subtype": "CARLOT",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BuildingElementProxy",
+            "label": "Perforated"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-parking-lot-openatgrade-2dd4e71676b3",
+          "ifcType": "IfcBuildingElementProxy",
+          "subtype": "COACHLOT",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BuildingElementProxy",
+            "label": "OpenAtGrade"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-parking-lot-perforated-293e825dc8ca",
+          "ifcType": "IfcBuildingElementProxy",
+          "subtype": "COACHLOT",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BuildingElementProxy",
+            "label": "Perforated"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-parking-lot-openatgrade-e382b627cf90",
+          "ifcType": "IfcBuildingElementProxy",
+          "subtype": "LORRYLOT",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BuildingElementProxy",
+            "label": "OpenAtGrade"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-parking-lot-perforated-cd9dd2309928",
+          "ifcType": "IfcBuildingElementProxy",
+          "subtype": "LORRYLOT",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BuildingElementProxy",
+            "label": "Perforated"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-parking-lot-openatgrade-0251c9d02747",
+          "ifcType": "IfcBuildingElementProxy",
+          "subtype": "MOTORCYCLELOT",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BuildingElementProxy",
+            "label": "OpenAtGrade"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-parking-lot-perforated-6a2dad6494ab",
+          "ifcType": "IfcBuildingElementProxy",
+          "subtype": "MOTORCYCLELOT",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_BuildingElementProxy",
+            "label": "Perforated"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "industry-nparks-pipes-ducts",
+      "title": "NParks - Pipes/ Ducts",
+      "rules": [
+        {
+          "id": "industry-nparks-pipes-ducts-perforated-5630657ffc07",
+          "ifcType": "IfcPipeSegment",
+          "subtype": "FLEXIBLESEGMENT",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_PipeSegment",
+            "label": "Perforated"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-pipes-ducts-perforated-e5f406da5509",
+          "ifcType": "IfcPipeSegment",
+          "subtype": "RIGIDSEGMENT",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_PipeSegment",
+            "label": "Perforated"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "industry-nparks-planting-areas",
+      "title": "NParks - Planting Areas",
+      "rules": [
+        {
+          "id": "industry-nparks-planting-areas-approvedsoilmixture-6efef3a4b2a2",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "PLANTINGAREAS",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "ApprovedSoilMixture"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-planting-areas-carparkprovision-68e809c2827f",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "PLANTINGAREAS",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "CarparkProvision"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-planting-areas-compensated-c3d15077a55c",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "PLANTINGAREAS",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "Compensated"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-planting-areas-encroachment-ab03f7acf361",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "PLANTINGAREAS",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "Encroachment"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-planting-areas-status-96d89ac8f56c",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "PLANTINGAREAS",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "Status"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Existing",
+              "Proposed",
+              "New",
+              "To be Removed"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-planting-areas-turf-18e5c0e2b079",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "PLANTINGAREAS",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "Turf"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-planting-areas-turfspecies-8683f0599cbc",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "PLANTINGAREAS",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "TurfSpecies"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-planting-areas-area-54fa04412ed9",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "PLANTINGAREAS",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElementDimension",
+            "label": "Area"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "industry-nparks-roof",
+      "title": "NParks - Roof",
+      "rules": [
+        {
+          "id": "industry-nparks-roof-material-5b3e90728c7d",
+          "ifcType": "IfcCovering",
+          "subtype": "ROOFING",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Material",
+            "label": "Material"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-roof-material-a4f48ed91485",
+          "ifcType": "IfcRoof",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Material",
+            "label": "Material"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-roof-material-adcd14730967",
+          "ifcType": "IfcSlab",
+          "subtype": "ROOF",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Material",
+            "label": "Material"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "industry-nparks-site-boundary",
+      "title": "NParks - Site Boundary",
+      "rules": [
+        {
+          "id": "industry-nparks-site-boundary-vacantland-bfc5ea3de0cd",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "SITEBOUNDARY",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "VacantLand"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-nparks-site-boundary-area-aef05be6b74d",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "SITEBOUNDARY",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElementDimension",
+            "label": "Area"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "industry-all-block-name",
+      "title": "Shared - Block Name",
+      "rules": [
+        {
+          "id": "industry-all-block-name-name-2095d9f625f4",
+          "ifcType": "IfcSite",
+          "target": {
+            "kind": "attribute",
+            "name": "Name"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "industry-all-sanitary-appliances",
+      "title": "Shared - Sanitary Appliances",
+      "rules": [
+        {
+          "id": "industry-all-sanitary-appliances-systemname-e8b0a360c73e",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "BATH",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemtype-c77e5dd7b4e0",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "BATH",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemname-4d08bb5c057e",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "BIDET",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemtype-84a73cd3e817",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "BIDET",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemname-98b59ae49f1c",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "SHOWER",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemtype-a6f5fa70b9f8",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "SHOWER",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemname-2230f8f21410",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "URINAL",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemtype-e9274ae6f9ff",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "URINAL",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemname-5d56d9960182",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "WASHHANDBASIN",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemtype-68a9ba097707",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "WASHHANDBASIN",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemname-6330a85967bf",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "WATERCLOSET",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemtype-5d37180a6de4",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "WATERCLOSET",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "industry-all-space-usage",
+      "title": "Shared - Space (Usage)",
+      "rules": [
+        {
+          "id": "industry-all-space-usage-accreditation-mas-31ee2d442cdd",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "Accreditation_MAS"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-ambulantdisabled-cac143de1073",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "AmbulantDisabled"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-barrierfreeaccessibility-b41d22f44b2c",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "BarrierFreeAccessibility"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-childrenfriendly-ed933c538be7",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "ChildrenFriendly"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-cvalue-901b0fc0b0cc",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "CValue"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-elderlyfriendly-82d5097a1506",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "ElderlyFriendly"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-emergencyvoicecommunicationsystem-3384008b0dad",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "EmergencyVoiceCommunicationSystem"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "1-way EVC System",
+              "2-way EVC System",
+              "Public Address System"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-firedetectionandsuppressionsystem-74e66220c23a",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "FireDetectionAndSuppressionSystem"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Automatic Fire Alarm System",
+              "Automatic Sprinkler System",
+              "Water Mist System",
+              "Video Image Fire Detector System",
+              "Kitchen Hood Fire Extinguishing System",
+              "Clean Agent Fire Extinguishing System",
+              "Automatic Foam Sprinkler System",
+              "Foam Extinguisher System"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-fireemergencyventilationmode-2c630f4fcaea",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "FireEmergencyVentilationMode"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Natural Ventilation",
+              "Mechanical Ventilation",
+              "Pressurisation",
+              "Cross-ventilation",
+              "Cross-ventilation with Intermediate Ventilation Opening",
+              "Vapour Extraction System (for spray painting room)"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-fireexit-1f612247de74",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "FireExit"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-fullycoveredwithtreesshrubs-1fc5fdfeeea3",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "FullyCoveredWithTreesShrubs"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-hearingenhancement-2d40f66bffbc",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "HearingEnhancement"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-largeraccessible-0f666a5584d8",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "LargerAccessible"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-occupancyload-113e404a24b6",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "OccupancyLoad"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-occupancytype-765e4b44fa67",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "OccupancyType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-parkingtype-2e971d6e2bb5",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "ParkingType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-purposegroup-6e1467d6b4ba",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "PurposeGroup"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-refuseoutput-61b9644f8159",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "RefuseOutput"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-retrofit-eb9523a18117",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "Retrofit"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-smokecontrolsystem-d32382e2835e",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "SmokeControlSystem"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Smoke Vent",
+              "Smoke Purging System",
+              "Ductless Jet Fan System",
+              "Engineered Smoke Control System"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-soundpowerlevel-883f640ee3fb",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "SoundPowerLevel"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-soundpressurelevel-5718e7488a68",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "SoundPressureLevel"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-spacename-51588b653be5",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "SpaceName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-steprampaccess-a40e59462fbf",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "StepRampAccess"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-twentyfourhourmannedstation-56cbb105a3cd",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "TwentyFourHourMannedStation"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-unitnumber-e32db42586e5",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "UnitNumber"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-ventilationmode-ce8937c0d4c6",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "VentilationMode"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Natural Ventilation",
+              "Air Conditioning",
+              "Mechanical Ventilation"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-ventilationtype-586d520802df",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "VentilationType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-volume-401d85960d32",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "Volume"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-area-fc2cec758739",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceDimension",
+            "label": "Area"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-height-c8b1b4e2e933",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceDimension",
+            "label": "Height"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "industry-all-valve",
+      "title": "Shared - Valve",
+      "rules": [
+        {
+          "id": "industry-all-valve-systemname-15c0191237bc",
+          "ifcType": "IfcValve",
+          "subtype": "AIRADMITTANCE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemtype-963dda4af165",
+          "ifcType": "IfcValve",
+          "subtype": "AIRADMITTANCE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemname-7c3a6d2316a6",
+          "ifcType": "IfcValve",
+          "subtype": "CHECK",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemtype-0b4fb7619089",
+          "ifcType": "IfcValve",
+          "subtype": "CHECK",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemname-8b5ce19030a0",
+          "ifcType": "IfcValve",
+          "subtype": "DOUBLECHECK",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemtype-79cc8741901f",
+          "ifcType": "IfcValve",
+          "subtype": "DOUBLECHECK",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemname-f429592a2c24",
+          "ifcType": "IfcValve",
+          "subtype": "DRAINOFFCOCK",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemtype-2b503ea1f3f2",
+          "ifcType": "IfcValve",
+          "subtype": "DRAINOFFCOCK",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemname-9100d66aba84",
+          "ifcType": "IfcValve",
+          "subtype": "FAUCET",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemtype-6c967bf40938",
+          "ifcType": "IfcValve",
+          "subtype": "FAUCET",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemname-8eb61cbad2e9",
+          "ifcType": "IfcValve",
+          "subtype": "ISOLATING",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemtype-b4f11a2d586e",
+          "ifcType": "IfcValve",
+          "subtype": "ISOLATING",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemname-267e1dd6d140",
+          "ifcType": "IfcValve",
+          "subtype": "LANDINGVALVE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemtype-0850a09ff5cc",
+          "ifcType": "IfcValve",
+          "subtype": "LANDINGVALVE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemname-d2e465a15fc4",
+          "ifcType": "IfcValve",
+          "subtype": "MIXING",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemtype-8ff1b13d808e",
+          "ifcType": "IfcValve",
+          "subtype": "MIXING",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemname-0b738da13ce3",
+          "ifcType": "IfcValve",
+          "subtype": "SPRINKLERCONTROL",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemtype-03e79c48919e",
+          "ifcType": "IfcValve",
+          "subtype": "SPRINKLERCONTROL",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "industry-all-waste-terminal",
+      "title": "Shared - Waste Terminal",
+      "rules": [
+        {
+          "id": "industry-all-waste-terminal-systemname-c76a39b4dcbe",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "FLOORTRAP",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemtype-a2fb6f3fbb62",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "FLOORTRAP",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemname-910c8f86d120",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "FLOORWASTE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemtype-310dcb0cfdb5",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "FLOORWASTE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemname-d75d3e272a3f",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "GULLYSUMP",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemtype-69f98504b1b1",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "GULLYSUMP",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemname-a53c3a738372",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "GULLYTRAP",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemtype-11a1b2e584d8",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "GULLYTRAP",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemname-02e2a58e6341",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "WASTESUMP",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemtype-d9d55eb4b9bb",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "WASTESUMP",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemname-e9875b56bea1",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "WASTETRAP",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemtype-033531cdf19a",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "WASTETRAP",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        }
+      ]
+    }
+  ]
+}

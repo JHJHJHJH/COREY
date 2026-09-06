@@ -1,0 +1,909 @@
+# Industry mapping coverage and manual review
+
+Generated from `industry-mapping-4-dec-csv.csv`. The source CSV is not distributed with COREY. Regeneration requires a separately supplied file: `pnpm templates:generate --source /path/to/mapping.csv`. Do not edit generated artifacts.
+
+Source SHA-256: `9bf713783e8367d409df68ef1dd5eb1d165e26bbc8e73077255111d09dcf6a70`.
+
+833 source records: 671 mapped, 162 skipped. Identical checks are deduplicated within a component; subtype lists expand into multiple rules. Shared clauses appear in every agency template and in the standalone shared template.
+
+## Review before running
+
+These starter mappings require manual review. Component names group clauses but do not restrict applicability: the evaluator only filters by IFC entity and subtype. In particular, household shelters, refuse chutes, and staircases can impose incompatible SpaceName values on the same IfcSpace / SPACE. All source checks are retained for the reviewer to edit or remove.
+
+N.A means any subtype, including mixed N.A/subtype lists. The unavailable COP subtype list also becomes any subtype. A leading * is removed to match the runtime's resolved USERDEFINED/ObjectType value. Missing Space Values lists become presence checks. Sample values and property units do not create constraints; material-set metadata does not add material relationship checks. Positive numbers use decimal/scientific text syntax. Enum comparisons are case-insensitive, with both boolean values accepted in the runtime's supported spellings.
+
+The overlap table identifies shared targets across component clauses, including unrestricted rules overlapping a specific subtype. Different checks may conflict; equal checks can still have overly broad component applicability. This is a review aid, not proof that other mappings apply to every project.
+
+## Templates
+
+| Template | Clauses | Rules |
+| --- | ---: | ---: |
+| [BCA - Industry Mapping](./industry-mapping-bca.json) | 31 | 418 |
+| [SCDF - Industry Mapping](./industry-mapping-scdf.json) | 23 | 166 |
+| [URA - Industry Mapping](./industry-mapping-ura.json) | 11 | 104 |
+| [NEA - Industry Mapping](./industry-mapping-nea.json) | 19 | 439 |
+| [PUB - Industry Mapping](./industry-mapping-pub.json) | 23 | 495 |
+| [LTA - Industry Mapping](./industry-mapping-lta.json) | 11 | 158 |
+| [NParks - Industry Mapping](./industry-mapping-nparks.json) | 12 | 132 |
+| [Shared Requirements - Industry Mapping](./industry-mapping-shared.json) | 5 | 74 |
+
+## Component overlaps
+
+| Template | Entity / target / subtype | Clauses | Checks | Rule IDs |
+| --- | --- | --- | --- | --- |
+| industry-mapping-bca | IfcSpace / property:sgpset_space::constructionmethod / SPACE | BCA - Household Shelter; BCA - Refuse Chute / Recyclables Chute | Equal — review applicability | `industry-bca-household-shelter-constructionmethod-4bd1658165cd`; `industry-bca-refuse-chute-recyclables-chute-constructionmethod-4bd1658165cd` |
+| industry-mapping-bca | IfcSpace / property:sgpset_space::spacename / SPACE | BCA - Household Shelter; BCA - Refuse Chute / Recyclables Chute; BCA - Staircase; Shared - Space (Usage) | Different — review for conflicts | `industry-bca-household-shelter-spacename-e133f37b089c`; `industry-bca-refuse-chute-recyclables-chute-spacename-219c1c0f4ebe`; `industry-bca-staircase-spacename-0aad96949e88`; `industry-all-space-usage-spacename-51588b653be5` |
+| industry-mapping-bca | IfcSpace / property:sgpset_spacedimension::area / SPACE | BCA - Household Shelter; BCA - Parking Lot (relevant elements); Shared - Space (Usage) | Equal — review applicability | `industry-bca-household-shelter-area-fc2cec758739`; `industry-bca-parking-lot-relevant-elements-area-fc2cec758739`; `industry-all-space-usage-area-fc2cec758739` |
+| industry-mapping-bca | IfcWall / property:sgpset_wall::constructionmethod / any subtype | BCA - Household Shelter; BCA - Prefabricated Building Systems and MEP Components; BCA - Wall | Equal — review applicability | `industry-bca-household-shelter-constructionmethod-d83c55c0efbe`; `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-d83c55c0efbe`; `industry-bca-wall-constructionmethod-d83c55c0efbe` |
+| industry-mapping-bca | IfcWall / property:sgpset_wall::constructionmethod / BOUNDARYWALL | BCA - Household Shelter; BCA - Prefabricated Building Systems and MEP Components; BCA - Wall | Equal — review applicability | `industry-bca-household-shelter-constructionmethod-d83c55c0efbe`; `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-d83c55c0efbe`; `industry-bca-wall-constructionmethod-d83c55c0efbe`; `industry-bca-wall-constructionmethod-fd8aaee67e98` |
+| industry-mapping-bca | IfcWall / property:sgpset_wall::constructionmethod / PARAPET | BCA - Household Shelter; BCA - Prefabricated Building Systems and MEP Components; BCA - Wall | Equal — review applicability | `industry-bca-household-shelter-constructionmethod-d83c55c0efbe`; `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-d83c55c0efbe`; `industry-bca-wall-constructionmethod-d83c55c0efbe`; `industry-bca-wall-constructionmethod-e5cf29a93926` |
+| industry-mapping-bca | IfcWall / property:sgpset_wall::constructionmethod / RETAININGWALL | BCA - Household Shelter; BCA - Prefabricated Building Systems and MEP Components; BCA - Wall | Equal — review applicability | `industry-bca-household-shelter-constructionmethod-d83c55c0efbe`; `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-d83c55c0efbe`; `industry-bca-wall-constructionmethod-d83c55c0efbe`; `industry-bca-wall-constructionmethod-c9371d472702` |
+| industry-mapping-bca | IfcWall / property:sgpset_wall::shelterusage / any subtype | BCA - Household Shelter; BCA - Wall | Equal — review applicability | `industry-bca-household-shelter-shelterusage-ae6be4fc58e5`; `industry-bca-wall-shelterusage-ae6be4fc58e5` |
+| industry-mapping-bca | IfcWall / property:sgpset_walldimension::thickness / any subtype | BCA - Household Shelter; BCA - Prefabricated Building Systems and MEP Components; BCA - Wall | Equal — review applicability | `industry-bca-household-shelter-thickness-3718bae9a0e9`; `industry-bca-prefabricated-building-systems-and-mep-components-thickness-3718bae9a0e9`; `industry-bca-wall-thickness-3718bae9a0e9` |
+| industry-mapping-bca | IfcSpace / property:sgpset_space::ventilationmode / SPACE | BCA - Parking Lot (relevant elements); Shared - Space (Usage) | Equal — review applicability | `industry-bca-parking-lot-relevant-elements-ventilationmode-ce8937c0d4c6`; `industry-all-space-usage-ventilationmode-ce8937c0d4c6` |
+| industry-mapping-bca | IfcDuctFitting / property:sgpset_ductfitting::constructionmethod / any subtype | BCA - Pipes/ Ducts; BCA - Prefabricated Building Systems and MEP Components | Different — review for conflicts | `industry-bca-pipes-ducts-constructionmethod-c2e4d568ec4e`; `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-49ff66ca4a6b` |
+| industry-mapping-bca | IfcDuctFitting / property:sgpset_ductfitting::preinsulated / any subtype | BCA - Pipes/ Ducts; BCA - Prefabricated Building Systems and MEP Components | Equal — review applicability | `industry-bca-pipes-ducts-preinsulated-d7f228e1abd0`; `industry-bca-prefabricated-building-systems-and-mep-components-preinsulated-d7f228e1abd0` |
+| industry-mapping-bca | IfcDuctFitting / property:sgpset_ductfitting::systemname / any subtype | BCA - Pipes/ Ducts; BCA - Prefabricated Building Systems and MEP Components | Equal — review applicability | `industry-bca-pipes-ducts-systemname-1d11d062a26f`; `industry-bca-prefabricated-building-systems-and-mep-components-systemname-1d11d062a26f` |
+| industry-mapping-bca | IfcDuctFitting / property:sgpset_ductfitting::systemtype / any subtype | BCA - Pipes/ Ducts; BCA - Prefabricated Building Systems and MEP Components | Equal — review applicability | `industry-bca-pipes-ducts-systemtype-86514df919a7`; `industry-bca-prefabricated-building-systems-and-mep-components-systemtype-86514df919a7` |
+| industry-mapping-bca | IfcDuctSegment / property:sgpset_ductsegment::constructionmethod / FLEXIBLESEGMENT | BCA - Pipes/ Ducts; BCA - Prefabricated Building Systems and MEP Components | Different — review for conflicts | `industry-bca-pipes-ducts-constructionmethod-24b3dbdb8e82`; `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-864905d65d02` |
+| industry-mapping-bca | IfcDuctSegment / property:sgpset_ductsegment::constructionmethod / RIGIDSEGMENT | BCA - Pipes/ Ducts; BCA - Prefabricated Building Systems and MEP Components | Different — review for conflicts | `industry-bca-pipes-ducts-constructionmethod-24b3dbdb8e82`; `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-a6f24a294317` |
+| industry-mapping-bca | IfcDuctSegment / property:sgpset_ductsegment::preinsulated / FLEXIBLESEGMENT | BCA - Pipes/ Ducts; BCA - Prefabricated Building Systems and MEP Components | Equal — review applicability | `industry-bca-pipes-ducts-preinsulated-f674b16588c2`; `industry-bca-prefabricated-building-systems-and-mep-components-preinsulated-a46d5115ea15` |
+| industry-mapping-bca | IfcDuctSegment / property:sgpset_ductsegment::preinsulated / RIGIDSEGMENT | BCA - Pipes/ Ducts; BCA - Prefabricated Building Systems and MEP Components | Equal — review applicability | `industry-bca-pipes-ducts-preinsulated-f674b16588c2`; `industry-bca-prefabricated-building-systems-and-mep-components-preinsulated-15a8b99aa872` |
+| industry-mapping-bca | IfcDuctSegment / property:sgpset_ductsegment::systemname / FLEXIBLESEGMENT | BCA - Pipes/ Ducts; BCA - Prefabricated Building Systems and MEP Components | Equal — review applicability | `industry-bca-pipes-ducts-systemname-9491e3db1381`; `industry-bca-prefabricated-building-systems-and-mep-components-systemname-e85e19564671` |
+| industry-mapping-bca | IfcDuctSegment / property:sgpset_ductsegment::systemname / RIGIDSEGMENT | BCA - Pipes/ Ducts; BCA - Prefabricated Building Systems and MEP Components | Equal — review applicability | `industry-bca-pipes-ducts-systemname-9491e3db1381`; `industry-bca-prefabricated-building-systems-and-mep-components-systemname-6330132038b7` |
+| industry-mapping-bca | IfcDuctSegment / property:sgpset_ductsegment::systemtype / FLEXIBLESEGMENT | BCA - Pipes/ Ducts; BCA - Prefabricated Building Systems and MEP Components | Equal — review applicability | `industry-bca-pipes-ducts-systemtype-f57d6e40d1a5`; `industry-bca-prefabricated-building-systems-and-mep-components-systemtype-ca2c52902baf` |
+| industry-mapping-bca | IfcDuctSegment / property:sgpset_ductsegment::systemtype / RIGIDSEGMENT | BCA - Pipes/ Ducts; BCA - Prefabricated Building Systems and MEP Components | Equal — review applicability | `industry-bca-pipes-ducts-systemtype-f57d6e40d1a5`; `industry-bca-prefabricated-building-systems-and-mep-components-systemtype-d60930fb38ad` |
+| industry-mapping-bca | IfcPipeSegment / property:sgpset_pipesegment::constructionmethod / FLEXIBLESEGMENT | BCA - Pipes/ Ducts; BCA - Prefabricated Building Systems and MEP Components | Different — review for conflicts | `industry-bca-pipes-ducts-constructionmethod-c8592e25a904`; `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-7d57e9033f9b` |
+| industry-mapping-bca | IfcPipeSegment / property:sgpset_pipesegment::constructionmethod / RIGIDSEGMENT | BCA - Pipes/ Ducts; BCA - Prefabricated Building Systems and MEP Components | Different — review for conflicts | `industry-bca-pipes-ducts-constructionmethod-657a7156e416`; `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-a87de5e2dd8d` |
+| industry-mapping-bca | IfcPipeSegment / property:sgpset_pipesegment::preinsulated / FLEXIBLESEGMENT | BCA - Pipes/ Ducts; BCA - Prefabricated Building Systems and MEP Components | Equal — review applicability | `industry-bca-pipes-ducts-preinsulated-6c61a4f6935d`; `industry-bca-prefabricated-building-systems-and-mep-components-preinsulated-6c61a4f6935d` |
+| industry-mapping-bca | IfcPipeSegment / property:sgpset_pipesegment::preinsulated / RIGIDSEGMENT | BCA - Pipes/ Ducts; BCA - Prefabricated Building Systems and MEP Components | Equal — review applicability | `industry-bca-pipes-ducts-preinsulated-f7fbcb2eed8f`; `industry-bca-prefabricated-building-systems-and-mep-components-preinsulated-f7fbcb2eed8f` |
+| industry-mapping-bca | IfcSlab / property:sgpset_slab::constructionmethod / any subtype | BCA - Prefabricated Building Systems and MEP Components; BCA - Slab | Equal — review applicability | `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-1f8176bf5a8d`; `industry-bca-slab-constructionmethod-1f8176bf5a8d` |
+| industry-mapping-bca | IfcSlab / property:sgpset_slab::constructionmethod / ROOF | BCA - Prefabricated Building Systems and MEP Components; BCA - Roof; BCA - Slab | Equal — review applicability | `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-1f8176bf5a8d`; `industry-bca-roof-constructionmethod-42ab3d07ab65`; `industry-bca-slab-constructionmethod-1f8176bf5a8d` |
+| industry-mapping-bca | IfcSlab / property:sgpset_slabdimension::thickness / any subtype | BCA - Prefabricated Building Systems and MEP Components; BCA - Slab | Equal — review applicability | `industry-bca-prefabricated-building-systems-and-mep-components-thickness-9305d6174162`; `industry-bca-slab-thickness-9305d6174162` |
+| industry-mapping-scdf | IfcCovering / property:pset_coveringcommon::firerating / SOFFIT | SCDF - Finishes; SCDF - Soffit | Equal — review applicability | `industry-scdf-finishes-firerating-e0b22b330d30`; `industry-scdf-soffit-firerating-e0b22b330d30` |
+| industry-mapping-scdf | IfcWindow / property:sgpset_window::fireaccessopening / OPENING | SCDF - Fire Access Opening; SCDF - Window | Equal — review applicability | `industry-scdf-fire-access-opening-fireaccessopening-bee48c38d778`; `industry-scdf-window-fireaccessopening-a3acfcd3b095` |
+| industry-mapping-ura | IfcSpace / property:sgpset_spacearea_gfa::agf_name / AREA_GFA | URA - Parking Lot (relevant elements); URA - Space (Area) | Different — review for conflicts | `industry-ura-parking-lot-relevant-elements-agf-name-d12fe3013c2c`; `industry-ura-space-area-agf-name-ec54dad65d8c` |
+| industry-mapping-pub | IfcSpace / property:sgpset_space::spacename / SPACE | PUB - Tank (RC Tank); Shared - Space (Usage) | Different — review for conflicts | `industry-pub-tank-rc-tank-spacename-5f49a58054ad`; `industry-all-space-usage-spacename-51588b653be5` |
+| industry-mapping-pub | IfcSpace / property:sgpset_spacedimension::area / SPACE | PUB - Tank (RC Tank); Shared - Space (Usage) | Equal — review applicability | `industry-pub-tank-rc-tank-area-fc2cec758739`; `industry-all-space-usage-area-fc2cec758739` |
+| industry-mapping-pub | IfcSpace / property:sgpset_spacedimension::height / SPACE | PUB - Tank (RC Tank); Shared - Space (Usage) | Equal — review applicability | `industry-pub-tank-rc-tank-height-c8b1b4e2e933`; `industry-all-space-usage-height-c8b1b4e2e933` |
+| industry-mapping-lta | IfcSpace / property:sgpset_space::spacename / SPACE | LTA - Parking Lot (relevant elements); Shared - Space (Usage) | Different — review for conflicts | `industry-lta-parking-lot-relevant-elements-spacename-200f84780505`; `industry-all-space-usage-spacename-51588b653be5` |
+
+## Source record coverage
+
+Record numbers count CSV data records, excluding the multiline header; they are not physical file line numbers. S/N is preserved for reference and is not unique (609 occurs twice). Rule IDs locate checks in the JSON templates; shared IDs are intentionally reused across template configs.
+
+| Record | S/N | Agency | Component | Rule IDs | Notes |
+| ---: | --- | --- | --- | --- | --- |
+| 1 | 1 | BCA | Accessible Route | `industry-bca-accessible-route-width-97fedbf52dad` | Mapped |
+| 2 | 2 | BCA | Accessible Route | `industry-bca-accessible-route-barrierfreeaccessibility-38d3e45c63e3` | Mapped |
+| 3 | 3 | BCA | Beam | `industry-bca-beam-beamspantype-bbc57606f69f` | Mapped |
+| 4 | 4 | BCA | Beam | `industry-bca-beam-bottomleft-988519bc506f` | Mapped |
+| 5 | 5 | BCA | Beam | `industry-bca-beam-bottommiddle-ec78465f79ad` | Mapped |
+| 6 | 6 | BCA | Beam | `industry-bca-beam-bottomright-081707b1144c` | Mapped |
+| 7 | 7 | BCA | Beam | `industry-bca-beam-constructionmethod-6978d19897b2` | Mapped |
+| 8 | 8 | BCA | Beam | `industry-bca-beam-depth-4ad5ae5ef9f2` | Mapped |
+| 9 | 9 | BCA | Beam | `industry-bca-beam-leftconnectiondetail-c35d916a64a3` | Mapped |
+| 10 | 10 | BCA | Beam | `industry-bca-beam-leftconnectiontype-1350434fe402` | Mapped |
+| 11 | 11 | BCA | Beam | `industry-bca-beam-mark-102996772ecf` | Mapped |
+| 12 | 12 | BCA | Beam | `industry-bca-beam-materialgrade-f20d6465f840` | Mapped |
+| 13 | 13 | BCA | Beam | `industry-bca-beam-mechanicalconnectiontype-1102a58d264a` | Mapped |
+| 14 | 14 | BCA | Beam | `industry-bca-beam-membersection-054e1010680d` | Mapped |
+| 15 | 15 | BCA | Beam | `industry-bca-beam-prefabricatedreinforcementcage-c69ac81a8fca` | Mapped |
+| 16 | 16 | BCA | Beam | `industry-bca-beam-referto2ddetail-40a1043f6bd6` | Mapped |
+| 17 | 17 | BCA | Beam | `industry-bca-beam-reinforcementsteelgrade-0d15d93b5e5e` | Mapped |
+| 18 | 18 | BCA | Beam | `industry-bca-beam-rightconnectiondetail-6816922af991` | Mapped |
+| 19 | 19 | BCA | Beam | `industry-bca-beam-rightconnectiontype-c16f26947a55` | Mapped |
+| 20 | 20 | BCA | Beam | `industry-bca-beam-sectionfabricationmethod-c29699a133ed` | Mapped |
+| 21 | 21 | BCA | Beam | `industry-bca-beam-sidebar-1f1ba719a897` | Mapped |
+| 22 | 22 | BCA | Beam | `industry-bca-beam-spliceconnection-fd2424f8b000` | Mapped |
+| 23 | 23 | BCA | Beam | `industry-bca-beam-stirrupsleft-8d48712ba454` | Mapped |
+| 24 | 24 | BCA | Beam | `industry-bca-beam-stirrupsmiddle-ad779064bdd6` | Mapped |
+| 25 | 25 | BCA | Beam | `industry-bca-beam-stirrupsright-3ab532224638` | Mapped |
+| 26 | 26 | BCA | Beam | `industry-bca-beam-stirrupstypeleft-eea0100f1c6e` | Mapped |
+| 27 | 27 | BCA | Beam | `industry-bca-beam-stirrupstypemiddle-3ba5e08dab07` | Mapped |
+| 28 | 28 | BCA | Beam | `industry-bca-beam-stirrupstyperight-5ff388fa3f3f` | Mapped |
+| 29 | 29 | BCA | Beam | `industry-bca-beam-topleft-fb36d8f00a54` | Mapped |
+| 30 | 30 | BCA | Beam | `industry-bca-beam-topmiddle-c9cb553181eb` | Mapped |
+| 31 | 31 | BCA | Beam | `industry-bca-beam-topright-4dbe41fdcb2e` | Mapped |
+| 32 | 32 | BCA | Beam | `industry-bca-beam-width-80e4640f617e` | Mapped |
+| 33 | 33 | BCA | Borehole | `industry-bca-borehole-depth-5e88c19c7242` | Mapped |
+| 34 | 34 | BCA | Borehole | `industry-bca-borehole-mark-29ab7035c91f` | Mapped |
+| 35 | 35 | BCA | Borehole | `industry-bca-borehole-shdlevel-spt-morethan-100n-f167da70b891` | Mapped |
+| 36 | 36 | BCA | Borehole | `industry-bca-borehole-shdlevel-spt-morethan-60n-007283f2d864` | Mapped |
+| 37 | 37 | BCA | Borehole | `industry-bca-borehole-terminationlevel-65ac1c7e42e8` | Mapped |
+| 38 | 38 | BCA | Borehole | `industry-bca-borehole-toplevel-923d8037cc51` | Mapped |
+| 39 | 39 | SCDF | Breeching Inlet | `industry-scdf-breeching-inlet-hose-nominaldiameter-38b8fd6afa40` | Mapped |
+| 40 | 40 | SCDF | Breeching Inlet | `industry-scdf-breeching-inlet-id-3f26019e555c` | Mapped |
+| 41 | 41 | SCDF | Breeching Inlet | `industry-scdf-breeching-inlet-systemname-497ff91e7804` | Mapped |
+| 42 | 42 | SCDF | Breeching Inlet | `industry-scdf-breeching-inlet-systemtype-b0cb8dd15085` | Mapped |
+| 43 | 43 | URA | Building Storey | — | Skipped: representation/reference row without a concrete target. |
+| 44 | 44 | SCDF | Ceiling | `industry-scdf-ceiling-firerating-c78af5d044c0` | Mapped |
+| 45 | 45 | SCDF | Ceiling | `industry-scdf-ceiling-material-23ef39227747` | Mapped |
+| 46 | 46 | BCA | Column | `industry-bca-column-arrangementtype-a0c7b15af48c` | Mapped |
+| 47 | 47 | BCA | Column | `industry-bca-column-breadth-1751a84fc0e5` | Mapped |
+| 48 | 48 | BCA | Column | `industry-bca-column-connectiondetailsbottom-7fbc69c8ee1a` | Mapped |
+| 49 | 49 | BCA | Column | `industry-bca-column-connectiondetailstop-9ac89ea42551` | Mapped |
+| 50 | 50 | BCA | Column | `industry-bca-column-connectiontypebottom-cda56f2e8429` | Mapped |
+| 51 | 51 | BCA | Column | `industry-bca-column-connectiontypetop-fd5cd3790397` | Mapped |
+| 52 | 52 | BCA | Column | `industry-bca-column-constructionmethod-d1b43b85d23f` | Mapped |
+| 53 | 53 | BCA | Column | `industry-bca-column-diameter-c9e1de42feb6` | Mapped |
+| 54 | 54 | BCA | Column | `industry-bca-column-endstorey-8e4b4a135d16` | Mapped |
+| 55 | 55 | BCA | Column | `industry-bca-column-mainrebar-72753979faf6` | Mapped |
+| 56 | 56 | BCA | Column | `industry-bca-column-mark-eb5816800560` | Mapped |
+| 57 | 57 | BCA | Column | `industry-bca-column-materialgrade-3bcb1a75f894` | Mapped |
+| 58 | 58 | BCA | Column | `industry-bca-column-mechanicalconnectiontype-825bebf2a0a9` | Mapped |
+| 59 | 59 | BCA | Column | `industry-bca-column-membersection-de7400b98019` | Mapped |
+| 60 | 60 | BCA | Column | `industry-bca-column-prefabricatedreinforcementcage-d0144364d66b` | Mapped |
+| 61 | 61 | BCA | Column | `industry-bca-column-referto2ddetail-4aaae6434de3` | Mapped |
+| 62 | 62 | BCA | Column | `industry-bca-column-reinforcementsteelgrade-650179315c75` | Mapped |
+| 63 | 63 | BCA | Column | `industry-bca-column-sectionfabricationmethod-a005f441471b` | Mapped |
+| 64 | 64 | BCA | Column | `industry-bca-column-splicedetail-30cb42fadb0b` | Mapped |
+| 65 | 65 | BCA | Column | `industry-bca-column-startingstorey-9948dd806abc` | Mapped |
+| 66 | 66 | BCA | Column | `industry-bca-column-stirrups-5a2c0dc34381` | Mapped |
+| 67 | 67 | BCA | Column | `industry-bca-column-stirrupstype-6e517dee79e3` | Mapped |
+| 68 | 68 | BCA | Column | `industry-bca-column-width-3167287b5242` | Mapped |
+| 69 | 69 | BCA | Column | `industry-bca-column-workingload-da1-1-17c930139e23` | Mapped |
+| 70 | 70 | BCA | Column | `industry-bca-column-workingload-da1-2-ee12f9d720a7` | Mapped |
+| 71 | 71 | NEA | Control Element | `industry-nea-control-element-pwcs-flushing-dbc64e8fa142` | Mapped |
+| 72 | 72 | SCDF | Control Element | `industry-scdf-control-element-purpose-0a18f861563a` | Mapped |
+| 73 | 73 | All | Culvert/ Drains | — | Skipped: representation/reference row without a concrete target. |
+| 74 | 74 | All | Culvert/ Drains | — | Skipped: representation/reference row without a concrete target. |
+| 75 | 75 | All | Culvert/ Drains | — | Skipped: representation/reference row without a concrete target. |
+| 76 | 76 | All | Culvert/ Drains | — | Skipped: representation/reference row without a concrete target. |
+| 77 | 77 | All | Culvert/ Drains | — | Skipped: representation/reference row without a concrete target. |
+| 78 | 78 | All | Culvert/ Drains | — | Skipped: representation/reference row without a concrete target. |
+| 79 | 79 | All | Culvert/ Drains | — | Skipped: representation/reference row without a concrete target. |
+| 80 | 80 | All | Culvert/ Drains | — | Skipped: representation/reference row without a concrete target. |
+| 81 | 81 | All | Culvert/ Drains | — | Skipped: representation/reference row without a concrete target. |
+| 82 | 82 | PUB | Culvert/ Drains | `industry-pub-culvert-drains-diameter-b989ebff87d1`; `industry-pub-culvert-drains-diameter-9c6c3115aa86`; `industry-pub-culvert-drains-diameter-d032e00c4662`; `industry-pub-culvert-drains-diameter-134d1c3672c2`; `industry-pub-culvert-drains-diameter-8deee740f9c3`; `industry-pub-culvert-drains-diameter-80f7ef651b48`; `industry-pub-culvert-drains-diameter-0e47d89b2b7b`; `industry-pub-culvert-drains-diameter-285ad65ed578`; `industry-pub-culvert-drains-diameter-a42ead32e41c` | Mapped |
+| 83 | 83 | PUB | Culvert/ Drains | `industry-pub-culvert-drains-gradient-eecf9867056b`; `industry-pub-culvert-drains-gradient-3c4097a959dc`; `industry-pub-culvert-drains-gradient-dfbb24da4201`; `industry-pub-culvert-drains-gradient-418acafb3648`; `industry-pub-culvert-drains-gradient-dd36c351c378`; `industry-pub-culvert-drains-gradient-97d026168ca1`; `industry-pub-culvert-drains-gradient-19a77cfa1f44`; `industry-pub-culvert-drains-gradient-a35f1cf03aad`; `industry-pub-culvert-drains-gradient-9197c2ad4c04` | Mapped |
+| 84 | 84 | PUB | Culvert/ Drains | `industry-pub-culvert-drains-height-11cdfbe80437`; `industry-pub-culvert-drains-height-6286f18faec7`; `industry-pub-culvert-drains-height-e835620d8544`; `industry-pub-culvert-drains-height-fd55a785d6cc`; `industry-pub-culvert-drains-height-f4793a1927a9`; `industry-pub-culvert-drains-height-158bf3874c30`; `industry-pub-culvert-drains-height-aa9761f59be6`; `industry-pub-culvert-drains-height-0898e18a9662`; `industry-pub-culvert-drains-height-f4de991abb3b` | Mapped |
+| 85 | 85 | PUB | Culvert/ Drains | `industry-pub-culvert-drains-length-e41d00d2a091`; `industry-pub-culvert-drains-length-b12495a854e6`; `industry-pub-culvert-drains-length-4b376fdf33b0`; `industry-pub-culvert-drains-length-866a1e3d8459`; `industry-pub-culvert-drains-length-c5347ba938bd`; `industry-pub-culvert-drains-length-56c257706200`; `industry-pub-culvert-drains-length-b40704a12b0d`; `industry-pub-culvert-drains-length-cd871bbae981`; `industry-pub-culvert-drains-length-583dd5cfc2a5` | Mapped |
+| 86 | 86 | LTA | Culvert/ Drains | `industry-lta-culvert-drains-loadbearing-010a5529ec15`; `industry-lta-culvert-drains-loadbearing-e074454f5ba6`; `industry-lta-culvert-drains-loadbearing-6c526fd79f7c`; `industry-lta-culvert-drains-loadbearing-754bca998eb6`; `industry-lta-culvert-drains-loadbearing-8a7582343092`; `industry-lta-culvert-drains-loadbearing-e9fccdc3f77b`; `industry-lta-culvert-drains-loadbearing-1b402c93215f`; `industry-lta-culvert-drains-loadbearing-1aed96bfeacf`; `industry-lta-culvert-drains-loadbearing-b674b80750d8` | Mapped |
+| 87 | 87 | PUB | Culvert/ Drains | `industry-pub-culvert-drains-material-27bd92ff2a7d`; `industry-pub-culvert-drains-material-0565c45993ad`; `industry-pub-culvert-drains-material-c4f9619d2862`; `industry-pub-culvert-drains-material-58e6e0e83b33`; `industry-pub-culvert-drains-material-965da9c42f97`; `industry-pub-culvert-drains-material-864521bf62c2`; `industry-pub-culvert-drains-material-deff87f3c0d0`; `industry-pub-culvert-drains-material-5d9fd195e883`; `industry-pub-culvert-drains-material-bc1b9d0c75b4` | Mapped |
+| 88 | 88 | PUB | Culvert/ Drains | `industry-pub-culvert-drains-systemname-b51f99ae6aa5`; `industry-pub-culvert-drains-systemname-a9757418141a`; `industry-pub-culvert-drains-systemname-1bd1de93dcaf`; `industry-pub-culvert-drains-systemname-b879004ccac5`; `industry-pub-culvert-drains-systemname-36c9912527b7`; `industry-pub-culvert-drains-systemname-e74ec8d5bf54`; `industry-pub-culvert-drains-systemname-93c3852b8b8d`; `industry-pub-culvert-drains-systemname-94792e47287c`; `industry-pub-culvert-drains-systemname-60c09b65c3ab` | Mapped |
+| 89 | 89 | PUB | Culvert/ Drains | `industry-pub-culvert-drains-systemtype-af8225715a10`; `industry-pub-culvert-drains-systemtype-1224a79fc8f7`; `industry-pub-culvert-drains-systemtype-7b8b25f31314`; `industry-pub-culvert-drains-systemtype-cdda09ffd3c7`; `industry-pub-culvert-drains-systemtype-14315839e270`; `industry-pub-culvert-drains-systemtype-9a0a409c4e4a`; `industry-pub-culvert-drains-systemtype-1405ce7b472b`; `industry-pub-culvert-drains-systemtype-0275f2b59226`; `industry-pub-culvert-drains-systemtype-a56bb746e5a3` | Mapped |
+| 90 | 90 | PUB | Culvert/ Drains | `industry-pub-culvert-drains-thickness-13fce3c3b4f5`; `industry-pub-culvert-drains-thickness-68bbbe530b1a`; `industry-pub-culvert-drains-thickness-44f4c3a47bff`; `industry-pub-culvert-drains-thickness-3bbfe8fb7449`; `industry-pub-culvert-drains-thickness-fdd529e9a5fa`; `industry-pub-culvert-drains-thickness-3e24c7e7ec97`; `industry-pub-culvert-drains-thickness-d065f1dc665e`; `industry-pub-culvert-drains-thickness-07160a2c2eb3`; `industry-pub-culvert-drains-thickness-d9a410ca2672` | Mapped |
+| 91 | 91 | PUB | Culvert/ Drains | `industry-pub-culvert-drains-width-c2f4ce1df795`; `industry-pub-culvert-drains-width-ce7ae88216de`; `industry-pub-culvert-drains-width-69417c12e3ea`; `industry-pub-culvert-drains-width-fdf01c72a5d1`; `industry-pub-culvert-drains-width-8abfed3eb2dd`; `industry-pub-culvert-drains-width-929cbdbe75a0`; `industry-pub-culvert-drains-width-297e3f52c117`; `industry-pub-culvert-drains-width-5b8a25a3e97b`; `industry-pub-culvert-drains-width-30895bbca041` | Mapped |
+| 92 | 92 | PUB | Culvert/ Drains | — | Skipped: representation/reference row without a concrete target. |
+| 93 | 93 | URA | Curtain Wall | — | Skipped: representation/reference row without a concrete target. |
+| 94 | 94 | SCDF | Damper | `industry-scdf-damper-firerating-2e11eda42d09` | Mapped |
+| 95 | 95 | SCDF | Damper | `industry-scdf-damper-firerating-89010dfac4d7` | Mapped |
+| 96 | 96 | SCDF | Damper | `industry-scdf-damper-firerating-f7713bc937f9` | Mapped |
+| 97 | 97 | PUB | Distribution Chamber | — | Skipped: representation/reference row without a concrete target. |
+| 98 | 98 | PUB | Distribution Chamber | — | Skipped: representation/reference row without a concrete target. |
+| 99 | 99 | PUB | Distribution Chamber | — | Skipped: representation/reference row without a concrete target. |
+| 100 | 100 | NEA | Distribution Chamber | — | Skipped: representation/reference row without a concrete target. |
+| 101 | 101 | NEA | Distribution Chamber | — | Skipped: representation/reference row without a concrete target. |
+| 102 | 102 | PUB | Distribution Chamber | — | Skipped: representation/reference row without a concrete target. |
+| 103 | 103 | NEA | Distribution Chamber | — | Skipped: representation/reference row without a concrete target. |
+| 104 | 104 | All | Distribution Chamber | — | Skipped: representation/reference row without a concrete target. |
+| 105 | 105 | PUB | Distribution Chamber | — | Skipped: representation/reference row without a concrete target. |
+| 106 | 106 | PUB | Distribution Chamber | `industry-pub-distribution-chamber-depth-f1a02e914366`; `industry-pub-distribution-chamber-depth-eaae1e3108cb`; `industry-pub-distribution-chamber-depth-1c0da5311eeb`; `industry-pub-distribution-chamber-depth-8ebd2493cca0`; `industry-pub-distribution-chamber-depth-2225c284acaf`; `industry-pub-distribution-chamber-depth-552509dfd27b`; `industry-pub-distribution-chamber-depth-48c19e8e894b`; `industry-pub-distribution-chamber-depth-6a9f6c2078d1`; `industry-pub-distribution-chamber-depth-682002eb8daa` | Mapped |
+| 107 | 107 | PUB | Distribution Chamber | `industry-pub-distribution-chamber-diameter-24762a0cb8c7`; `industry-pub-distribution-chamber-diameter-dca5b8a75b59`; `industry-pub-distribution-chamber-diameter-81db84c2172d`; `industry-pub-distribution-chamber-diameter-0868954d24ca`; `industry-pub-distribution-chamber-diameter-800aa1fed972`; `industry-pub-distribution-chamber-diameter-3acf4d6db024`; `industry-pub-distribution-chamber-diameter-36cc373a9f5b`; `industry-pub-distribution-chamber-diameter-0eb5c39c195c`; `industry-pub-distribution-chamber-diameter-1ac952e7ff61` | Mapped |
+| 108 | 108 | PUB | Distribution Chamber | `industry-pub-distribution-chamber-height-7224c1e27f3a`; `industry-pub-distribution-chamber-height-b9a68a0c2424`; `industry-pub-distribution-chamber-height-4e8daa754467`; `industry-pub-distribution-chamber-height-7f8eb4604744`; `industry-pub-distribution-chamber-height-24fe53a91d40`; `industry-pub-distribution-chamber-height-6290ddc4b455`; `industry-pub-distribution-chamber-height-dd6cc588bd8f`; `industry-pub-distribution-chamber-height-8ab249b4b1c2`; `industry-pub-distribution-chamber-height-3f081c91b51b` | Mapped |
+| 109 | 109 | PUB | Distribution Chamber | `industry-pub-distribution-chamber-id-6001a2003517`; `industry-pub-distribution-chamber-id-2d8fe6068f01`; `industry-pub-distribution-chamber-id-b7e6370f143f`; `industry-pub-distribution-chamber-id-de7eadb1d954`; `industry-pub-distribution-chamber-id-a33025233687`; `industry-pub-distribution-chamber-id-30c2a3a88d46`; `industry-pub-distribution-chamber-id-c3d6de5068d5`; `industry-pub-distribution-chamber-id-78f56cd99131`; `industry-pub-distribution-chamber-id-9a597feb7518` | Mapped |
+| 110 | 110 | PUB | Distribution Chamber | `industry-pub-distribution-chamber-invertlevel-106d73289bbc`; `industry-pub-distribution-chamber-invertlevel-458a953ef89a`; `industry-pub-distribution-chamber-invertlevel-d4756b0fee84`; `industry-pub-distribution-chamber-invertlevel-52b56eadeba8`; `industry-pub-distribution-chamber-invertlevel-72e24fd1adbf`; `industry-pub-distribution-chamber-invertlevel-4edc80e02459`; `industry-pub-distribution-chamber-invertlevel-0866b8108141`; `industry-pub-distribution-chamber-invertlevel-29d22ee64d1e`; `industry-pub-distribution-chamber-invertlevel-dbc3ef3e7ce6` | Mapped |
+| 111 | 111 | PUB | Distribution Chamber | `industry-pub-distribution-chamber-length-375aee5b93c2`; `industry-pub-distribution-chamber-length-822e0c676d9e`; `industry-pub-distribution-chamber-length-a89e5b31e509`; `industry-pub-distribution-chamber-length-65a5a7915bde`; `industry-pub-distribution-chamber-length-9df64a3d1d96`; `industry-pub-distribution-chamber-length-76e5b5f0c440`; `industry-pub-distribution-chamber-length-3302c9003773`; `industry-pub-distribution-chamber-length-ee6aaab18a01`; `industry-pub-distribution-chamber-length-3fb668e14bbb` | Mapped |
+| 112 | 112 | PUB | Distribution Chamber | `industry-pub-distribution-chamber-material-d58b3fe743ba`; `industry-pub-distribution-chamber-material-5f5719a7a7e4`; `industry-pub-distribution-chamber-material-5cae701a155e`; `industry-pub-distribution-chamber-material-40cb79798787`; `industry-pub-distribution-chamber-material-134f06884516`; `industry-pub-distribution-chamber-material-be74ecc7b7d3`; `industry-pub-distribution-chamber-material-8d369f72d657`; `industry-pub-distribution-chamber-material-edfcd1623f7e`; `industry-pub-distribution-chamber-material-c52286f20c09` | Mapped |
+| 113 | 113 | PUB | Distribution Chamber | `industry-pub-distribution-chamber-status-49ab19db1df7`; `industry-pub-distribution-chamber-status-9a63a7b4d552`; `industry-pub-distribution-chamber-status-234b2bb2a098`; `industry-pub-distribution-chamber-status-c430db639923`; `industry-pub-distribution-chamber-status-4917c14ac0fa`; `industry-pub-distribution-chamber-status-62769e16f92d`; `industry-pub-distribution-chamber-status-90420b7e15ad`; `industry-pub-distribution-chamber-status-f86390bbee4e`; `industry-pub-distribution-chamber-status-e2fd46a69ade` | Mapped |
+| 114 | 114 | PUB | Distribution Chamber | `industry-pub-distribution-chamber-systemname-71e1fd7bc361`; `industry-pub-distribution-chamber-systemname-cd3dd89cfb72`; `industry-pub-distribution-chamber-systemname-69062f8476e1`; `industry-pub-distribution-chamber-systemname-c391caf5a204`; `industry-pub-distribution-chamber-systemname-337f9fbf9440`; `industry-pub-distribution-chamber-systemname-0b9b5aa76124`; `industry-pub-distribution-chamber-systemname-93810f86298b`; `industry-pub-distribution-chamber-systemname-08bb67a6a9fd`; `industry-pub-distribution-chamber-systemname-af33fdaa835f` | Mapped |
+| 115 | 115 | PUB | Distribution Chamber | `industry-pub-distribution-chamber-systemtype-41d49d09503f`; `industry-pub-distribution-chamber-systemtype-93b242eee29f`; `industry-pub-distribution-chamber-systemtype-aa2a879b7b0f`; `industry-pub-distribution-chamber-systemtype-1200fb4f7d23`; `industry-pub-distribution-chamber-systemtype-4b5962d6282b`; `industry-pub-distribution-chamber-systemtype-ffa18391c2e4`; `industry-pub-distribution-chamber-systemtype-8b3c02057be3`; `industry-pub-distribution-chamber-systemtype-b47eb256ffed`; `industry-pub-distribution-chamber-systemtype-2f8e35c62815` | Mapped |
+| 116 | 116 | PUB | Distribution Chamber | `industry-pub-distribution-chamber-toplevel-5b3a5d3fdbf5`; `industry-pub-distribution-chamber-toplevel-bd1dcb58bfc3`; `industry-pub-distribution-chamber-toplevel-083c642076b2`; `industry-pub-distribution-chamber-toplevel-f74a5831c673`; `industry-pub-distribution-chamber-toplevel-877963defc7f`; `industry-pub-distribution-chamber-toplevel-0156fffa4080`; `industry-pub-distribution-chamber-toplevel-35f414a39276`; `industry-pub-distribution-chamber-toplevel-ca3b5ac8515f`; `industry-pub-distribution-chamber-toplevel-c5687ac42a25` | Mapped |
+| 117 | 117 | PUB | Distribution Chamber | `industry-pub-distribution-chamber-tradeeffluent-b3547d2b0f0c`; `industry-pub-distribution-chamber-tradeeffluent-c5aba2e59754`; `industry-pub-distribution-chamber-tradeeffluent-bfbfba62d078`; `industry-pub-distribution-chamber-tradeeffluent-bc4fa6e0645b`; `industry-pub-distribution-chamber-tradeeffluent-10336df14a27`; `industry-pub-distribution-chamber-tradeeffluent-352d7718b0e4`; `industry-pub-distribution-chamber-tradeeffluent-534de8f582e8`; `industry-pub-distribution-chamber-tradeeffluent-b1c340849101`; `industry-pub-distribution-chamber-tradeeffluent-d5894e853ce6` | Mapped |
+| 118 | 118 | PUB | Distribution Chamber | `industry-pub-distribution-chamber-width-d00897247770`; `industry-pub-distribution-chamber-width-eb719db9a830`; `industry-pub-distribution-chamber-width-d4bc2f2fc34f`; `industry-pub-distribution-chamber-width-bbce15ae3683`; `industry-pub-distribution-chamber-width-5e60bc727efe`; `industry-pub-distribution-chamber-width-c8eef07cd9c2`; `industry-pub-distribution-chamber-width-f6fb06a3f9ec`; `industry-pub-distribution-chamber-width-d5880bf6b84e`; `industry-pub-distribution-chamber-width-deecb1af96d1` | Mapped |
+| 119 | 119 | NEA | Distribution Chamber | `industry-nea-distribution-chamber-externalreference-069c03ed0784` | Mapped |
+| 120 | 120 | NEA | Distribution Chamber | `industry-nea-distribution-chamber-watertight-b854465c4213` | Mapped |
+| 121 | 121 | NEA | Distribution Chamber | `industry-nea-distribution-chamber-externalreference-7d598039d1af` | Mapped |
+| 122 | 122 | NEA | Distribution Chamber | `industry-nea-distribution-chamber-watertight-fcb55ff5f3c1` | Mapped |
+| 123 | 123 | SCDF | Door | — | Skipped: representation/reference row without a concrete target. |
+| 124 | 124 | SCDF | Door | — | Skipped: representation/reference row without a concrete target. |
+| 125 | 125 | SCDF | Door | — | Skipped: representation/reference row without a concrete target. |
+| 126 | 126 | SCDF | Door | — | Skipped: representation/reference row without a concrete target. |
+| 127 | 127 | SCDF | Door | `industry-scdf-door-clearheight-d5620aad7eeb`; `industry-scdf-door-clearheight-10903ddbc6f6`; `industry-scdf-door-clearheight-4a83aff6d4d6`; `industry-scdf-door-clearheight-b51f8e987074` | Mapped |
+| 128 | 128 | SCDF | Door | `industry-scdf-door-clearwidth-c623a7cdb114`; `industry-scdf-door-clearwidth-cd80efdf0f84`; `industry-scdf-door-clearwidth-cbb67b7cb570`; `industry-scdf-door-clearwidth-1e547f1646f4` | Mapped |
+| 129 | 129 | SCDF | Door | `industry-scdf-door-fireaccessopening-d961bdbde6d3`; `industry-scdf-door-fireaccessopening-0a95795bf7bc`; `industry-scdf-door-fireaccessopening-e23c7bf647e9`; `industry-scdf-door-fireaccessopening-3581dc2e20d5` | Mapped |
+| 130 | 130 | SCDF | Door | `industry-scdf-door-fireexit-197932b4dcb9`; `industry-scdf-door-fireexit-72a89d5fa396`; `industry-scdf-door-fireexit-21b97d9a6199`; `industry-scdf-door-fireexit-95c41cecc7c6` | Mapped |
+| 131 | 131 | SCDF | Door | `industry-scdf-door-firerating-bab963917fd8`; `industry-scdf-door-firerating-255dbfff1d28`; `industry-scdf-door-firerating-4072fe4d2a73`; `industry-scdf-door-firerating-6e34629373a5` | Mapped |
+| 132 | 132 | NEA | Door | `industry-nea-door-mainentrance-826398823d14`; `industry-nea-door-mainentrance-9f9222dbad78`; `industry-nea-door-mainentrance-4dbbb738a906`; `industry-nea-door-mainentrance-0b5c5c800c99` | Mapped |
+| 133 | 133 | SCDF | Door | `industry-scdf-door-material-c428f6ceea7b`; `industry-scdf-door-material-bb31be4496c4`; `industry-scdf-door-material-ba06438003dc`; `industry-scdf-door-material-438fcd168902` | Mapped |
+| 134 | 134 | SCDF | Door | `industry-scdf-door-onewaylockingdevice-64e3a9033204`; `industry-scdf-door-onewaylockingdevice-a55d98758594`; `industry-scdf-door-onewaylockingdevice-e2b9ae41df55`; `industry-scdf-door-onewaylockingdevice-03329cd6878b` | Mapped |
+| 135 | 135 | SCDF | Door | `industry-scdf-door-operationtype-4b55b230d5ac`; `industry-scdf-door-operationtype-1eb3ac4bca74`; `industry-scdf-door-operationtype-505aa49289ac`; `industry-scdf-door-operationtype-74aed763d3c3` | Mapped |
+| 136 | 136 | BCA | Door | `industry-bca-door-overallwidth-907a657ae5ab`; `industry-bca-door-overallwidth-dfcc5bed13f2`; `industry-bca-door-overallwidth-3c764a93ea80`; `industry-bca-door-overallwidth-b689d6181220` | Mapped |
+| 137 | 137 | BCA | Door | `industry-bca-door-poweroperated-8496a316c161`; `industry-bca-door-poweroperated-4584b0af4850`; `industry-bca-door-poweroperated-e7d1a6b2d4ef`; `industry-bca-door-poweroperated-b5da16d4aaf5` | Mapped |
+| 138 | 138 | SCDF | Door | `industry-scdf-door-selfclosing-619be01faeb7`; `industry-scdf-door-selfclosing-d41a2b283da3`; `industry-scdf-door-selfclosing-2fb706d2ac70`; `industry-scdf-door-selfclosing-d861c838e369` | Mapped |
+| 139 | 139 | BCA | Door | `industry-bca-door-structuralheight-ce64e2de9cf7`; `industry-bca-door-structuralheight-4c7a3a7a3649`; `industry-bca-door-structuralheight-aada9faf02a3`; `industry-bca-door-structuralheight-670ba58b46ef` | Mapped |
+| 140 | 140 | BCA | Door | `industry-bca-door-structuralwidth-7d5878354dc9`; `industry-bca-door-structuralwidth-8b68fa1f066d`; `industry-bca-door-structuralwidth-6782ae02e7da`; `industry-bca-door-structuralwidth-3f4c941fc6b7` | Mapped |
+| 141 | 141 | BCA | Door | `industry-bca-door-thickness-20ea2b25bd16`; `industry-bca-door-thickness-233cec587a3f`; `industry-bca-door-thickness-cc967cd19bcc`; `industry-bca-door-thickness-f22033d6f8b0` | Mapped |
+| 142 | 142 | BCA | Door | `industry-bca-door-visionpanel-60d4a454dc9b`; `industry-bca-door-visionpanel-0c268eb59181`; `industry-bca-door-visionpanel-afd014f77790`; `industry-bca-door-visionpanel-77aaf9b7ac4b` | Mapped |
+| 143 | 143 | URA | Earthworks | `industry-ura-earthworks-area-582d1e7080b0` | Mapped |
+| 144 | 144 | URA | Earthworks | `industry-ura-earthworks-status-773a19d79751` | Mapped |
+| 145 | 145 | URA | Envelope Control | — | Skipped: representation/reference row without a concrete target. |
+| 146 | 146 | BCA | Escalator | — | Skipped: representation/reference row without a concrete target. |
+| 147 | 147 | BCA | Family-Friendly Furniture | — | Skipped: representation/reference row without a concrete target. |
+| 148 | 148 | BCA | Family-Friendly Furniture | — | Skipped: representation/reference row without a concrete target. |
+| 149 | 149 | BCA | Family-Friendly Furniture | — | Skipped: representation/reference row without a concrete target. |
+| 150 | 150 | SCDF | Finishes | — | Skipped: representation/reference row without a concrete target. |
+| 151 | 151 | SCDF | Finishes | — | Skipped: representation/reference row without a concrete target. |
+| 152 | 152 | SCDF | Finishes | — | Skipped: representation/reference row without a concrete target. |
+| 153 | 153 | SCDF | Finishes | — | Skipped: representation/reference row without a concrete target. |
+| 154 | 154 | SCDF | Finishes | — | Skipped: representation/reference row without a concrete target. |
+| 155 | 155 | SCDF | Finishes | `industry-scdf-finishes-firerating-ae7eb7892fe4`; `industry-scdf-finishes-firerating-fdec3c69d78b`; `industry-scdf-finishes-firerating-46842c107af9`; `industry-scdf-finishes-firerating-bae309e34cb6`; `industry-scdf-finishes-firerating-e0b22b330d30`; `industry-scdf-finishes-firerating-708c3551493f` | Mapped |
+| 156 | 156 | SCDF | Finishes | `industry-scdf-finishes-material-213dabb3efb1`; `industry-scdf-finishes-material-6d0a9a2037b7`; `industry-scdf-finishes-material-a0d8ca24b073`; `industry-scdf-finishes-material-2a3a3187ca73`; `industry-scdf-finishes-material-f384fb348ed4`; `industry-scdf-finishes-material-a1ac2871e85f` | Mapped |
+| 157 | 157 | BCA | Finishes | — | Skipped: representation/reference row without a concrete target. |
+| 158 | 158 | SCDF | Fire Access Opening | `industry-scdf-fire-access-opening-fireaccessopening-985939981b22` | Mapped |
+| 159 | 159 | SCDF | Fire Access Opening | `industry-scdf-fire-access-opening-fireaccessopening-5607022bcb0b` | Mapped |
+| 160 | 160 | SCDF | Fire Access Opening | `industry-scdf-fire-access-opening-fireaccessopening-bee48c38d778` | Mapped |
+| 161 | 161 | SCDF | Fire Alarm | — | Skipped: representation/reference row without a concrete target. |
+| 162 | 162 | SCDF | Fire Alarm | — | Skipped: representation/reference row without a concrete target. |
+| 163 | 163 | SCDF | Fire Alarm | — | Skipped: representation/reference row without a concrete target. |
+| 164 | 164 | SCDF | Fire Alarm | — | Skipped: representation/reference row without a concrete target. |
+| 165 | 165 | SCDF | Fire Alarm | — | Skipped: representation/reference row without a concrete target. |
+| 166 | 166 | SCDF | Fire Extinguisher | `industry-scdf-fire-extinguisher-fireextinguisherrating-6ee5dffe3962` | Mapped |
+| 167 | 167 | SCDF | Fire Hydrant | `industry-scdf-fire-hydrant-id-739447120ead` | Mapped |
+| 168 | 168 | SCDF | Fire Hydrant | `industry-scdf-fire-hydrant-private-41eb4791fb68` | Mapped |
+| 169 | 169 | SCDF | Fire Hydrant | `industry-scdf-fire-hydrant-public-25866ef506ee` | Mapped |
+| 170 | 170 | SCDF | Foam Inlet / Outlet | — | Skipped: representation/reference row without a concrete target. |
+| 171 | 171 | SCDF | Foam Inlet / Outlet | — | Skipped: representation/reference row without a concrete target. |
+| 172 | 172 | SCDF | Foam Inlet / Outlet | `industry-scdf-foam-inlet-outlet-systemname-cca9f66c0a94`; `industry-scdf-foam-inlet-outlet-systemname-8dcd4a6c4b6a` | Mapped |
+| 173 | 173 | SCDF | Foam Inlet / Outlet | `industry-scdf-foam-inlet-outlet-systemtype-578f45588068`; `industry-scdf-foam-inlet-outlet-systemtype-26cecda54237` | Mapped |
+| 174 | 174 | BCA | Footing | `industry-bca-footing-bottomdistribution-a44434ab0c7a` | Mapped |
+| 175 | 175 | BCA | Footing | `industry-bca-footing-bottommain-bd341d8cbc12` | Mapped |
+| 176 | 176 | BCA | Footing | `industry-bca-footing-breadth-75eddd90b897` | Mapped |
+| 177 | 177 | BCA | Footing | `industry-bca-footing-da1-1-bearingcapacity-1ba3f053ccb7` | Mapped |
+| 178 | 178 | BCA | Footing | `industry-bca-footing-da1-2-bearingcapacity-594d966c57a2` | Mapped |
+| 179 | 179 | BCA | Footing | `industry-bca-footing-depth-43ef7c58676e` | Mapped |
+| 180 | 180 | BCA | Footing | `industry-bca-footing-mark-96f27336d193` | Mapped |
+| 181 | 181 | BCA | Footing | `industry-bca-footing-materialgrade-33f81e3e0f7e` | Mapped |
+| 182 | 182 | BCA | Footing | `industry-bca-footing-referto2ddetail-06e35a64e4f2` | Mapped |
+| 183 | 183 | BCA | Footing | `industry-bca-footing-reinforcementsteelgrade-b04e85e9ab99` | Mapped |
+| 184 | 184 | BCA | Footing | `industry-bca-footing-sidebar-e0f0a800e69a` | Mapped |
+| 185 | 185 | BCA | Footing | `industry-bca-footing-soilverificationtest-e8fab525dddd` | Mapped |
+| 186 | 186 | BCA | Footing | `industry-bca-footing-stirrups-ce7493c73017` | Mapped |
+| 187 | 187 | BCA | Footing | `industry-bca-footing-stirrupstype-fcbc84dd1cb0` | Mapped |
+| 188 | 188 | BCA | Footing | `industry-bca-footing-topdistribution-2e0de15c801a` | Mapped |
+| 189 | 189 | BCA | Footing | `industry-bca-footing-topmain-2be3f962319f` | Mapped |
+| 190 | 190 | BCA | Footing | `industry-bca-footing-width-778b6b425944` | Mapped |
+| 191 | 191 | BCA | Footing | `industry-bca-footing-workingload-da1-1-c5636ecaefcc` | Mapped |
+| 192 | 192 | BCA | Footing | `industry-bca-footing-workingload-da1-2-391a2b1931f9` | Mapped |
+| 193 | 193 | BCA | Footpath | `industry-bca-footpath-material-344a08bb1f43` | Mapped |
+| 194 | 194 | BCA | Footpath | `industry-bca-footpath-width-b9d949802abf` | Mapped |
+| 195 | 195 | BCA | Footpath | — | Skipped: representation/reference row without a concrete target. |
+| 196 | 196 | PUB | Grating | `industry-pub-grating-systemname-914ac3662653` | Mapped |
+| 197 | 197 | PUB | Grating | `industry-pub-grating-systemtype-0e6fbaa08b8c` | Mapped |
+| 198 | 198 | NParks | Green Verge | `industry-nparks-green-verge-approvedsoilmixture-b042782014b8` | Mapped |
+| 199 | 199 | NParks | Green Verge | `industry-nparks-green-verge-approvedturfspecies-e0551dad4697` | Mapped |
+| 200 | 200 | NParks | Green Verge | `industry-nparks-green-verge-area-2b42201706fd` | Mapped |
+| 201 | 201 | NParks | Green Verge | `industry-nparks-green-verge-shrubspecies-f3bb5fcd47f8` | Mapped |
+| 202 | 202 | NParks | Green Verge | `industry-nparks-green-verge-status-159c5cfe105e` | Mapped |
+| 203 | 203 | NParks | Green Verge | `industry-nparks-green-verge-als-greeneryfeatures-616602d69b82` | Mapped |
+| 204 | 204 | NParks | Green Verge | `industry-nparks-green-verge-als-landscapetype-81ea60461f1d` | Mapped |
+| 205 | 205 | NParks | Green Verge | `industry-nparks-green-verge-als-status-b78be9d2cfac` | Mapped |
+| 206 | 206 | NEA | Gutter | `industry-nea-gutter-systemname-3cebb62196fa` | Mapped |
+| 207 | 207 | NEA | Gutter | `industry-nea-gutter-systemtype-1d6d5bb2434d` | Mapped |
+| 208 | 208 | PUB | Gutter | `industry-pub-gutter-constructionmethod-d1a31cb28bfa` | Mapped |
+| 209 | 209 | PUB | Gutter | `industry-pub-gutter-height-d229597dd185` | Mapped |
+| 210 | 210 | PUB | Gutter | `industry-pub-gutter-length-afbd48d5b70c` | Mapped |
+| 211 | 211 | PUB | Gutter | `industry-pub-gutter-public-effa177401e2` | Mapped |
+| 212 | 212 | PUB | Gutter | `industry-pub-gutter-thickness-5956a6aedf62` | Mapped |
+| 213 | 213 | PUB | Gutter | `industry-pub-gutter-width-f57214b7c2c7` | Mapped |
+| 214 | 214 | PUB | Gutter | `industry-pub-gutter-systemname-86d53c82c889` | Mapped |
+| 215 | 215 | PUB | Gutter | `industry-pub-gutter-systemtype-17e54e93e749` | Mapped |
+| 216 | 216 | SCDF | Hose Reel | — | Skipped: representation/reference row without a concrete target. |
+| 217 | 217 | SCDF | Hose Reel | — | Skipped: representation/reference row without a concrete target. |
+| 218 | 218 | SCDF | Hose Reel | `industry-scdf-hose-reel-hose-nominaldiameter-55e5c3e8ad4c`; `industry-scdf-hose-reel-hose-nominaldiameter-90b2f5890707` | Mapped |
+| 219 | 219 | BCA | Household Shelter | `industry-bca-household-shelter-spacename-e133f37b089c` | Mapped |
+| 220 | 220 | BCA | Household Shelter | `industry-bca-household-shelter-constructionmethod-4bd1658165cd` | Mapped |
+| 221 | 221 | BCA | Household Shelter | `industry-bca-household-shelter-area-fc2cec758739` | Mapped |
+| 222 | 222 | BCA | Household Shelter | `industry-bca-household-shelter-internallength-1fc30c3e8772` | Mapped |
+| 223 | 223 | BCA | Household Shelter | `industry-bca-household-shelter-internalwidth-ae7d11efa553` | Mapped |
+| 224 | 224 | BCA | Household Shelter | `industry-bca-household-shelter-agf-name-74c2f11f55a0` | Mapped |
+| 225 | 225 | BCA | Household Shelter | — | Skipped: representation/reference row without a concrete target. |
+| 226 | 226 | BCA | Household Shelter | `industry-bca-household-shelter-constructionmethod-d83c55c0efbe` | Mapped |
+| 227 | 227 | BCA | Household Shelter | `industry-bca-household-shelter-thickness-3718bae9a0e9` | Mapped |
+| 228 | 228 | BCA | Household Shelter | `industry-bca-household-shelter-shelterusage-ae6be4fc58e5` | Mapped |
+| 229 | 229 | BCA | Household Shelter | — | Skipped: representation/reference row without a concrete target. |
+| 230 | 230 | BCA | Household Shelter | — | Skipped: representation/reference row without a concrete target. |
+| 231 | 231 | BCA | Household Shelter | — | Skipped: representation/reference row without a concrete target. |
+| 232 | 232 | BCA | Household Shelter | — | Skipped: representation/reference row without a concrete target. |
+| 233 | 233 | BCA | Household Shelter | — | Skipped: representation/reference row without a concrete target. |
+| 234 | 234 | PUB | Interceptor | — | Skipped: representation/reference row without a concrete target. |
+| 235 | 235 | PUB | Interceptor | — | Skipped: representation/reference row without a concrete target. |
+| 236 | 236 | PUB | Interceptor | `industry-pub-interceptor-complytopubstandarddrawing-0c131c39f404`; `industry-pub-interceptor-complytopubstandarddrawing-217d0198ced9` | Mapped |
+| 237 | 237 | PUB | Interceptor | `industry-pub-interceptor-refertodrawingnumber-6cc140aea9da`; `industry-pub-interceptor-refertodrawingnumber-e0e418bbe3de` | Mapped |
+| 238 | 238 | PUB | Interceptor | `industry-pub-interceptor-invertlevel-db3ce8c04767`; `industry-pub-interceptor-invertlevel-5615b1795baf` | Mapped |
+| 239 | 239 | PUB | Interceptor | `industry-pub-interceptor-toplevel-8fdd91347605`; `industry-pub-interceptor-toplevel-9ebc745d0f2a` | Mapped |
+| 240 | 240 | PUB | Interceptor | `industry-pub-interceptor-diameter-d2d4aa38db8d`; `industry-pub-interceptor-diameter-a79dc11711b2` | Mapped |
+| 241 | 241 | PUB | Interceptor | `industry-pub-interceptor-height-a42d243ac715`; `industry-pub-interceptor-height-ffb46e33b7fe` | Mapped |
+| 242 | 242 | PUB | Interceptor | `industry-pub-interceptor-length-a2ad1bb0437d`; `industry-pub-interceptor-length-29c979e71c68` | Mapped |
+| 243 | 243 | PUB | Interceptor | `industry-pub-interceptor-width-20e070490473`; `industry-pub-interceptor-width-06e626022641` | Mapped |
+| 244 | 244 | PUB | Interceptor | `industry-pub-interceptor-tradeeffluent-4c7e3a1f8288`; `industry-pub-interceptor-tradeeffluent-414c24923f35` | Mapped |
+| 245 | 245 | PUB | Interceptor | `industry-pub-interceptor-systemtype-b437164c2c26`; `industry-pub-interceptor-systemtype-80ff5e0667e9` | Mapped |
+| 246 | 246 | PUB | Interceptor | `industry-pub-interceptor-systemname-7eeab622df3a`; `industry-pub-interceptor-systemname-3e2880a91594` | Mapped |
+| 247 | 247 | LTA | Lamp Post | — | Skipped: representation/reference row without a concrete target. |
+| 248 | 248 | NParks | Landscape Plants | — | Skipped: representation/reference row without a concrete target. |
+| 249 | 249 | NParks | Landscape Plants | — | Skipped: representation/reference row without a concrete target. |
+| 250 | 250 | NParks | Landscape Plants | — | Skipped: representation/reference row without a concrete target. |
+| 251 | 251 | NParks | Landscape Plants | `industry-nparks-landscape-plants-girth-9f9bf0d36df4`; `industry-nparks-landscape-plants-girth-69eadfb08189` | Mapped |
+| 252 | 252 | NParks | Landscape Plants | `industry-nparks-landscape-plants-hedgenumber-a2102b7d91c8` | Mapped |
+| 253 | 253 | NParks | Landscape Plants | `industry-nparks-landscape-plants-height-d6bcfc1f9f6f`; `industry-nparks-landscape-plants-height-fe9c6c2ed1a0`; `industry-nparks-landscape-plants-height-70fc80c74885` | Mapped |
+| 254 | 254 | NParks | Landscape Plants | `industry-nparks-landscape-plants-reasonforremoval-afc6a4818ff5`; `industry-nparks-landscape-plants-reasonforremoval-5799609a46ec` | Mapped |
+| 255 | 255 | NParks | Landscape Plants | `industry-nparks-landscape-plants-roadside-1a3dd3f795c3`; `industry-nparks-landscape-plants-roadside-a9798520274b` | Mapped |
+| 256 | 256 | NParks | Landscape Plants | `industry-nparks-landscape-plants-singlestem-59faae097f48`; `industry-nparks-landscape-plants-singlestem-2fd59cd5c632` | Mapped |
+| 257 | 257 | NParks | Landscape Plants | `industry-nparks-landscape-plants-species-ac68e3427c1c`; `industry-nparks-landscape-plants-species-9a132cf8eb04`; `industry-nparks-landscape-plants-species-21551bac5770` | Mapped |
+| 258 | 258 | NParks | Landscape Plants | `industry-nparks-landscape-plants-status-1d6664899405`; `industry-nparks-landscape-plants-status-c5c66a8c1dcd`; `industry-nparks-landscape-plants-status-bf4aab9c3ecb` | Mapped |
+| 259 | 259 | NParks | Landscape Plants | `industry-nparks-landscape-plants-treenumber-7a2a280a0cb2`; `industry-nparks-landscape-plants-treenumber-0b61a87e0d51` | Mapped |
+| 260 | 260 | NParks | Landscape Plants | `industry-nparks-landscape-plants-treesize-0dec614419fe`; `industry-nparks-landscape-plants-treesize-be6a9f5e3590` | Mapped |
+| 261 | 261 | NParks | Landscape Plants | `industry-nparks-landscape-plants-turf-6eaba5a1234e`; `industry-nparks-landscape-plants-turf-abf41dd971c6`; `industry-nparks-landscape-plants-turf-bb4f8a22fbce` | Mapped |
+| 262 | 262 | BCA | Lift | — | Skipped: representation/reference row without a concrete target. |
+| 263 | 263 | LTA | Lift | — | Skipped: representation/reference row without a concrete target. |
+| 264 | 264 | BCA | Lift | `industry-bca-lift-barrierfreeaccessibility-1cd3823da268` | Mapped |
+| 265 | 265 | BCA | Lift | `industry-bca-lift-length-9465570de825` | Mapped |
+| 266 | 266 | LTA | Lift | `industry-lta-lift-length-2218b00fad3e` | Mapped |
+| 267 | 267 | BCA | Lift | `industry-bca-lift-width-c249901f9698` | Mapped |
+| 268 | 268 | LTA | Lift | `industry-lta-lift-width-0345755457e4` | Mapped |
+| 269 | 269 | SCDF | Lift | `industry-scdf-lift-cleardepth-25eb29b4ff23` | Mapped |
+| 270 | 270 | SCDF | Lift | `industry-scdf-lift-clearheight-f9c0a90a7093` | Mapped |
+| 271 | 271 | SCDF | Lift | `industry-scdf-lift-clearwidth-7aed89fd7ca0` | Mapped |
+| 272 | 272 | SCDF | Lift | `industry-scdf-lift-firefightinglift-0d8e808399ee` | Mapped |
+| 273 | 273 | SCDF | Lift | `industry-scdf-lift-lifttype-dcdce38f1360` | Mapped |
+| 274 | 274 | LTA | Parking Lot | — | Skipped: representation/reference row without a concrete target. |
+| 275 | 275 | BCA | Parking Lot | `industry-bca-parking-lot-barrierfreeaccessibility-3c4882b84f25` | Mapped |
+| 276 | 276 | BCA | Parking Lot | `industry-bca-parking-lot-familylot-060a0a096e25` | Mapped |
+| 277 | 277 | LTA | Parking Lot | — | Skipped: representation/reference row without a concrete target. |
+| 278 | 278 | LTA | Parking Lot | — | Skipped: representation/reference row without a concrete target. |
+| 279 | 279 | LTA | Parking Lot | — | Skipped: representation/reference row without a concrete target. |
+| 280 | 280 | LTA | Parking Lot | — | Skipped: representation/reference row without a concrete target. |
+| 281 | 281 | LTA | Parking Lot | — | Skipped: representation/reference row without a concrete target. |
+| 282 | 282 | LTA | Parking Lot | `industry-lta-parking-lot-length-94c78b9e60e3`; `industry-lta-parking-lot-length-cb764ca225c9`; `industry-lta-parking-lot-length-bdc9b47ef0e9`; `industry-lta-parking-lot-length-548f5b586453`; `industry-lta-parking-lot-length-73b2cfad7d74`; `industry-lta-parking-lot-length-50b5c15b9c92` | Mapped |
+| 283 | 283 | LTA | Parking Lot | `industry-lta-parking-lot-width-8ecfd437837d`; `industry-lta-parking-lot-width-03f58d5de39e`; `industry-lta-parking-lot-width-ccd60b12b889`; `industry-lta-parking-lot-width-796b07d21470`; `industry-lta-parking-lot-width-721bfe5e5fa0`; `industry-lta-parking-lot-width-011e918d6474` | Mapped |
+| 284 | 284 | LTA | Parking Lot | `industry-lta-parking-lot-lotnumber-c9d7bd02e869`; `industry-lta-parking-lot-lotnumber-f57e6bc49058`; `industry-lta-parking-lot-lotnumber-42aa8c07e08d`; `industry-lta-parking-lot-lotnumber-5da09c4d640e`; `industry-lta-parking-lot-lotnumber-c61071486269`; `industry-lta-parking-lot-lotnumber-b7d105f02acd` | Mapped |
+| 285 | 285 | LTA | Parking Lot | `industry-lta-parking-lot-carparking-servedbycarlift-668701f7f71f` | Mapped |
+| 286 | 286 | LTA | Parking Lot | `industry-lta-parking-lot-mechanisedparkingsystem-040eeb9b9e67` | Mapped |
+| 287 | 287 | NParks | Parking Lot | `industry-nparks-parking-lot-perforated-b68f16383db2`; `industry-nparks-parking-lot-perforated-c23a92cf15f2`; `industry-nparks-parking-lot-perforated-293e825dc8ca`; `industry-nparks-parking-lot-perforated-cd9dd2309928`; `industry-nparks-parking-lot-perforated-6a2dad6494ab` | Mapped |
+| 288 | 288 | NParks | Parking Lot | `industry-nparks-parking-lot-openatgrade-acb4291761b1`; `industry-nparks-parking-lot-openatgrade-26e1b38a0207`; `industry-nparks-parking-lot-openatgrade-2dd4e71676b3`; `industry-nparks-parking-lot-openatgrade-e382b627cf90`; `industry-nparks-parking-lot-openatgrade-0251c9d02747` | Mapped |
+| 289 | 289 | LTA | Parking Lot | `industry-lta-parking-lot-parkinguse-b8a45ed6b8d4`; `industry-lta-parking-lot-parkinguse-b429c5d517d7`; `industry-lta-parking-lot-parkinguse-d7271958672a` | Mapped |
+| 290 | 290 | LTA | Parking Lot | `industry-lta-parking-lot-vehicletype-8da586804d9b`; `industry-lta-parking-lot-vehicletype-1c8ba9ec4b8b`; `industry-lta-parking-lot-vehicletype-be5d22d47650` | Mapped |
+| 291 | 291 | LTA | Parking Lot | `industry-lta-parking-lot-bicyclerack-type-018ff8a9c093` | Mapped |
+| 292 | 292 | LTA | Parking Lot (relevant elements) | `industry-lta-parking-lot-relevant-elements-spacename-200f84780505` | Mapped |
+| 293 | 293 | BCA | Parking Lot (relevant elements) | `industry-bca-parking-lot-relevant-elements-ventilationmode-ce8937c0d4c6` | Mapped |
+| 294 | 294 | BCA | Parking Lot (relevant elements) | `industry-bca-parking-lot-relevant-elements-area-fc2cec758739` | Mapped |
+| 295 | 295 | URA | Parking Lot (relevant elements) | `industry-ura-parking-lot-relevant-elements-agf-name-d12fe3013c2c` | Mapped |
+| 296 | 296 | LTA | Parking Lot (relevant elements) | `industry-lta-parking-lot-relevant-elements-length-1277d4df46d3` | Mapped |
+| 297 | 297 | LTA | Parking Lot (relevant elements) | `industry-lta-parking-lot-relevant-elements-width-352b268c86bd` | Mapped |
+| 298 | 298 | LTA | Parking Lot (relevant elements) | `industry-lta-parking-lot-relevant-elements-length-91af97986008` | Mapped |
+| 299 | 299 | LTA | Parking Lot (relevant elements) | `industry-lta-parking-lot-relevant-elements-width-16bafc8eeb4a` | Mapped |
+| 300 | 300 | BCA | Pile | `industry-bca-pile-boreholeref-4ea6731d04cc` | Mapped |
+| 301 | 301 | BCA | Pile | `industry-bca-pile-breadth-f7bdb629fe1a` | Mapped |
+| 302 | 302 | BCA | Pile | `industry-bca-pile-constructionmethod-6f2003084769` | Mapped |
+| 303 | 303 | BCA | Pile | `industry-bca-pile-cutofflevel-shd-1b2343aaa027` | Mapped |
+| 304 | 304 | BCA | Pile | `industry-bca-pile-da1-1-compressioncapacity-0ce8f100f0e3` | Mapped |
+| 305 | 305 | BCA | Pile | `industry-bca-pile-da1-1-compressiondesignload-dd42fc0c5194` | Mapped |
+| 306 | 306 | BCA | Pile | `industry-bca-pile-da1-1-tensioncapacity-ff12f9e8b907` | Mapped |
+| 307 | 307 | BCA | Pile | `industry-bca-pile-da1-1-tensiondesignload-66215e9ca48f` | Mapped |
+| 308 | 308 | BCA | Pile | `industry-bca-pile-da1-2-compressioncapacity-3430ff259d2d` | Mapped |
+| 309 | 309 | BCA | Pile | `industry-bca-pile-da1-2-compressiondesignload-ee6b03990e51` | Mapped |
+| 310 | 310 | BCA | Pile | `industry-bca-pile-da1-2-tensioncapacity-48d85a1e5a12` | Mapped |
+| 311 | 311 | BCA | Pile | `industry-bca-pile-da1-2-tensiondesignload-7914225d3445` | Mapped |
+| 312 | 312 | BCA | Pile | `industry-bca-pile-diameter-32403003cd1e` | Mapped |
+| 313 | 313 | BCA | Pile | `industry-bca-pile-length-8e1eab5f4902` | Mapped |
+| 314 | 314 | BCA | Pile | `industry-bca-pile-mainrebar-d93b8d02dc67` | Mapped |
+| 315 | 315 | BCA | Pile | `industry-bca-pile-mark-5081826887c6` | Mapped |
+| 316 | 316 | BCA | Pile | `industry-bca-pile-materialgrade-c70c96405002` | Mapped |
+| 317 | 317 | BCA | Pile | `industry-bca-pile-membersection-cfec76c7e439` | Mapped |
+| 318 | 318 | BCA | Pile | `industry-bca-pile-minembedmentintobearinglayer-spt-morethan-100n-e3e78b81bcbd` | Mapped |
+| 319 | 319 | BCA | Pile | `industry-bca-pile-minembedmentintobearinglayer-spt-morethan-60n-30c292e9b3e7` | Mapped |
+| 320 | 320 | BCA | Pile | `industry-bca-pile-minrocksocketinglength-25b8734e465d` | Mapped |
+| 321 | 321 | BCA | Pile | `industry-bca-pile-negativeskinfriction-40fe7f5acffa` | Mapped |
+| 322 | 322 | BCA | Pile | `industry-bca-pile-piletype-772a33d7a830` | Mapped |
+| 323 | 323 | BCA | Pile | `industry-bca-pile-reinforcementlength-6e9715aa99eb` | Mapped |
+| 324 | 324 | BCA | Pile | `industry-bca-pile-reinforcementsteelgrade-6bf3693afba5` | Mapped |
+| 325 | 325 | BCA | Pile | `industry-bca-pile-stirrups-3bdd8e0ff790` | Mapped |
+| 326 | 326 | BCA | Pile | `industry-bca-pile-structuralcompressioncapacity-6aa29ac9f706` | Mapped |
+| 327 | 327 | BCA | Pile | `industry-bca-pile-structuraltensioncapacity-e7f68896d558` | Mapped |
+| 328 | 328 | BCA | Pile | `industry-bca-pile-toelevel-shd-72ba93100d44` | Mapped |
+| 329 | 329 | BCA | Pile | `industry-bca-pile-width-729e3a8f9c02` | Mapped |
+| 330 | 330 | BCA | Pile | `industry-bca-pile-pilemodelfactor-780bc40cae9e` | Mapped |
+| 331 | 331 | BCA | Pile | `industry-bca-pile-shaftr4designfactor-bbb1e340e1ff` | Mapped |
+| 332 | 332 | BCA | Pile | `industry-bca-pile-endbearingr4designfactor-3d10da8fc4d9` | Mapped |
+| 333 | 333 | BCA | Pile | `industry-bca-pile-noofulttest-e711e42f9174` | Mapped |
+| 334 | 334 | BCA | Pile | `industry-bca-pile-noofworkingloadtest-maintainedloadtest-cbab9ce4c063` | Mapped |
+| 335 | 335 | BCA | Pile | `industry-bca-pile-noofworkingloadtest-rapidloadtest-bf772c45d068` | Mapped |
+| 336 | 336 | BCA | Pile | `industry-bca-pile-noofnondestructivetestpile-1614da45a7da` | Mapped |
+| 337 | 337 | PUB | Pipes/ Ducts | — | Skipped: representation/reference row without a concrete target. |
+| 338 | 338 | PUB | Pipes/ Ducts | — | Skipped: representation/reference row without a concrete target. |
+| 339 | 339 | BCA | Pipes/ Ducts | `industry-bca-pipes-ducts-preinsulated-6c61a4f6935d`; `industry-bca-pipes-ducts-preinsulated-f7fbcb2eed8f` | Mapped |
+| 340 | 340 | NParks | Pipes/ Ducts | `industry-nparks-pipes-ducts-perforated-5630657ffc07`; `industry-nparks-pipes-ducts-perforated-e5f406da5509` | Mapped |
+| 341 | 341 | BCA | Pipes/ Ducts | `industry-bca-pipes-ducts-constructionmethod-c8592e25a904`; `industry-bca-pipes-ducts-constructionmethod-657a7156e416` | Mapped |
+| 342 | 342 | PUB | Pipes/ Ducts | `industry-pub-pipes-ducts-material-dc778765f28f`; `industry-pub-pipes-ducts-material-8f3db9b27312` | Mapped |
+| 343 | 343 | PUB | Pipes/ Ducts | `industry-pub-pipes-ducts-gradient-e2e2846c3581`; `industry-pub-pipes-ducts-gradient-3120071678c5` | Mapped |
+| 344 | 344 | PUB | Pipes/ Ducts | `industry-pub-pipes-ducts-innerdiameter-d0128ad6135b`; `industry-pub-pipes-ducts-innerdiameter-7caeddd4dd03` | Mapped |
+| 345 | 345 | PUB | Pipes/ Ducts | `industry-pub-pipes-ducts-length-39189bbbaf30`; `industry-pub-pipes-ducts-length-b7331df783cc` | Mapped |
+| 346 | 346 | PUB | Pipes/ Ducts | `industry-pub-pipes-ducts-thickness-4ff9cc8d7c57`; `industry-pub-pipes-ducts-thickness-d39016dad52f` | Mapped |
+| 347 | 347 | NEA | Pipes/ Ducts | `industry-nea-pipes-ducts-tradeeffluent-71c6b95a8e1b`; `industry-nea-pipes-ducts-tradeeffluent-1c8e23ef9b52` | Mapped |
+| 348 | 348 | PUB | Pipes/ Ducts | `industry-pub-pipes-ducts-demountablestructureabovepipe-d5e73d10f186`; `industry-pub-pipes-ducts-demountablestructureabovepipe-1711c09aae50` | Mapped |
+| 349 | 349 | PUB | Pipes/ Ducts | `industry-pub-pipes-ducts-systemtype-4a18824ff666`; `industry-pub-pipes-ducts-systemtype-e75d91f72f34` | Mapped |
+| 350 | 350 | PUB | Pipes/ Ducts | `industry-pub-pipes-ducts-systemname-715cd2f93207`; `industry-pub-pipes-ducts-systemname-5d490da05736` | Mapped |
+| 351 | 351 | BCA | Pipes/ Ducts | `industry-bca-pipes-ducts-preinsulated-d7f228e1abd0` | Mapped |
+| 352 | 352 | BCA | Pipes/ Ducts | `industry-bca-pipes-ducts-constructionmethod-c2e4d568ec4e` | Mapped |
+| 353 | 353 | NEA | Pipes/ Ducts | `industry-nea-pipes-ducts-tradeeffluent-35e66c6c2283` | Mapped |
+| 354 | 354 | BCA | Pipes/ Ducts | `industry-bca-pipes-ducts-systemtype-86514df919a7` | Mapped |
+| 355 | 355 | BCA | Pipes/ Ducts | `industry-bca-pipes-ducts-systemname-1d11d062a26f` | Mapped |
+| 356 | 356 | BCA | Pipes/ Ducts | `industry-bca-pipes-ducts-preinsulated-f674b16588c2` | Mapped |
+| 357 | 357 | BCA | Pipes/ Ducts | `industry-bca-pipes-ducts-constructionmethod-24b3dbdb8e82` | Mapped |
+| 358 | 358 | NEA | Pipes/ Ducts | `industry-nea-pipes-ducts-tradeeffluent-3845261e9145` | Mapped |
+| 359 | 359 | BCA | Pipes/ Ducts | `industry-bca-pipes-ducts-systemtype-f57d6e40d1a5` | Mapped |
+| 360 | 360 | BCA | Pipes/ Ducts | `industry-bca-pipes-ducts-systemname-9491e3db1381` | Mapped |
+| 361 | 361 | NEA | Pipes/ Ducts | — | Skipped: representation/reference row without a concrete target. |
+| 362 | 362 | PUB | Pipes/ Ducts | — | Skipped: representation/reference row without a concrete target. |
+| 363 | 363 | PUB | Pipes/ Ducts | — | Skipped: representation/reference row without a concrete target. |
+| 364 | 364 | PUB | Pipes/ Ducts | — | Skipped: representation/reference row without a concrete target. |
+| 365 | 365 | PUB | Pipes/ Ducts | — | Skipped: representation/reference row without a concrete target. |
+| 366 | 366 | PUB | Pipes/ Ducts | — | Skipped: representation/reference row without a concrete target. |
+| 367 | 367 | PUB | Pipes/ Ducts | — | Skipped: representation/reference row without a concrete target. |
+| 368 | 368 | PUB | Pipes/ Ducts | — | Skipped: representation/reference row without a concrete target. |
+| 369 | 369 | PUB | Pipes/ Ducts | — | Skipped: representation/reference row without a concrete target. |
+| 370 | 370 | PUB | Pipes/ Ducts | — | Skipped: representation/reference row without a concrete target. |
+| 371 | 371 | PUB | Pipes/ Ducts | `industry-pub-pipes-ducts-innerdiameter-6131767985e7`; `industry-pub-pipes-ducts-innerdiameter-e1c24fac21f6`; `industry-pub-pipes-ducts-innerdiameter-fbb5bfa29569`; `industry-pub-pipes-ducts-innerdiameter-4de3f04807ba`; `industry-pub-pipes-ducts-innerdiameter-b333f37fd008`; `industry-pub-pipes-ducts-innerdiameter-515da9bb4a8a`; `industry-pub-pipes-ducts-innerdiameter-88208d5d8040`; `industry-pub-pipes-ducts-innerdiameter-3f367eccb96c`; `industry-pub-pipes-ducts-innerdiameter-0d1fd154d44c`; `industry-pub-pipes-ducts-innerdiameter-33d4423af984` | Mapped |
+| 372 | 372 | NEA | Pipes/ Ducts | `industry-nea-pipes-ducts-nominaldiameter-47880d00f849`; `industry-nea-pipes-ducts-nominaldiameter-709ee91596fc`; `industry-nea-pipes-ducts-nominaldiameter-eabff553b4e9`; `industry-nea-pipes-ducts-nominaldiameter-58f0afba26d8`; `industry-nea-pipes-ducts-nominaldiameter-703523351a82`; `industry-nea-pipes-ducts-nominaldiameter-d609e44c307f`; `industry-nea-pipes-ducts-nominaldiameter-049244e2ebf6`; `industry-nea-pipes-ducts-nominaldiameter-02e10c33b48f`; `industry-nea-pipes-ducts-nominaldiameter-b81c36caf062`; `industry-nea-pipes-ducts-nominaldiameter-7afd4a658c01` | Mapped |
+| 373 | 373 | PUB | Pipes/ Ducts | `industry-pub-pipes-ducts-outerdiameter-98996bf4c43a`; `industry-pub-pipes-ducts-outerdiameter-51870aedfdb6`; `industry-pub-pipes-ducts-outerdiameter-5e7db8d3b430`; `industry-pub-pipes-ducts-outerdiameter-7111afeee533`; `industry-pub-pipes-ducts-outerdiameter-b2db997df1f2`; `industry-pub-pipes-ducts-outerdiameter-49051e292dbb`; `industry-pub-pipes-ducts-outerdiameter-b723dcbb2167`; `industry-pub-pipes-ducts-outerdiameter-32a9314e034f`; `industry-pub-pipes-ducts-outerdiameter-e8fe7733dfb4`; `industry-pub-pipes-ducts-outerdiameter-bb83ac7b6fa0` | Mapped |
+| 374 | 374 | PUB | Pipes/ Ducts | `industry-pub-pipes-ducts-thickness-0a7b25fc98fd`; `industry-pub-pipes-ducts-thickness-d17eb2f464de`; `industry-pub-pipes-ducts-thickness-69f0527efc8a`; `industry-pub-pipes-ducts-thickness-9bfe4187e4e9`; `industry-pub-pipes-ducts-thickness-ff0ccbeae4ae`; `industry-pub-pipes-ducts-thickness-6688ae96fb16`; `industry-pub-pipes-ducts-thickness-785d91b7a4c8`; `industry-pub-pipes-ducts-thickness-2b03ade1222f`; `industry-pub-pipes-ducts-thickness-8cf95b321146`; `industry-pub-pipes-ducts-thickness-20645edfd04c` | Mapped |
+| 375 | 375 | PUB | Pipes/ Ducts | `industry-pub-pipes-ducts-systemtype-ec3b2f4c89e7`; `industry-pub-pipes-ducts-systemtype-1a80ea6e0a1e`; `industry-pub-pipes-ducts-systemtype-cf6afc680ed6`; `industry-pub-pipes-ducts-systemtype-b089cf551a21`; `industry-pub-pipes-ducts-systemtype-26150e0edada`; `industry-pub-pipes-ducts-systemtype-ccb45857f955`; `industry-pub-pipes-ducts-systemtype-14d6a688666f`; `industry-pub-pipes-ducts-systemtype-2b51db172304`; `industry-pub-pipes-ducts-systemtype-39b37bf8c90e`; `industry-pub-pipes-ducts-systemtype-6cf523250310` | Mapped |
+| 376 | 376 | PUB | Pipes/ Ducts | `industry-pub-pipes-ducts-systemname-44ed8a6a8b64`; `industry-pub-pipes-ducts-systemname-625d2872328e`; `industry-pub-pipes-ducts-systemname-d6182dea34be`; `industry-pub-pipes-ducts-systemname-a5f169401b55`; `industry-pub-pipes-ducts-systemname-c1511f1fc540`; `industry-pub-pipes-ducts-systemname-c3d7ba8a80bc`; `industry-pub-pipes-ducts-systemname-a121586a58e0`; `industry-pub-pipes-ducts-systemname-394479035f7b`; `industry-pub-pipes-ducts-systemname-3005f1e8e5c9`; `industry-pub-pipes-ducts-systemname-1343927d3e25` | Mapped |
+| 377 | 377 | BCA | Pipes/ Ducts | — | Skipped: representation/reference row without a concrete target. |
+| 378 | 378 | BCA | Pipes/ Ducts | — | Skipped: representation/reference row without a concrete target. |
+| 379 | 379 | BCA | Pipes/ Ducts | `industry-bca-pipes-ducts-systemtype-d39f554e6074`; `industry-bca-pipes-ducts-systemtype-c6cf812b9be1` | Mapped |
+| 380 | 380 | BCA | Pipes/ Ducts | `industry-bca-pipes-ducts-systemname-257b3596ee29`; `industry-bca-pipes-ducts-systemname-9817aa19acff` | Mapped |
+| 381 | 381 | NEA | Pipes/ Ducts | — | Skipped: representation/reference row without a concrete target. |
+| 382 | 382 | PUB | Pipes/ Ducts | — | Skipped: representation/reference row without a concrete target. |
+| 383 | 383 | NEA | Pipes/ Ducts | — | Skipped: representation/reference row without a concrete target. |
+| 384 | 384 | NEA | Pipes/ Ducts | — | Skipped: representation/reference row without a concrete target. |
+| 385 | 385 | URA | Planter Box/ Planting Trough | — | Skipped: representation/reference row without a concrete target. |
+| 386 | 386 | NParks | Planter Box/ Planting Trough | — | Skipped: representation/reference row without a concrete target. |
+| 387 | 387 | NParks | Planting Areas | `industry-nparks-planting-areas-area-54fa04412ed9` | Mapped |
+| 388 | 388 | NParks | Planting Areas | `industry-nparks-planting-areas-approvedsoilmixture-6efef3a4b2a2` | Mapped |
+| 389 | 389 | NParks | Planting Areas | `industry-nparks-planting-areas-status-96d89ac8f56c` | Mapped |
+| 390 | 390 | NParks | Planting Areas | `industry-nparks-planting-areas-turf-18e5c0e2b079` | Mapped |
+| 391 | 391 | NParks | Planting Areas | `industry-nparks-planting-areas-turfspecies-8683f0599cbc` | Mapped |
+| 392 | 392 | NParks | Planting Areas | `industry-nparks-planting-areas-compensated-c3d15077a55c` | Mapped |
+| 393 | 393 | NParks | Planting Areas | `industry-nparks-planting-areas-encroachment-ab03f7acf361` | Mapped |
+| 394 | 394 | NParks | Planting Areas | `industry-nparks-planting-areas-carparkprovision-68e809c2827f` | Mapped |
+| 395 | 395 | NEA | Pollution Control | — | Skipped: representation/reference row without a concrete target. |
+| 396 | 396 | NEA | Pollution Control | — | Skipped: representation/reference row without a concrete target. |
+| 397 | 397 | NEA | Pollution Control | — | Skipped: representation/reference row without a concrete target. |
+| 398 | 398 | NEA | Pollution Control | — | Skipped: representation/reference row without a concrete target. |
+| 399 | 399 | NEA | Pollution Control | `industry-nea-pollution-control-ai-ammoniaandammonium-b00383d2bda3`; `industry-nea-pollution-control-ai-ammoniaandammonium-9ce1d0b92cc3`; `industry-nea-pollution-control-ai-ammoniaandammonium-0d8960182ff6`; `industry-nea-pollution-control-ai-ammoniaandammonium-ed9899e9739d` | Mapped |
+| 400 | 400 | NEA | Pollution Control | `industry-nea-pollution-control-ai-antimony-8838d829288c`; `industry-nea-pollution-control-ai-antimony-af02119df7c9`; `industry-nea-pollution-control-ai-antimony-b256e7c460e3`; `industry-nea-pollution-control-ai-antimony-5cf70fd19f5f` | Mapped |
+| 401 | 401 | NEA | Pollution Control | `industry-nea-pollution-control-ai-arsenic-b65efadb6b32`; `industry-nea-pollution-control-ai-arsenic-604153d4d1e7`; `industry-nea-pollution-control-ai-arsenic-22a43361d433`; `industry-nea-pollution-control-ai-arsenic-899cc7e37c5a` | Mapped |
+| 402 | 402 | NEA | Pollution Control | `industry-nea-pollution-control-ai-benzene-3cf8cc01dd47`; `industry-nea-pollution-control-ai-benzene-abf9845f63c8`; `industry-nea-pollution-control-ai-benzene-64a0b59bd85c`; `industry-nea-pollution-control-ai-benzene-a70f3f8e14c5` | Mapped |
+| 403 | 403 | NEA | Pollution Control | `industry-nea-pollution-control-ai-cadmium-76b15bffe70c`; `industry-nea-pollution-control-ai-cadmium-d25176486ed9`; `industry-nea-pollution-control-ai-cadmium-20f168553759`; `industry-nea-pollution-control-ai-cadmium-9571cf880ec0` | Mapped |
+| 404 | 404 | NEA | Pollution Control | `industry-nea-pollution-control-ai-carbonmonoxide-16f6a22b0df9`; `industry-nea-pollution-control-ai-carbonmonoxide-f1dcf09e1d37`; `industry-nea-pollution-control-ai-carbonmonoxide-4e8a11b9111e`; `industry-nea-pollution-control-ai-carbonmonoxide-10e8f9d81386` | Mapped |
+| 405 | 405 | NEA | Pollution Control | `industry-nea-pollution-control-ai-chlorine-535ef15ed2b9`; `industry-nea-pollution-control-ai-chlorine-06591503527e`; `industry-nea-pollution-control-ai-chlorine-044cf3b4dd09`; `industry-nea-pollution-control-ai-chlorine-fef452d7c89f` | Mapped |
+| 406 | 406 | NEA | Pollution Control | `industry-nea-pollution-control-ai-copper-8458f6be18a3`; `industry-nea-pollution-control-ai-copper-0d3773547038`; `industry-nea-pollution-control-ai-copper-c6adf1a0f310`; `industry-nea-pollution-control-ai-copper-e50a57510a9d` | Mapped |
+| 407 | 407 | NEA | Pollution Control | `industry-nea-pollution-control-ai-dioxinsandfurans-0acebe406420`; `industry-nea-pollution-control-ai-dioxinsandfurans-c225d33b5901`; `industry-nea-pollution-control-ai-dioxinsandfurans-5fe94e8a5a4e`; `industry-nea-pollution-control-ai-dioxinsandfurans-073f89e4b4f4` | Mapped |
+| 408 | 408 | NEA | Pollution Control | `industry-nea-pollution-control-ai-ethyleneoxide-48566fcf9955`; `industry-nea-pollution-control-ai-ethyleneoxide-ec108ebff8bb`; `industry-nea-pollution-control-ai-ethyleneoxide-339fd58a519e`; `industry-nea-pollution-control-ai-ethyleneoxide-9fb7738ae302` | Mapped |
+| 409 | 409 | NEA | Pollution Control | `industry-nea-pollution-control-ai-flourineandhydrofluoricacid-5dba5f6a0ea2`; `industry-nea-pollution-control-ai-flourineandhydrofluoricacid-82bdeed7bb43`; `industry-nea-pollution-control-ai-flourineandhydrofluoricacid-61307b1ad2a4`; `industry-nea-pollution-control-ai-flourineandhydrofluoricacid-1b31994c643b` | Mapped |
+| 410 | 410 | NEA | Pollution Control | `industry-nea-pollution-control-ai-formaldehyde-79bb9c26e5fe`; `industry-nea-pollution-control-ai-formaldehyde-2e33a4cc49b5`; `industry-nea-pollution-control-ai-formaldehyde-c15a3cb27ea3`; `industry-nea-pollution-control-ai-formaldehyde-f2e5a287d44e` | Mapped |
+| 411 | 411 | NEA | Pollution Control | `industry-nea-pollution-control-ai-hydrogenchloride-b8af05b38f47`; `industry-nea-pollution-control-ai-hydrogenchloride-3165cebfaccc`; `industry-nea-pollution-control-ai-hydrogenchloride-3ea5540da3f8`; `industry-nea-pollution-control-ai-hydrogenchloride-285c69457a32` | Mapped |
+| 412 | 412 | NEA | Pollution Control | `industry-nea-pollution-control-ai-hydrogensulphide-7e1884e5330f`; `industry-nea-pollution-control-ai-hydrogensulphide-835143aced07`; `industry-nea-pollution-control-ai-hydrogensulphide-4ff4ab15d130`; `industry-nea-pollution-control-ai-hydrogensulphide-e0b550933646` | Mapped |
+| 413 | 413 | NEA | Pollution Control | `industry-nea-pollution-control-ai-lead-0386740c2547`; `industry-nea-pollution-control-ai-lead-ab3294b9fae8`; `industry-nea-pollution-control-ai-lead-b7b1892269ba`; `industry-nea-pollution-control-ai-lead-6191f755ab8b` | Mapped |
+| 414 | 414 | NEA | Pollution Control | `industry-nea-pollution-control-ai-mercury-92081117d5ae`; `industry-nea-pollution-control-ai-mercury-20092a83bb84`; `industry-nea-pollution-control-ai-mercury-650037c19cbb`; `industry-nea-pollution-control-ai-mercury-1647469c613b` | Mapped |
+| 415 | 415 | NEA | Pollution Control | `industry-nea-pollution-control-ai-oxidesofnitrogen-f4d1c16c3375`; `industry-nea-pollution-control-ai-oxidesofnitrogen-bed5cc63aafd`; `industry-nea-pollution-control-ai-oxidesofnitrogen-6c6a12247067`; `industry-nea-pollution-control-ai-oxidesofnitrogen-8286bb4b9aa4` | Mapped |
+| 416 | 416 | NEA | Pollution Control | `industry-nea-pollution-control-ai-particulatesubstances-173f1124de42`; `industry-nea-pollution-control-ai-particulatesubstances-b38b9dc9f5e4`; `industry-nea-pollution-control-ai-particulatesubstances-015cd2ea2843`; `industry-nea-pollution-control-ai-particulatesubstances-54a03a434b89` | Mapped |
+| 417 | 417 | NEA | Pollution Control | `industry-nea-pollution-control-ai-styrenemonomer-a97c94cc380e`; `industry-nea-pollution-control-ai-styrenemonomer-6c32f99b58a4`; `industry-nea-pollution-control-ai-styrenemonomer-484b3a6f3f5c`; `industry-nea-pollution-control-ai-styrenemonomer-0f060cfba9aa` | Mapped |
+| 418 | 418 | NEA | Pollution Control | `industry-nea-pollution-control-ai-sulphurdioxide-e57f1dad87e5`; `industry-nea-pollution-control-ai-sulphurdioxide-4041b5ea362a`; `industry-nea-pollution-control-ai-sulphurdioxide-9e96e5439b2f`; `industry-nea-pollution-control-ai-sulphurdioxide-8abeea1a1b01` | Mapped |
+| 419 | 419 | NEA | Pollution Control | `industry-nea-pollution-control-ai-sulphurtrioxideandacidgases-bacff4ef8569`; `industry-nea-pollution-control-ai-sulphurtrioxideandacidgases-9f8f4de06400`; `industry-nea-pollution-control-ai-sulphurtrioxideandacidgases-c7127016c8ee`; `industry-nea-pollution-control-ai-sulphurtrioxideandacidgases-943dfd9e1320` | Mapped |
+| 420 | 420 | NEA | Pollution Control | `industry-nea-pollution-control-ai-sulphurtrioxideorsulphuricacidmist-25c3beffa634`; `industry-nea-pollution-control-ai-sulphurtrioxideorsulphuricacidmist-4c788ec37a63`; `industry-nea-pollution-control-ai-sulphurtrioxideorsulphuricacidmist-49e31a7f0795`; `industry-nea-pollution-control-ai-sulphurtrioxideorsulphuricacidmist-a5ca59c81396` | Mapped |
+| 421 | 421 | NEA | Pollution Control | `industry-nea-pollution-control-ai-vinylchloridemonomer-b6eef0a95b32`; `industry-nea-pollution-control-ai-vinylchloridemonomer-6c0c64c1e045`; `industry-nea-pollution-control-ai-vinylchloridemonomer-78334a5cd5f2`; `industry-nea-pollution-control-ai-vinylchloridemonomer-8815b1427b85` | Mapped |
+| 422 | 422 | NEA | Pollution Control | `industry-nea-pollution-control-ted-arsenic-33f413668911`; `industry-nea-pollution-control-ted-arsenic-729a2804724c`; `industry-nea-pollution-control-ted-arsenic-92c5397a9cd1`; `industry-nea-pollution-control-ted-arsenic-f6141e265579` | Mapped |
+| 423 | 423 | NEA | Pollution Control | `industry-nea-pollution-control-ted-barium-71914b5fe66a`; `industry-nea-pollution-control-ted-barium-5da65c7993a4`; `industry-nea-pollution-control-ted-barium-aaf0999543f0`; `industry-nea-pollution-control-ted-barium-f54e5367c5fd` | Mapped |
+| 424 | 424 | NEA | Pollution Control | `industry-nea-pollution-control-ted-beryllium-a00cdc507aa3`; `industry-nea-pollution-control-ted-beryllium-d47d655cd9cd`; `industry-nea-pollution-control-ted-beryllium-7f99885490d2`; `industry-nea-pollution-control-ted-beryllium-71750e23e50b` | Mapped |
+| 425 | 425 | NEA | Pollution Control | `industry-nea-pollution-control-ted-biochemicaloxygendemand-09cb8e50d2f6`; `industry-nea-pollution-control-ted-biochemicaloxygendemand-d8d01ddf85de`; `industry-nea-pollution-control-ted-biochemicaloxygendemand-40ee24f057fe`; `industry-nea-pollution-control-ted-biochemicaloxygendemand-57a73cc2fc5e` | Mapped |
+| 426 | 426 | NEA | Pollution Control | `industry-nea-pollution-control-ted-boron-82cdda6e4f2a`; `industry-nea-pollution-control-ted-boron-6429618fb01a`; `industry-nea-pollution-control-ted-boron-7789e0c6f0d4`; `industry-nea-pollution-control-ted-boron-79b5082f27fa` | Mapped |
+| 427 | 427 | NEA | Pollution Control | `industry-nea-pollution-control-ted-cadmium-c5be081d09fc`; `industry-nea-pollution-control-ted-cadmium-0fd969087558`; `industry-nea-pollution-control-ted-cadmium-56525f168977`; `industry-nea-pollution-control-ted-cadmium-48456dcae50f` | Mapped |
+| 428 | 428 | NEA | Pollution Control | `industry-nea-pollution-control-ted-calcium-51f161c4f38e`; `industry-nea-pollution-control-ted-calcium-081d9025f673`; `industry-nea-pollution-control-ted-calcium-fcf9115225f4`; `industry-nea-pollution-control-ted-calcium-49b8b91d1026` | Mapped |
+| 429 | 429 | NEA | Pollution Control | `industry-nea-pollution-control-ted-chemicaloxygendemand-7c1475a6bde6`; `industry-nea-pollution-control-ted-chemicaloxygendemand-b4387ddbab61`; `industry-nea-pollution-control-ted-chemicaloxygendemand-a0718d1f6ed3`; `industry-nea-pollution-control-ted-chemicaloxygendemand-73c6c8e1ac05` | Mapped |
+| 430 | 430 | NEA | Pollution Control | `industry-nea-pollution-control-ted-chloride-ce9b9d134d9b`; `industry-nea-pollution-control-ted-chloride-695c5ee74221`; `industry-nea-pollution-control-ted-chloride-924dbf891735`; `industry-nea-pollution-control-ted-chloride-7b0d824eae09` | Mapped |
+| 431 | 431 | NEA | Pollution Control | `industry-nea-pollution-control-ted-chromium-b7bf4390af08`; `industry-nea-pollution-control-ted-chromium-1c14c7063734`; `industry-nea-pollution-control-ted-chromium-e6847295d5a3`; `industry-nea-pollution-control-ted-chromium-e2bc92ed1fa8` | Mapped |
+| 432 | 432 | NEA | Pollution Control | `industry-nea-pollution-control-ted-colour-788610099825`; `industry-nea-pollution-control-ted-colour-db6d47d4a886`; `industry-nea-pollution-control-ted-colour-24e2e398fafa`; `industry-nea-pollution-control-ted-colour-20f65c0ed786` | Mapped |
+| 433 | 433 | NEA | Pollution Control | `industry-nea-pollution-control-ted-copper-71287ded8a2c`; `industry-nea-pollution-control-ted-copper-67aa38ab0320`; `industry-nea-pollution-control-ted-copper-e2a1ef5b5b73`; `industry-nea-pollution-control-ted-copper-dd89ca4bf6a5` | Mapped |
+| 434 | 434 | NEA | Pollution Control | `industry-nea-pollution-control-ted-cyanide-4b94f25cccea`; `industry-nea-pollution-control-ted-cyanide-dba519bb6136`; `industry-nea-pollution-control-ted-cyanide-8ae8e16e742e`; `industry-nea-pollution-control-ted-cyanide-474ed6d6c4e5` | Mapped |
+| 435 | 435 | NEA | Pollution Control | `industry-nea-pollution-control-ted-detergent-6cbe3bc314c7`; `industry-nea-pollution-control-ted-detergent-db4886e7e251`; `industry-nea-pollution-control-ted-detergent-49426efafcfa`; `industry-nea-pollution-control-ted-detergent-2692f8850ab7` | Mapped |
+| 436 | 436 | NEA | Pollution Control | `industry-nea-pollution-control-ted-greaseandoil-7539a5182488`; `industry-nea-pollution-control-ted-greaseandoil-51ac5c288003`; `industry-nea-pollution-control-ted-greaseandoil-16be183a1525`; `industry-nea-pollution-control-ted-greaseandoil-9af509f92164` | Mapped |
+| 437 | 437 | NEA | Pollution Control | `industry-nea-pollution-control-ted-iron-432e6d19bd26`; `industry-nea-pollution-control-ted-iron-27dc8b44dcd2`; `industry-nea-pollution-control-ted-iron-09426b136912`; `industry-nea-pollution-control-ted-iron-e5b0193dc9ee` | Mapped |
+| 438 | 438 | NEA | Pollution Control | `industry-nea-pollution-control-ted-lead-59bf8eb83316`; `industry-nea-pollution-control-ted-lead-430df3e4ff9f`; `industry-nea-pollution-control-ted-lead-0804ffa023f8`; `industry-nea-pollution-control-ted-lead-fbc0a2d230bc` | Mapped |
+| 439 | 439 | NEA | Pollution Control | `industry-nea-pollution-control-ted-magnesium-da7d7391161b`; `industry-nea-pollution-control-ted-magnesium-276bb3ac9e7c`; `industry-nea-pollution-control-ted-magnesium-6866d7eb9942`; `industry-nea-pollution-control-ted-magnesium-45c9fa650e20` | Mapped |
+| 440 | 440 | NEA | Pollution Control | `industry-nea-pollution-control-ted-manganese-1749736880ff`; `industry-nea-pollution-control-ted-manganese-466b608f7d57`; `industry-nea-pollution-control-ted-manganese-bf3ddf5b4d55`; `industry-nea-pollution-control-ted-manganese-d8c7d8176c4e` | Mapped |
+| 441 | 441 | NEA | Pollution Control | `industry-nea-pollution-control-ted-mercury-ddbe5c1af489`; `industry-nea-pollution-control-ted-mercury-7381ec6f1dfe`; `industry-nea-pollution-control-ted-mercury-dd5fe554b7d9`; `industry-nea-pollution-control-ted-mercury-9bc528029d94` | Mapped |
+| 442 | 442 | NEA | Pollution Control | `industry-nea-pollution-control-ted-metalsintotal-d59c0f62b9b4`; `industry-nea-pollution-control-ted-metalsintotal-424b8c6a68d7`; `industry-nea-pollution-control-ted-metalsintotal-0bc1efdc27ac`; `industry-nea-pollution-control-ted-metalsintotal-0408d6ae5c97` | Mapped |
+| 443 | 443 | NEA | Pollution Control | `industry-nea-pollution-control-ted-nickel-b44a81cbda97`; `industry-nea-pollution-control-ted-nickel-105f91a56bbc`; `industry-nea-pollution-control-ted-nickel-d1c23819dc8d`; `industry-nea-pollution-control-ted-nickel-c7b2a88598a7` | Mapped |
+| 444 | 444 | NEA | Pollution Control | `industry-nea-pollution-control-ted-nitrate-1c8a72a3a1b8`; `industry-nea-pollution-control-ted-nitrate-d7fd48f4a41c`; `industry-nea-pollution-control-ted-nitrate-1da2650eee27`; `industry-nea-pollution-control-ted-nitrate-e432a45316e4` | Mapped |
+| 445 | 445 | NEA | Pollution Control | `industry-nea-pollution-control-ted-phenoliccompound-acb980d50910`; `industry-nea-pollution-control-ted-phenoliccompound-08071c6fe242`; `industry-nea-pollution-control-ted-phenoliccompound-0f9caa1c8af9`; `industry-nea-pollution-control-ted-phenoliccompound-084725ee5ecb` | Mapped |
+| 446 | 446 | NEA | Pollution Control | `industry-nea-pollution-control-ted-phosphate-ec867c8789e3`; `industry-nea-pollution-control-ted-phosphate-2cbda67922ef`; `industry-nea-pollution-control-ted-phosphate-ec127b5b7f79`; `industry-nea-pollution-control-ted-phosphate-2c02cf62be97` | Mapped |
+| 447 | 447 | NEA | Pollution Control | `industry-nea-pollution-control-ted-phvalue-bdd24cd29905`; `industry-nea-pollution-control-ted-phvalue-60f7b3c8ccb5`; `industry-nea-pollution-control-ted-phvalue-20a59c868f98`; `industry-nea-pollution-control-ted-phvalue-f31099317631` | Mapped |
+| 448 | 448 | NEA | Pollution Control | `industry-nea-pollution-control-ted-selenium-0b08947a64b9`; `industry-nea-pollution-control-ted-selenium-0887baa297c0`; `industry-nea-pollution-control-ted-selenium-f4e7d6e65e2b`; `industry-nea-pollution-control-ted-selenium-93b2fe63ee66` | Mapped |
+| 449 | 449 | NEA | Pollution Control | `industry-nea-pollution-control-ted-silver-c7204b8fd520`; `industry-nea-pollution-control-ted-silver-771f1481fb6c`; `industry-nea-pollution-control-ted-silver-88f81d64cf10`; `industry-nea-pollution-control-ted-silver-e66c496d8f0a` | Mapped |
+| 450 | 450 | NEA | Pollution Control | `industry-nea-pollution-control-ted-sulphate-f8804a0b69f1`; `industry-nea-pollution-control-ted-sulphate-b8c453af4943`; `industry-nea-pollution-control-ted-sulphate-d04653d5ab19`; `industry-nea-pollution-control-ted-sulphate-d09d477dd1cc` | Mapped |
+| 451 | 451 | NEA | Pollution Control | `industry-nea-pollution-control-ted-sulphide-a4fa8ce0b65a`; `industry-nea-pollution-control-ted-sulphide-bedff8d00718`; `industry-nea-pollution-control-ted-sulphide-fbb2506cf65f`; `industry-nea-pollution-control-ted-sulphide-a190baed0a7f` | Mapped |
+| 452 | 452 | NEA | Pollution Control | `industry-nea-pollution-control-ted-temperatureofdischarge-76c6c07af9ac`; `industry-nea-pollution-control-ted-temperatureofdischarge-145957bb94de`; `industry-nea-pollution-control-ted-temperatureofdischarge-d2eb11ef977b`; `industry-nea-pollution-control-ted-temperatureofdischarge-12074f036887` | Mapped |
+| 453 | 453 | NEA | Pollution Control | `industry-nea-pollution-control-ted-tin-4954245c1c0d`; `industry-nea-pollution-control-ted-tin-2ce27a1f85a4`; `industry-nea-pollution-control-ted-tin-502954c77e65`; `industry-nea-pollution-control-ted-tin-208f96ca02d7` | Mapped |
+| 454 | 454 | NEA | Pollution Control | `industry-nea-pollution-control-ted-totaldissolvedsolid-c8e7f381c987`; `industry-nea-pollution-control-ted-totaldissolvedsolid-a3674c86d364`; `industry-nea-pollution-control-ted-totaldissolvedsolid-a0e8032782c7`; `industry-nea-pollution-control-ted-totaldissolvedsolid-208f11062523` | Mapped |
+| 455 | 455 | NEA | Pollution Control | `industry-nea-pollution-control-ted-totalsuspendedsolid-09f4b129d6ec`; `industry-nea-pollution-control-ted-totalsuspendedsolid-5aa8e236a43f`; `industry-nea-pollution-control-ted-totalsuspendedsolid-be3dcfd6dccc`; `industry-nea-pollution-control-ted-totalsuspendedsolid-4b526095e2e9` | Mapped |
+| 456 | 456 | NEA | Pollution Control | `industry-nea-pollution-control-ted-zinc-3f57505256e4`; `industry-nea-pollution-control-ted-zinc-73f926b0a757`; `industry-nea-pollution-control-ted-zinc-e642f8d074d8`; `industry-nea-pollution-control-ted-zinc-43f6e8b3aeb3` | Mapped |
+| 457 | 457 | BCA | Prefabricated Building Systems and MEP Components | — | Skipped: representation/reference row without a concrete target. |
+| 458 | 458 | BCA | Prefabricated Building Systems and MEP Components | — | Skipped: representation/reference row without a concrete target. |
+| 459 | 459 | BCA | Prefabricated Building Systems and MEP Components | — | Skipped: representation/reference row without a concrete target. |
+| 460 | 460 | BCA | Prefabricated Building Systems and MEP Components | — | Skipped: representation/reference row without a concrete target. |
+| 461 | 461 | BCA | Prefabricated Building Systems and MEP Components | — | Skipped: representation/reference row without a concrete target. |
+| 462 | 462 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-spacename-a0bab5bd08f9`; `industry-bca-prefabricated-building-systems-and-mep-components-spacename-c237b9972717`; `industry-bca-prefabricated-building-systems-and-mep-components-spacename-6c64bc0c78c5`; `industry-bca-prefabricated-building-systems-and-mep-components-spacename-88612e2bed86`; `industry-bca-prefabricated-building-systems-and-mep-components-spacename-5b37051f2719` | Mapped |
+| 463 | 463 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-internallength-6d88e6ef21ae`; `industry-bca-prefabricated-building-systems-and-mep-components-internallength-e6047122f52f`; `industry-bca-prefabricated-building-systems-and-mep-components-internallength-1cf7f8dd9994`; `industry-bca-prefabricated-building-systems-and-mep-components-internallength-ffec36ff8522`; `industry-bca-prefabricated-building-systems-and-mep-components-internallength-893e117c3a4e` | Mapped |
+| 464 | 464 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-internalwidth-5fc233f02b91`; `industry-bca-prefabricated-building-systems-and-mep-components-internalwidth-5aa2dd601244`; `industry-bca-prefabricated-building-systems-and-mep-components-internalwidth-55fd124b5fca`; `industry-bca-prefabricated-building-systems-and-mep-components-internalwidth-57a14a3241a8`; `industry-bca-prefabricated-building-systems-and-mep-components-internalwidth-ad2785e6728b` | Mapped |
+| 465 | 465 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-f0131c5d6198`; `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-7cd92e0f4d3d`; `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-39c0ed266559`; `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-15137fda9ab6`; `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-853e0d86921d` | Mapped |
+| 466 | 466 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-accreditation-mas-b93756a75961`; `industry-bca-prefabricated-building-systems-and-mep-components-accreditation-mas-d2089353ae79`; `industry-bca-prefabricated-building-systems-and-mep-components-accreditation-mas-4550a62d797e`; `industry-bca-prefabricated-building-systems-and-mep-components-accreditation-mas-b24cb30eeae3`; `industry-bca-prefabricated-building-systems-and-mep-components-accreditation-mas-2645b5239325` | Mapped |
+| 467 | 467 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-mechanicalconnectiontype-7c2a04fcea4c`; `industry-bca-prefabricated-building-systems-and-mep-components-mechanicalconnectiontype-b7e5dfb7ff6b`; `industry-bca-prefabricated-building-systems-and-mep-components-mechanicalconnectiontype-e80a1f9f7189`; `industry-bca-prefabricated-building-systems-and-mep-components-mechanicalconnectiontype-30fb2f48b4de`; `industry-bca-prefabricated-building-systems-and-mep-components-mechanicalconnectiontype-6ab89eeeac08` | Mapped |
+| 468 | 468 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-1f8176bf5a8d` | Mapped |
+| 469 | 469 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-thickness-9305d6174162` | Mapped |
+| 470 | 470 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-d83c55c0efbe` | Mapped |
+| 471 | 471 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-thickness-3718bae9a0e9` | Mapped |
+| 472 | 472 | BCA | Prefabricated Building Systems and MEP Components | — | Skipped: representation/reference row without a concrete target. |
+| 473 | 473 | BCA | Prefabricated Building Systems and MEP Components | — | Skipped: representation/reference row without a concrete target. |
+| 474 | 474 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-preinsulated-6c61a4f6935d`; `industry-bca-prefabricated-building-systems-and-mep-components-preinsulated-f7fbcb2eed8f` | Mapped |
+| 475 | 475 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-7d57e9033f9b`; `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-a87de5e2dd8d` | Mapped |
+| 476 | 476 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-systemname-715cd2f93207`; `industry-bca-prefabricated-building-systems-and-mep-components-systemname-5d490da05736` | Mapped |
+| 477 | 477 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-systemtype-4a18824ff666`; `industry-bca-prefabricated-building-systems-and-mep-components-systemtype-e75d91f72f34` | Mapped |
+| 478 | 478 | BCA | Prefabricated Building Systems and MEP Components | — | Skipped: representation/reference row without a concrete target. |
+| 479 | 479 | BCA | Prefabricated Building Systems and MEP Components | — | Skipped: representation/reference row without a concrete target. |
+| 480 | 480 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-preinsulated-a46d5115ea15`; `industry-bca-prefabricated-building-systems-and-mep-components-preinsulated-15a8b99aa872` | Mapped |
+| 481 | 481 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-864905d65d02`; `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-a6f24a294317` | Mapped |
+| 482 | 482 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-systemname-e85e19564671`; `industry-bca-prefabricated-building-systems-and-mep-components-systemname-6330132038b7` | Mapped |
+| 483 | 483 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-systemtype-ca2c52902baf`; `industry-bca-prefabricated-building-systems-and-mep-components-systemtype-d60930fb38ad` | Mapped |
+| 484 | 484 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-preinsulated-70f3504c1710` | Mapped |
+| 485 | 485 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-e47c86641a90` | Mapped |
+| 486 | 486 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-systemname-0aed3bbcd5ca` | Mapped |
+| 487 | 487 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-systemtype-7254adca3d88` | Mapped |
+| 488 | 488 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-preinsulated-d7f228e1abd0` | Mapped |
+| 489 | 489 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-constructionmethod-49ff66ca4a6b` | Mapped |
+| 490 | 490 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-systemname-1d11d062a26f` | Mapped |
+| 491 | 491 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-systemtype-86514df919a7` | Mapped |
+| 492 | 492 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-iscommon-069e97b5bcb1` | Mapped |
+| 493 | 493 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-systemname-72c37b1cb805` | Mapped |
+| 494 | 494 | BCA | Prefabricated Building Systems and MEP Components | `industry-bca-prefabricated-building-systems-and-mep-components-systemtype-81f2e1c71988` | Mapped |
+| 495 | 495 | BCA | Project Development Type | `industry-bca-project-development-type-ownerbuiltownerstay-158488af18f9` | Mapped |
+| 496 | 496 | BCA | Project Development Type | `industry-bca-project-development-type-projectdevelopmenttype-fe4323745f75` | Mapped |
+| 497 | 497 | PUB | Pump | `industry-pub-pump-capacity-945ca5f0c82d` | Mapped |
+| 498 | 498 | PUB | Pump | `industry-pub-pump-capacity-945ca5f0c82d` | Identical check deduplicated: industry-pub-pump-capacity-945ca5f0c82d |
+| 499 | 499 | PUB | Pump | `industry-pub-pump-duty-5f95567a9506` | Mapped |
+| 500 | 500 | PUB | Pump | `industry-pub-pump-standby-bb8cc0390e69` | Mapped |
+| 501 | 501 | PUB | Pump | `industry-pub-pump-pumphead-922a0bb50185` | Mapped |
+| 502 | 502 | PUB | Pump | `industry-pub-pump-systemname-b88acfe7d1fb` | Mapped |
+| 503 | 503 | PUB | Pump | `industry-pub-pump-systemtype-a24b6e01ecba` | Mapped |
+| 504 | 504 | URA | Racking System | — | Skipped: representation/reference row without a concrete target. |
+| 505 | 505 | BCA | Railing | — | Skipped: representation/reference row without a concrete target. |
+| 506 | 506 | BCA | Railing | — | Skipped: representation/reference row without a concrete target. |
+| 507 | 507 | BCA | Railing | — | Skipped: representation/reference row without a concrete target. |
+| 508 | 508 | BCA | Railing | `industry-bca-railing-height-27a7c0a63346` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 509 | 509 | BCA | Railing | `industry-bca-railing-material-c77e4998a080` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 510 | 510 | BCA | Railing | `industry-bca-railing-safetybarrier-ae3797f9c9b3` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 511 | 511 | BCA | Railing | `industry-bca-railing-typeofbarrier-26873b8426f9` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 512 | 512 | BCA | Railing | `industry-bca-railing-islaminated-8ee37bc5dbdd` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 513 | 513 | LTA | Ramp | — | Skipped: representation/reference row without a concrete target. |
+| 514 | 514 | BCA | Ramp | — | Skipped: representation/reference row without a concrete target. |
+| 515 | 515 | BCA | Ramp | — | Skipped: representation/reference row without a concrete target. |
+| 516 | 516 | LTA | Ramp | — | Skipped: representation/reference row without a concrete target. |
+| 517 | 517 | BCA | Ramp | `industry-bca-ramp-gradient-cb8007250c6f`; `industry-bca-ramp-gradient-2a39ab1d916d`; `industry-bca-ramp-gradient-a5a132bbb3b3` | Mapped |
+| 518 | 518 | LTA | Ramp | `industry-lta-ramp-gradient-cb8007250c6f`; `industry-lta-ramp-gradient-2a39ab1d916d`; `industry-lta-ramp-gradient-a5a132bbb3b3` | Mapped |
+| 519 | 519 | BCA | Ramp | `industry-bca-ramp-width-afb319084378`; `industry-bca-ramp-width-46c00606eb17`; `industry-bca-ramp-width-d57550376766` | Mapped |
+| 520 | 520 | LTA | Ramp | `industry-lta-ramp-width-afb319084378`; `industry-lta-ramp-width-46c00606eb17`; `industry-lta-ramp-width-d57550376766` | Mapped |
+| 521 | 521 | BCA | Ramp | `industry-bca-ramp-barrierfreeaccessibility-654899a0dda7`; `industry-bca-ramp-barrierfreeaccessibility-7ab849f17ee6`; `industry-bca-ramp-barrierfreeaccessibility-98a8e2568f53` | Mapped |
+| 522 | 522 | LTA | Ramp | `industry-lta-ramp-transitionramp-b64172b81128`; `industry-lta-ramp-transitionramp-ce9df631fc46`; `industry-lta-ramp-transitionramp-97cdc3bf4c7a` | Mapped |
+| 523 | 523 | LTA | Ramp | `industry-lta-ramp-accessway-44f52378e41e`; `industry-lta-ramp-accessway-f14defeb7729`; `industry-lta-ramp-accessway-f661fe129107` | Mapped |
+| 524 | 524 | LTA | Ramp | `industry-lta-ramp-egress-8989965e8961`; `industry-lta-ramp-egress-7583198626b9`; `industry-lta-ramp-egress-e6be6d2eced1` | Mapped |
+| 525 | 525 | LTA | Ramp | `industry-lta-ramp-ingress-2003775a178b`; `industry-lta-ramp-ingress-7d6ff313083c`; `industry-lta-ramp-ingress-f6228135c8b7` | Mapped |
+| 526 | 526 | LTA | Ramp | `industry-lta-ramp-vehicular-19a9161f27fd`; `industry-lta-ramp-vehicular-dbd5a331bfdb`; `industry-lta-ramp-vehicular-779dcc763fda` | Mapped |
+| 527 | 527 | LTA | Ramp | `industry-lta-ramp-material-8e6bf65b0f66`; `industry-lta-ramp-material-a2a6cef7f813`; `industry-lta-ramp-material-1764e063d167` | Mapped |
+| 528 | 528 | BCA | Refuse Chute / Recyclables Chute | `industry-bca-refuse-chute-recyclables-chute-spacename-219c1c0f4ebe` | Mapped |
+| 529 | 529 | BCA | Refuse Chute / Recyclables Chute | `industry-bca-refuse-chute-recyclables-chute-constructionmethod-4bd1658165cd` | Mapped |
+| 530 | 530 | BCA | Refuse Chute / Recyclables Chute | `industry-bca-refuse-chute-recyclables-chute-innerlength-cd7c8c1f5717` | Mapped |
+| 531 | 531 | BCA | Refuse Chute / Recyclables Chute | `industry-bca-refuse-chute-recyclables-chute-innerwidth-4f0f1a64ceeb` | Mapped |
+| 532 | 532 | BCA | Refuse Chute / Recyclables Chute | `industry-bca-refuse-chute-recyclables-chute-outerlength-c96db8c6d7d2` | Mapped |
+| 533 | 533 | BCA | Refuse Chute / Recyclables Chute | `industry-bca-refuse-chute-recyclables-chute-outerwidth-7fa6db159338` | Mapped |
+| 534 | 534 | BCA | Refuse Chute / Recyclables Chute | `industry-bca-refuse-chute-recyclables-chute-chamferradius-3a52c92bbeb8` | Mapped |
+| 535 | 535 | NEA | Refuse Chute / Recyclables Chute | `industry-nea-refuse-chute-recyclables-chute-constructionmethod-fdf40b7e7cad` | Mapped |
+| 536 | 536 | NEA | Refuse Chute / Recyclables Chute | — | Skipped: representation/reference row without a concrete target. |
+| 537 | 537 | NEA | Refuse Chute / Recyclables Chute | — | Skipped: representation/reference row without a concrete target. |
+| 538 | 538 | NEA | Refuse Chute / Recyclables Chute | — | Skipped: representation/reference row without a concrete target. |
+| 539 | 539 | NEA | Refuse Chute / Recyclables Chute | — | Skipped: representation/reference row without a concrete target. |
+| 540 | 540 | NEA | Refuse Chute / Recyclables Chute | — | Skipped: representation/reference row without a concrete target. |
+| 541 | 541 | NEA | Refuse Chute / Recyclables Chute | `industry-nea-refuse-chute-recyclables-chute-airtight-3f9bbbe98df5`; `industry-nea-refuse-chute-recyclables-chute-airtight-31d7832ca096`; `industry-nea-refuse-chute-recyclables-chute-airtight-4c751332cb23`; `industry-nea-refuse-chute-recyclables-chute-airtight-2ecb966d76e7`; `industry-nea-refuse-chute-recyclables-chute-airtight-57c2d57129f7` | Mapped |
+| 542 | 542 | NEA | Refuse Chute / Recyclables Chute | `industry-nea-refuse-chute-recyclables-chute-firerating-d17cdfe652db`; `industry-nea-refuse-chute-recyclables-chute-firerating-5d2754ed4319`; `industry-nea-refuse-chute-recyclables-chute-firerating-8312871a75b1`; `industry-nea-refuse-chute-recyclables-chute-firerating-509140056ca7`; `industry-nea-refuse-chute-recyclables-chute-firerating-b464bee5e16d` | Mapped |
+| 543 | 543 | NEA | Refuse Chute / Recyclables Chute | `industry-nea-refuse-chute-recyclables-chute-selfclosing-95c59d55b159`; `industry-nea-refuse-chute-recyclables-chute-selfclosing-25f39015195b`; `industry-nea-refuse-chute-recyclables-chute-selfclosing-595edf33f46a`; `industry-nea-refuse-chute-recyclables-chute-selfclosing-9ecb0acbf0db`; `industry-nea-refuse-chute-recyclables-chute-selfclosing-b4f1badf57fd` | Mapped |
+| 544 | 544 | NEA | Refuse Chute / Recyclables Chute | `industry-nea-refuse-chute-recyclables-chute-volumecontrolled-11b4f928d5e6`; `industry-nea-refuse-chute-recyclables-chute-volumecontrolled-d73a3e72b242`; `industry-nea-refuse-chute-recyclables-chute-volumecontrolled-f15aaebc4cd6`; `industry-nea-refuse-chute-recyclables-chute-volumecontrolled-91809a212dad`; `industry-nea-refuse-chute-recyclables-chute-volumecontrolled-cbe61b75ef6f` | Mapped |
+| 545 | 545 | NEA | Refuse Chute / Recyclables Chute | `industry-nea-refuse-chute-recyclables-chute-clearheight-91eb06b86ee1`; `industry-nea-refuse-chute-recyclables-chute-clearheight-383fbc767443`; `industry-nea-refuse-chute-recyclables-chute-clearheight-a79c5ca70660`; `industry-nea-refuse-chute-recyclables-chute-clearheight-36a728247bc5`; `industry-nea-refuse-chute-recyclables-chute-clearheight-2dd4a11d248d` | Mapped |
+| 546 | 546 | NEA | Refuse Chute / Recyclables Chute | `industry-nea-refuse-chute-recyclables-chute-clearwidth-a850b56393a4`; `industry-nea-refuse-chute-recyclables-chute-clearwidth-9474468afb51`; `industry-nea-refuse-chute-recyclables-chute-clearwidth-f2fc530ad2e5`; `industry-nea-refuse-chute-recyclables-chute-clearwidth-2cf479550c1a`; `industry-nea-refuse-chute-recyclables-chute-clearwidth-ac6873d5794c` | Mapped |
+| 547 | 547 | NEA | Refuse Chute / Recyclables Chute | `industry-nea-refuse-chute-recyclables-chute-structuralheight-58d3a5bab3cf`; `industry-nea-refuse-chute-recyclables-chute-structuralheight-26cf7d718677`; `industry-nea-refuse-chute-recyclables-chute-structuralheight-318aadabbdee`; `industry-nea-refuse-chute-recyclables-chute-structuralheight-329a58501e8e`; `industry-nea-refuse-chute-recyclables-chute-structuralheight-8b1e3066d685` | Mapped |
+| 548 | 548 | NEA | Refuse Chute / Recyclables Chute | `industry-nea-refuse-chute-recyclables-chute-structuralwidth-bf261a2370cb`; `industry-nea-refuse-chute-recyclables-chute-structuralwidth-36b3561c9c29`; `industry-nea-refuse-chute-recyclables-chute-structuralwidth-8d38a25a97b6`; `industry-nea-refuse-chute-recyclables-chute-structuralwidth-a2a742cf1e7c`; `industry-nea-refuse-chute-recyclables-chute-structuralwidth-f79118a665ef` | Mapped |
+| 549 | 549 | NEA | Refuse Chute / Recyclables Chute | `industry-nea-refuse-chute-recyclables-chute-material-a9c14b51dc42`; `industry-nea-refuse-chute-recyclables-chute-material-c17588adc533`; `industry-nea-refuse-chute-recyclables-chute-material-fc2230b33bc5`; `industry-nea-refuse-chute-recyclables-chute-material-5ab104a86540`; `industry-nea-refuse-chute-recyclables-chute-material-c582df6e5275` | Mapped |
+| 550 | 550 | NEA | Refuse Chute / Recyclables Chute | `industry-nea-refuse-chute-recyclables-chute-thickness-c4469db571b0`; `industry-nea-refuse-chute-recyclables-chute-thickness-7f24e12290e2`; `industry-nea-refuse-chute-recyclables-chute-thickness-b33013890dc7`; `industry-nea-refuse-chute-recyclables-chute-thickness-367834df0095`; `industry-nea-refuse-chute-recyclables-chute-thickness-6d2bba3fdfa2` | Mapped |
+| 551 | 551 | NEA | Refuse Chute / Recyclables Chute | — | Skipped: representation/reference row without a concrete target. |
+| 552 | 552 | NEA | Refuse Chute / Recyclables Chute | — | Skipped: representation/reference row without a concrete target. |
+| 553 | 553 | NEA | Refuse Chute / Recyclables Chute | — | Skipped: representation/reference row without a concrete target. |
+| 554 | 554 | NEA | Refuse Chute / Recyclables Chute | — | Skipped: representation/reference row without a concrete target. |
+| 555 | 555 | NEA | Refuse Chute / Recyclables Chute | — | Skipped: representation/reference row without a concrete target. |
+| 556 | 556 | NEA | Refuse Chute / Recyclables Chute | `industry-nea-refuse-chute-recyclables-chute-compactionratio-789b1a693e56`; `industry-nea-refuse-chute-recyclables-chute-compactionratio-d8ed187f9f52`; `industry-nea-refuse-chute-recyclables-chute-compactionratio-d4a58f390317`; `industry-nea-refuse-chute-recyclables-chute-compactionratio-f73b0511e919`; `industry-nea-refuse-chute-recyclables-chute-compactionratio-f48a9195d1d4` | Mapped |
+| 557 | 557 | NEA | Refuse Chute / Recyclables Chute | `industry-nea-refuse-chute-recyclables-chute-nominalcapacity-55c81342d286`; `industry-nea-refuse-chute-recyclables-chute-nominalcapacity-b78f41a12364`; `industry-nea-refuse-chute-recyclables-chute-nominalcapacity-1fd155bc4d5e`; `industry-nea-refuse-chute-recyclables-chute-nominalcapacity-3767f993bf75`; `industry-nea-refuse-chute-recyclables-chute-nominalcapacity-4ae06cc6b9dd` | Mapped |
+| 558 | 558 | NEA | Refuse Chute / Recyclables Chute | `industry-nea-refuse-chute-recyclables-chute-colourcode-ee829a4340fc`; `industry-nea-refuse-chute-recyclables-chute-colourcode-ef8b62883750`; `industry-nea-refuse-chute-recyclables-chute-colourcode-cd890a82448e`; `industry-nea-refuse-chute-recyclables-chute-colourcode-bd0181b42176`; `industry-nea-refuse-chute-recyclables-chute-colourcode-ac99b6d5789d` | Mapped |
+| 559 | 559 | NEA | Refuse Chute / Recyclables Chute | `industry-nea-refuse-chute-recyclables-chute-baseplatematerial-7821bc0e2edf`; `industry-nea-refuse-chute-recyclables-chute-baseplatematerial-b821ef0e001c`; `industry-nea-refuse-chute-recyclables-chute-baseplatematerial-2d3065f77967`; `industry-nea-refuse-chute-recyclables-chute-baseplatematerial-bd42355a8a89`; `industry-nea-refuse-chute-recyclables-chute-baseplatematerial-3ecc7532a247` | Mapped |
+| 560 | 560 | NEA | Refuse Chute / Recyclables Chute | `industry-nea-refuse-chute-recyclables-chute-baseplatethickness-a9f734a03eae`; `industry-nea-refuse-chute-recyclables-chute-baseplatethickness-b9adb1690742`; `industry-nea-refuse-chute-recyclables-chute-baseplatethickness-6efa2512afb6`; `industry-nea-refuse-chute-recyclables-chute-baseplatethickness-6bcc9659b2a1`; `industry-nea-refuse-chute-recyclables-chute-baseplatethickness-eb1c0d9a2165` | Mapped |
+| 561 | 561 | NEA | Refuse Chute / Recyclables Chute | `industry-nea-refuse-chute-recyclables-chute-tailgateorientation-0b76cc2206b1`; `industry-nea-refuse-chute-recyclables-chute-tailgateorientation-e12da3c691c5`; `industry-nea-refuse-chute-recyclables-chute-tailgateorientation-c71ae1d9c0f2`; `industry-nea-refuse-chute-recyclables-chute-tailgateorientation-73e85e915893`; `industry-nea-refuse-chute-recyclables-chute-tailgateorientation-dd8157d5b8a7` | Mapped |
+| 562 | 562 | NEA | Refuse Chute / Recyclables Chute | `industry-nea-refuse-chute-recyclables-chute-hookuppoint-04335543588c`; `industry-nea-refuse-chute-recyclables-chute-hookuppoint-44b774ffa193`; `industry-nea-refuse-chute-recyclables-chute-hookuppoint-af4f9de53d21`; `industry-nea-refuse-chute-recyclables-chute-hookuppoint-54bd7f9d6e2d`; `industry-nea-refuse-chute-recyclables-chute-hookuppoint-3cbfb2bec9de` | Mapped |
+| 563 | 563 | NEA | Refuse Chute / Recyclables Chute | `industry-nea-refuse-chute-recyclables-chute-equipmenttype-c47602cf17d0`; `industry-nea-refuse-chute-recyclables-chute-equipmenttype-2e66410d3d19`; `industry-nea-refuse-chute-recyclables-chute-equipmenttype-1170538bde63`; `industry-nea-refuse-chute-recyclables-chute-equipmenttype-99a7c35c04e7`; `industry-nea-refuse-chute-recyclables-chute-equipmenttype-c32677ffd1a9` | Mapped |
+| 564 | 564 | NEA | Refuse Handling Equipment | `industry-nea-refuse-handling-equipment-litre-2ca87fa20ddf` | Mapped |
+| 565 | 565 | NEA | Refuse Handling Equipment | `industry-nea-refuse-handling-equipment-litre-859abeb6a27d` | Mapped |
+| 566 | 566 | SCDF | Road | `industry-scdf-road-designedvehiclemass-2785087c7137` | Mapped |
+| 567 | 567 | LTA | Road | `industry-lta-road-ingress-7337532b3645` | Mapped |
+| 568 | 568 | LTA | Road | `industry-lta-road-egress-d4343455126b` | Mapped |
+| 569 | 569 | LTA | Road | `industry-lta-road-material-b50f9364b9f0` | Mapped |
+| 570 | 570 | LTA | Road | `industry-lta-road-roadcategory-e9d799414735` | Mapped |
+| 571 | 571 | LTA | Road | — | Skipped: representation/reference row without a concrete target. |
+| 572 | 573 | LTA | Road | `industry-lta-road-ingress-06f06c8cfce6` | Mapped |
+| 573 | 574 | LTA | Road | `industry-lta-road-egress-af3b98283b86` | Mapped |
+| 574 | 575 | LTA | Road | `industry-lta-road-material-e75e3ea57abb` | Mapped |
+| 575 | 576 | LTA | Road | `industry-lta-road-roadcategory-63bec6679f52` | Mapped |
+| 576 | 577 | SCDF | Road | `industry-scdf-road-loadingcapacity-8e72c6837257` | Mapped |
+| 577 | 578 | SCDF | Road | `industry-scdf-road-loadingcapacity-a899b6abd680` | Mapped |
+| 578 | 579 | LTA | Road | `industry-lta-road-material-c481efb228f3` | Mapped |
+| 579 | 580 | NEA | Road | `industry-nea-road-material-a63df478596a` | Mapped |
+| 580 | 581 | LTA | Road | `industry-lta-road-width-7b49675421fa` | Mapped |
+| 581 | 582 | LTA | Road | `industry-lta-road-egress-76c123a0007b` | Mapped |
+| 582 | 583 | LTA | Road | `industry-lta-road-ingress-2422217c9beb` | Mapped |
+| 583 | 584 | LTA | Road | `industry-lta-road-vehicular-f03a1ce976ca` | Mapped |
+| 584 | 585 | LTA | Road | `industry-lta-road-kerbtype-f2dbfa789576` | Mapped |
+| 585 | 586 | LTA | Road | `industry-lta-road-thickness-d032b40443c6` | Mapped |
+| 586 | 587 | LTA | Road | `industry-lta-road-height-58f69f4f07a0` | Mapped |
+| 587 | 588 | LTA | Road | `industry-lta-road-material-b6ff6b287c7a` | Mapped |
+| 588 | 589 | URA | Roof | — | Skipped: representation/reference row without a concrete target. |
+| 589 | 590 | BCA | Roof | `industry-bca-roof-constructionmethod-aa7b650efebb` | Mapped |
+| 590 | 591 | NParks | Roof | `industry-nparks-roof-material-a4f48ed91485` | Mapped |
+| 591 | 592 | BCA | Roof | `industry-bca-roof-constructionmethod-42ab3d07ab65` | Mapped |
+| 592 | 593 | NParks | Roof | `industry-nparks-roof-material-adcd14730967` | Mapped |
+| 593 | 594 | BCA | Roof | `industry-bca-roof-constructionmethod-4f4a1a24cf36` | Mapped |
+| 594 | 595 | NParks | Roof | `industry-nparks-roof-material-5b3e90728c7d` | Mapped |
+| 595 | 596 | All | Sanitary Appliances | `industry-all-sanitary-appliances-systemname-e8b0a360c73e`; `industry-all-sanitary-appliances-systemname-4d08bb5c057e`; `industry-all-sanitary-appliances-systemname-98b59ae49f1c`; `industry-all-sanitary-appliances-systemname-2230f8f21410`; `industry-all-sanitary-appliances-systemname-5d56d9960182`; `industry-all-sanitary-appliances-systemname-6330a85967bf` | Mapped |
+| 596 | 597 | All | Sanitary Appliances | `industry-all-sanitary-appliances-systemtype-c77e5dd7b4e0`; `industry-all-sanitary-appliances-systemtype-84a73cd3e817`; `industry-all-sanitary-appliances-systemtype-a6f5fa70b9f8`; `industry-all-sanitary-appliances-systemtype-e9274ae6f9ff`; `industry-all-sanitary-appliances-systemtype-68a9ba097707`; `industry-all-sanitary-appliances-systemtype-5d37180a6de4` | Mapped |
+| 597 | 598 | PUB | Sanitary Appliances (Bath) | `industry-pub-sanitary-appliances-bath-wels-c9e01348d677` | Mapped |
+| 598 | 599 | PUB | Sanitary Appliances (Bidet) | `industry-pub-sanitary-appliances-bidet-wels-2a5ff6b235d0` | Mapped |
+| 599 | 600 | PUB | Sanitary Appliances (Shower) | `industry-pub-sanitary-appliances-shower-wels-59dfdcc8c2a7` | Mapped |
+| 600 | 601 | BCA | Sanitary Appliances (Urinal) | `industry-bca-sanitary-appliances-urinal-ambulantdisabled-3818d4e47083` | Mapped |
+| 601 | 602 | NEA | Sanitary Appliances (Urinal) | `industry-nea-sanitary-appliances-urinal-childrenfriendly-d264c4cfec46` | Mapped |
+| 602 | 603 | NEA | Sanitary Appliances (Urinal) | `industry-nea-sanitary-appliances-urinal-mounting-231498db157a` | Mapped |
+| 603 | 604 | BCA | Sanitary Appliances (Urinal) | `industry-bca-sanitary-appliances-urinal-waterless-6b5ce0c344bb` | Mapped |
+| 604 | 605 | PUB | Sanitary Appliances (Urinal) | `industry-pub-sanitary-appliances-urinal-wels-446424ead3ac` | Mapped |
+| 605 | 606 | NEA | Sanitary Appliances (Wash Basin) | `industry-nea-sanitary-appliances-wash-basin-childrenfriendly-84f0aa3b5c77` | Mapped |
+| 606 | 607 | NEA | Sanitary Appliances (Wash Basin) | `industry-nea-sanitary-appliances-wash-basin-mounting-29783cb9fe63` | Mapped |
+| 607 | 608 | PUB | Sanitary Appliances (Wash Basin) | `industry-pub-sanitary-appliances-wash-basin-wels-756ebb1cc270` | Mapped |
+| 608 | 609 | BCA | Sanitary Appliances (Water Closet) | `industry-bca-sanitary-appliances-water-closet-barrierfreeaccessibility-65fa1f183d53` | Mapped |
+| 609 | 609 | BCA | Sanitary Appliances (Water Closet) | `industry-bca-sanitary-appliances-water-closet-ambulantdisabled-ad5b8701e848` | Mapped |
+| 610 | 610 | BCA | Sanitary Appliances (Water Closet) | `industry-bca-sanitary-appliances-water-closet-childrenfriendly-866535d673af` | Mapped |
+| 611 | 611 | NEA | Sanitary Appliances (Water Closet) | `industry-nea-sanitary-appliances-water-closet-panmounting-dc2fae5c4b9b` | Mapped |
+| 612 | 612 | NEA | Sanitary Appliances (Water Closet) | `industry-nea-sanitary-appliances-water-closet-toiletpantype-8b4624b42aa2` | Mapped |
+| 613 | 613 | PUB | Sanitary Appliances (Water Closet) | `industry-pub-sanitary-appliances-water-closet-wels-92846ec3552e` | Mapped |
+| 614 | 614 | SCDF | Seating | `industry-scdf-seating-seatingcapacity-6ef0e9c8446a` | Mapped |
+| 615 | 615 | SCDF | Seating | — | Skipped: representation/reference row without a concrete target. |
+| 616 | 616 | SCDF | Security Lighting | — | Skipped: representation/reference row without a concrete target. |
+| 617 | 617 | NEA | Sensor | — | Skipped: representation/reference row without a concrete target. |
+| 618 | 618 | BCA | Shading Device | `industry-bca-shading-device-shadingdevice-3d52d7572eb8` | Mapped |
+| 619 | 619 | SCDF | Signage | `industry-scdf-signage-mountingheight-f7840c8b564f` | Mapped |
+| 620 | 620 | URA | Site | `industry-ura-site-numberofworkers-9a158cf8417b` | Mapped |
+| 621 | 621 | URA | Site Boundary | `industry-ura-site-boundary-area-d7649a67aba8` | Mapped |
+| 622 | 622 | NParks | Site Boundary | `industry-nparks-site-boundary-area-aef05be6b74d` | Mapped |
+| 623 | 623 | URA | Site Boundary | `industry-ura-site-boundary-broadlanduse-108f726f2769` | Mapped |
+| 624 | 624 | NParks | Site Boundary | `industry-nparks-site-boundary-vacantland-bfc5ea3de0cd` | Mapped |
+| 625 | 625 | URA | Site Coverage | — | Skipped: representation/reference row without a concrete target. |
+| 626 | 626 | BCA | Slab | — | Skipped: representation/reference row without a concrete target. |
+| 627 | 627 | BCA | Slab | — | Skipped: representation/reference row without a concrete target. |
+| 628 | 628 | BCA | Slab | — | Skipped: representation/reference row without a concrete target. |
+| 629 | 629 | BCA | Slab | `industry-bca-slab-accreditation-mas-a816af556a33` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 630 | 630 | BCA | Slab | `industry-bca-slab-bottomdistribution-nominal-48681e1d2f95` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 631 | 631 | BCA | Slab | `industry-bca-slab-bottommain-nominal-c58cefef57d9` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 632 | 632 | BCA | Slab | `industry-bca-slab-constructionmethod-1f8176bf5a8d` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 633 | 633 | BCA | Slab | `industry-bca-slab-latticegirderreinforcement-3d6ab302562f` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 634 | 634 | BCA | Slab | `industry-bca-slab-loadbearing-77c225943833` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 635 | 635 | BCA | Slab | `industry-bca-slab-mark-a90fd8c20cf1` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 636 | 636 | BCA | Slab | `industry-bca-slab-materialgrade-c3d44451760b` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 637 | 637 | BCA | Slab | `industry-bca-slab-mechanicalconnectiontype-cbf31ea9e587` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 638 | 638 | BCA | Slab | `industry-bca-slab-referto2ddetail-abf629413143` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 639 | 639 | BCA | Slab | `industry-bca-slab-reinforcementsteelgrade-0e8a584eb09a` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 640 | 640 | BCA | Slab | `industry-bca-slab-shelterusage-6385b4459b54` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 641 | 641 | BCA | Slab | `industry-bca-slab-slabtype-e21bbec68bc6` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 642 | 642 | BCA | Slab | `industry-bca-slab-stirrups-e110ef1976ab` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 643 | 643 | BCA | Slab | `industry-bca-slab-stirrupstype-ed06903a912e` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 644 | 644 | BCA | Slab | `industry-bca-slab-thickness-9305d6174162` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 645 | 645 | BCA | Slab | `industry-bca-slab-topdistribution-nominal-c78c56eb8699` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 646 | 646 | BCA | Slab | `industry-bca-slab-topmain-nominal-19dca4c732ac` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 647 | 647 | BCA | Slab | `industry-bca-slab-typedesignator-298f228114f4` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 648 | 648 | BCA | Slab | `industry-bca-slab-weldedmesh-c91e6a98b118` | Mixed N.A/subtype list: applies to every subtype of this IFC entity. |
+| 649 | 649 | SCDF | Soffit | `industry-scdf-soffit-firerating-e0b22b330d30` | Mapped |
+| 650 | 650 | URA | Space (Area) | `industry-ura-space-area-agf-developmentuse-f8cbc24b9741` | Unresolved accepted values: Refer to Space Values sheet; presence check only. |
+| 651 | 651 | URA | Space (Area) | `industry-ura-space-area-agf-name-ec54dad65d8c` | Unresolved accepted values: Refer to Space Values sheet; presence check only. |
+| 652 | 652 | URA | Space (Area) | `industry-ura-space-area-agf-unitnumber-9ad5eb1ac5d1` | Mapped |
+| 653 | 653 | URA | Space (Area) | `industry-ura-space-area-agf-bonusgfatype-6270361703bc` | Unresolved accepted values: Refer to Space Values sheet; presence check only. |
+| 654 | 654 | URA | Space (Area) | `industry-ura-space-area-agf-note-1f3a0e000c2f` | Mapped |
+| 655 | 655 | URA | Space (Area) | `industry-ura-space-area-agf-usequantum-78077da95dff` | Mapped |
+| 656 | 656 | URA | Space (Area) | `industry-ura-space-area-agf-buildingtypology-fe107d1d291e` | Unresolved accepted values: Refer to Space Values sheet; presence check only. |
+| 657 | 657 | URA | Space (Area) | `industry-ura-space-area-agf-supportingfacility-014204edb641` | Unresolved accepted values: Refer to Space Values sheet; presence check only. |
+| 658 | 658 | URA | Space (Area) | `industry-ura-space-area-ast-areatype-cd8fb13212ff` | Unresolved accepted values: Refer to Space Values sheet; presence check only. |
+| 659 | 659 | URA | Space (Area) | `industry-ura-space-area-ast-legalarea-96e9501474e4` | Mapped |
+| 660 | 660 | URA | Space (Area) | `industry-ura-space-area-ast-prop-stratalotnumber-3ae46c3a60f6` | Mapped |
+| 661 | 661 | URA | Space (Area) | `industry-ura-space-area-ast-extg-stratalotnumber-e7e203edb29e` | Mapped |
+| 662 | 662 | URA | Space (Area) | `industry-ura-space-area-acn-connectivitytype-8ec426ae394d` | Mapped |
+| 663 | 663 | URA | Space (Area) | `industry-ura-space-area-acn-activitygeneratingusetype-8c2c218246ff` | Mapped |
+| 664 | 664 | URA | Space (Area) | `industry-ura-space-area-acn-ispavingspecified-9a9c0655043a` | Mapped |
+| 665 | 665 | URA | Space (Area) | `industry-ura-space-area-acn-pavingspecification-aa201acf0fc9` | Mapped |
+| 666 | 666 | URA | Space (Area) | `industry-ura-space-area-acn-isopen24hourstopublic-c75ead1afd47` | Mapped |
+| 667 | 667 | URA | Space (Area) | `industry-ura-space-area-acn-opentime-58f40f86f215` | Mapped |
+| 668 | 668 | URA | Space (Area) | `industry-ura-space-area-acn-closetime-966557039d62` | Mapped |
+| 669 | 669 | URA | Space (Area) | `industry-ura-space-area-als-landscapetype-5e418611f0f3` | Unresolved accepted values: Refer to Space Values sheet; presence check only. |
+| 670 | 670 | URA | Space (Area) | `industry-ura-space-area-als-greeneryfeatures-af54bf1357f2` | Unresolved accepted values: Refer to Space Values sheet; presence check only. |
+| 671 | 671 | URA | Space (Area) | `industry-ura-space-area-als-species-d817cada0e01` | Mapped |
+| 672 | 672 | URA | Space (Area) | `industry-ura-space-area-avf-includeasgfa-c8e7c56e00b5` | Mapped |
+| 673 | 673 | All | Space (Usage) | `industry-all-space-usage-accreditation-mas-31ee2d442cdd` | Mapped |
+| 674 | 674 | All | Space (Usage) | `industry-all-space-usage-ambulantdisabled-cac143de1073` | Mapped |
+| 675 | 675 | All | Space (Usage) | `industry-all-space-usage-area-fc2cec758739` | Mapped |
+| 676 | 676 | All | Space (Usage) | `industry-all-space-usage-barrierfreeaccessibility-b41d22f44b2c` | Mapped |
+| 677 | 677 | All | Space (Usage) | `industry-all-space-usage-childrenfriendly-ed933c538be7` | Mapped |
+| 678 | 678 | All | Space (Usage) | `industry-all-space-usage-cvalue-901b0fc0b0cc` | Mapped |
+| 679 | 679 | All | Space (Usage) | `industry-all-space-usage-elderlyfriendly-82d5097a1506` | Mapped |
+| 680 | 680 | All | Space (Usage) | `industry-all-space-usage-emergencyvoicecommunicationsystem-3384008b0dad` | Mapped |
+| 681 | 681 | All | Space (Usage) | `industry-all-space-usage-firedetectionandsuppressionsystem-74e66220c23a` | Mapped |
+| 682 | 682 | All | Space (Usage) | `industry-all-space-usage-fireemergencyventilationmode-2c630f4fcaea` | Mapped |
+| 683 | 683 | All | Space (Usage) | `industry-all-space-usage-fireexit-1f612247de74` | Mapped |
+| 684 | 684 | All | Space (Usage) | `industry-all-space-usage-fullycoveredwithtreesshrubs-1fc5fdfeeea3` | Mapped |
+| 685 | 685 | All | Space (Usage) | `industry-all-space-usage-hearingenhancement-2d40f66bffbc` | Mapped |
+| 686 | 686 | All | Space (Usage) | `industry-all-space-usage-height-c8b1b4e2e933` | Mapped |
+| 687 | 687 | All | Space (Usage) | `industry-all-space-usage-largeraccessible-0f666a5584d8` | Mapped |
+| 688 | 688 | All | Space (Usage) | `industry-all-space-usage-occupancyload-113e404a24b6` | Mapped |
+| 689 | 689 | All | Space (Usage) | `industry-all-space-usage-occupancytype-765e4b44fa67` | Unresolved accepted values: Refer to Space Values sheet; presence check only. |
+| 690 | 690 | All | Space (Usage) | `industry-all-space-usage-parkingtype-2e971d6e2bb5` | Mapped |
+| 691 | 691 | All | Space (Usage) | `industry-all-space-usage-purposegroup-6e1467d6b4ba` | Mapped |
+| 692 | 692 | All | Space (Usage) | `industry-all-space-usage-refuseoutput-61b9644f8159` | Mapped |
+| 693 | 693 | All | Space (Usage) | `industry-all-space-usage-retrofit-eb9523a18117` | Mapped |
+| 694 | 694 | All | Space (Usage) | `industry-all-space-usage-smokecontrolsystem-d32382e2835e` | Mapped |
+| 695 | 695 | All | Space (Usage) | `industry-all-space-usage-soundpowerlevel-883f640ee3fb` | Mapped |
+| 696 | 696 | All | Space (Usage) | `industry-all-space-usage-soundpressurelevel-5718e7488a68` | Mapped |
+| 697 | 697 | All | Space (Usage) | `industry-all-space-usage-spacename-51588b653be5` | Unresolved accepted values: Refer to Space Values sheet; presence check only. |
+| 698 | 698 | All | Space (Usage) | `industry-all-space-usage-steprampaccess-a40e59462fbf` | Mapped |
+| 699 | 699 | All | Space (Usage) | `industry-all-space-usage-twentyfourhourmannedstation-56cbb105a3cd` | Mapped |
+| 700 | 700 | All | Space (Usage) | `industry-all-space-usage-unitnumber-e32db42586e5` | Mapped |
+| 701 | 701 | All | Space (Usage) | `industry-all-space-usage-ventilationmode-ce8937c0d4c6` | Mapped |
+| 702 | 702 | All | Space (Usage) | `industry-all-space-usage-ventilationtype-586d520802df` | Mapped |
+| 703 | 703 | All | Space (Usage) | `industry-all-space-usage-volume-401d85960d32` | Mapped |
+| 704 | 704 | NEA | Sprinkler (Non-Fire; for NEA) | `industry-nea-sprinkler-non-fire-for-nea-systemname-74fede145ec7` | Mapped |
+| 705 | 705 | NEA | Sprinkler (Non-Fire; for NEA) | `industry-nea-sprinkler-non-fire-for-nea-systemtype-24ad7f62214b` | Mapped |
+| 706 | 706 | SCDF | Staircase | `industry-scdf-staircase-fireexit-569c91afd955`; `industry-scdf-staircase-fireexit-a7cf3fe0c1b2`; `industry-scdf-staircase-fireexit-34c5c81b0d33`; `industry-scdf-staircase-fireexit-9516bd86c4e8`; `industry-scdf-staircase-fireexit-e50c98147db5`; `industry-scdf-staircase-fireexit-2d392624aa5c`; `industry-scdf-staircase-fireexit-e12bcb727796` | Mapped |
+| 707 | 713 | BCA | Staircase | — | Skipped: representation/reference row without a concrete target. |
+| 708 | 714 | BCA | Staircase | — | Skipped: representation/reference row without a concrete target. |
+| 709 | 715 | BCA | Staircase | — | Skipped: representation/reference row without a concrete target. |
+| 710 | 716 | BCA | Staircase | — | Skipped: representation/reference row without a concrete target. |
+| 711 | 717 | BCA | Staircase | `industry-bca-staircase-numberofriser-c8fe7cdce9fb` | Mapped |
+| 712 | 718 | BCA | Staircase | `industry-bca-staircase-riserheight-bb8800733272` | Mapped |
+| 713 | 719 | BCA | Staircase | `industry-bca-staircase-numberoftreads-b911d0c190af` | Mapped |
+| 714 | 720 | SCDF | Staircase | `industry-scdf-staircase-treadlength-98ec5cf2202a` | Mapped |
+| 715 | 721 | BCA | Staircase | `industry-bca-staircase-materialgrade-60862d35cd3c` | Mapped |
+| 716 | 722 | BCA | Staircase | `industry-bca-staircase-constructionmethod-02923c246d6a` | Mapped |
+| 717 | 723 | BCA | Staircase | `industry-bca-staircase-spacename-0aad96949e88` | Mapped |
+| 718 | 724 | BCA | Staircase | `industry-bca-staircase-bottomdistribution-b5109dea869b` | Mapped |
+| 719 | 725 | BCA | Staircase | `industry-bca-staircase-bottommain-8278b04187d7` | Mapped |
+| 720 | 726 | BCA | Staircase | `industry-bca-staircase-connectiondetailsbottom-445955e35fe3` | Mapped |
+| 721 | 727 | BCA | Staircase | `industry-bca-staircase-connectiondetailstop-5c3242eadd8e` | Mapped |
+| 722 | 728 | BCA | Staircase | `industry-bca-staircase-connectiontypebottom-3aea436cc571` | Mapped |
+| 723 | 729 | BCA | Staircase | `industry-bca-staircase-connectiontypetop-4b9b36a1eff1` | Mapped |
+| 724 | 730 | BCA | Staircase | `industry-bca-staircase-mark-6a568388f3ee` | Mapped |
+| 725 | 731 | BCA | Staircase | `industry-bca-staircase-membersection-5eb19bef8b7a` | Mapped |
+| 726 | 732 | BCA | Staircase | `industry-bca-staircase-referto2ddetail-24a861f874cd` | Mapped |
+| 727 | 733 | BCA | Staircase | `industry-bca-staircase-reinforcementsteelgrade-1ff7ae4c248e` | Mapped |
+| 728 | 734 | BCA | Staircase | `industry-bca-staircase-sectionfabricationmethod-cef006e8240b` | Mapped |
+| 729 | 735 | BCA | Staircase | `industry-bca-staircase-thickness-d55e6fde6a81` | Mapped |
+| 730 | 736 | BCA | Staircase | `industry-bca-staircase-topdistribution-09d88da28a32` | Mapped |
+| 731 | 737 | BCA | Staircase | `industry-bca-staircase-topmain-131762b32014` | Mapped |
+| 732 | 738 | BCA | Staircase | `industry-bca-staircase-width-f213e8e9f39c` | Mapped |
+| 733 | 739 | BCA | Staircase | `industry-bca-staircase-constructionmethod-02923c246d6a` | Identical check deduplicated: industry-bca-staircase-constructionmethod-02923c246d6a |
+| 734 | 740 | BCA | Staircase | `industry-bca-staircase-materialgrade-60862d35cd3c` | Identical check deduplicated: industry-bca-staircase-materialgrade-60862d35cd3c |
+| 735 | 741 | BCA | Staircase | `industry-bca-staircase-mechanicalconnectiontype-0f0a5f1f311f` | Mapped |
+| 736 | 742 | SCDF | Tank | — | Skipped: representation/reference row without a concrete target. |
+| 737 | 743 | PUB | Tank | — | Skipped: representation/reference row without a concrete target. |
+| 738 | 744 | PUB | Tank | — | Skipped: representation/reference row without a concrete target. |
+| 739 | 745 | PUB | Tank | — | Skipped: representation/reference row without a concrete target. |
+| 740 | 746 | PUB | Tank | — | Skipped: representation/reference row without a concrete target. |
+| 741 | 747 | PUB | Tank | — | Skipped: representation/reference row without a concrete target. |
+| 742 | 748 | PUB | Tank | — | Skipped: representation/reference row without a concrete target. |
+| 743 | 749 | PUB | Tank | — | Skipped: representation/reference row without a concrete target. |
+| 744 | 750 | PUB | Tank | — | Skipped: representation/reference row without a concrete target. |
+| 745 | 751 | PUB | Tank | `industry-pub-tank-ispotable-c401604fc360`; `industry-pub-tank-ispotable-c66a10a8c966`; `industry-pub-tank-ispotable-c88d512d7801`; `industry-pub-tank-ispotable-cea12db95aea`; `industry-pub-tank-ispotable-7f9d3d7bba67`; `industry-pub-tank-ispotable-23266b2bbfeb`; `industry-pub-tank-ispotable-bd0909c8f0cd`; `industry-pub-tank-ispotable-8862c27dbd94`; `industry-pub-tank-ispotable-491ccefd25c8` | Mapped |
+| 746 | 752 | PUB | Tank | `industry-pub-tank-nominalcapacity-32efd63a89d0`; `industry-pub-tank-nominalcapacity-bb85fc5a3342`; `industry-pub-tank-nominalcapacity-25b513db822d`; `industry-pub-tank-nominalcapacity-093d3a0e66cc`; `industry-pub-tank-nominalcapacity-bb8e8e9668fb`; `industry-pub-tank-nominalcapacity-dc5b7b390022`; `industry-pub-tank-nominalcapacity-d4810cc796b9`; `industry-pub-tank-nominalcapacity-745f1aafbe6f`; `industry-pub-tank-nominalcapacity-5533ddf9fc70` | Mapped |
+| 747 | 753 | PUB | Tank | `industry-pub-tank-effectivecapacity-a534fc4b4ff7`; `industry-pub-tank-effectivecapacity-fb04517c7688`; `industry-pub-tank-effectivecapacity-70cb677fdafb`; `industry-pub-tank-effectivecapacity-8f7aa9f3970f`; `industry-pub-tank-effectivecapacity-79a234b69d4c`; `industry-pub-tank-effectivecapacity-90da9baacdcc`; `industry-pub-tank-effectivecapacity-66566d6d577d`; `industry-pub-tank-effectivecapacity-581b77f2e450`; `industry-pub-tank-effectivecapacity-01286e65e558` | Mapped |
+| 748 | 754 | PUB | Tank | `industry-pub-tank-diameter-11f1f4e5edc1`; `industry-pub-tank-diameter-337719930efa`; `industry-pub-tank-diameter-5164333a8534`; `industry-pub-tank-diameter-d68edd922507`; `industry-pub-tank-diameter-9b409149472f`; `industry-pub-tank-diameter-7b4291d77383`; `industry-pub-tank-diameter-c58c20584e34`; `industry-pub-tank-diameter-4a0f2f0cd9f2`; `industry-pub-tank-diameter-8352a68a6939` | Mapped |
+| 749 | 755 | PUB | Tank | `industry-pub-tank-height-2d47b2e71499`; `industry-pub-tank-height-8682ff94e0f9`; `industry-pub-tank-height-b7466a09563d`; `industry-pub-tank-height-95c8370616a2`; `industry-pub-tank-height-cb8d1ab1352f`; `industry-pub-tank-height-ccd3d6ca4e2f`; `industry-pub-tank-height-71cae41fadc9`; `industry-pub-tank-height-93297814e5e6`; `industry-pub-tank-height-23d0362d5983` | Mapped |
+| 750 | 756 | PUB | Tank | `industry-pub-tank-length-2585f8d23b7d`; `industry-pub-tank-length-deaedddbee48`; `industry-pub-tank-length-1c3fce35bdff`; `industry-pub-tank-length-e7d100926b27`; `industry-pub-tank-length-245471733113`; `industry-pub-tank-length-e95f96df11ba`; `industry-pub-tank-length-5b7d4156e221`; `industry-pub-tank-length-0ba83b748e8e`; `industry-pub-tank-length-b4a7bde08136` | Mapped |
+| 751 | 757 | PUB | Tank | `industry-pub-tank-thickness-60de528dac58`; `industry-pub-tank-thickness-8baa5e62de37`; `industry-pub-tank-thickness-d75a518a1f84`; `industry-pub-tank-thickness-7ad3d0e19b07`; `industry-pub-tank-thickness-c71d2ff7baff`; `industry-pub-tank-thickness-db365b3b9a3e`; `industry-pub-tank-thickness-40864ec294c3`; `industry-pub-tank-thickness-69353ea38633`; `industry-pub-tank-thickness-f4cb0c45be72` | Mapped |
+| 752 | 758 | PUB | Tank | `industry-pub-tank-width-bfeed742f49a`; `industry-pub-tank-width-917f06195e9f`; `industry-pub-tank-width-c5c519c353ce`; `industry-pub-tank-width-18512e2c5f75`; `industry-pub-tank-width-ce7ab8f26d4e`; `industry-pub-tank-width-078f3e35dc68`; `industry-pub-tank-width-473ec0dbbc02`; `industry-pub-tank-width-148f698cfc55`; `industry-pub-tank-width-e27d27d1e710` | Mapped |
+| 753 | 759 | PUB | Tank | `industry-pub-tank-tradeeffluent-7b0b937bd045`; `industry-pub-tank-tradeeffluent-926b41d58197`; `industry-pub-tank-tradeeffluent-7c4be5544660`; `industry-pub-tank-tradeeffluent-c344a5551f8e`; `industry-pub-tank-tradeeffluent-67d70c5cca0c`; `industry-pub-tank-tradeeffluent-8d1c1a817d84`; `industry-pub-tank-tradeeffluent-63b696759315`; `industry-pub-tank-tradeeffluent-75125f4c4329`; `industry-pub-tank-tradeeffluent-e478c099ebbf` | Mapped |
+| 754 | 760 | PUB | Tank | `industry-pub-tank-equipmenttype-71296bb19b95`; `industry-pub-tank-equipmenttype-1961d9f92489`; `industry-pub-tank-equipmenttype-49a2c5fb575a`; `industry-pub-tank-equipmenttype-17ba33b90861`; `industry-pub-tank-equipmenttype-5894cacc8e21`; `industry-pub-tank-equipmenttype-2f3224089295`; `industry-pub-tank-equipmenttype-da1bafa3076c`; `industry-pub-tank-equipmenttype-59487a81107f`; `industry-pub-tank-equipmenttype-bda8ea8eccf0` | Mapped |
+| 755 | 761 | PUB | Tank (RC Tank) | `industry-pub-tank-rc-tank-spacename-5f49a58054ad` | Mapped |
+| 756 | 762 | PUB | Tank (RC Tank) | `industry-pub-tank-rc-tank-area-fc2cec758739` | Mapped |
+| 757 | 763 | PUB | Tank (RC Tank) | `industry-pub-tank-rc-tank-height-c8b1b4e2e933` | Mapped |
+| 758 | 764 | PUB | Tank (RC Tank) | `industry-pub-tank-rc-tank-thickness-28bdb58ed55f` | Mapped |
+| 759 | 765 | PUB | Tank (RC Tank) | `industry-pub-tank-rc-tank-nominalcapacity-b4c4307ebb35` | Mapped |
+| 760 | 766 | PUB | Tank (RC Tank) | `industry-pub-tank-rc-tank-effectivecapacity-c755ccfa9c8f` | Mapped |
+| 761 | 767 | PUB | Tank (RC Tank) | `industry-pub-tank-rc-tank-ispotable-36c0ef5f478c` | Mapped |
+| 762 | 768 | PUB | Type Bedding for Pipe | `industry-pub-type-bedding-for-pipe-beddingtype-a4b199471f9b` | Mapped |
+| 763 | 769 | SCDF | Valve | — | Skipped: representation/reference row without a concrete target. |
+| 764 | 770 | SCDF | Valve | — | Skipped: representation/reference row without a concrete target. |
+| 765 | 771 | PUB | Valve | — | Skipped: representation/reference row without a concrete target. |
+| 766 | 772 | PUB | Valve | — | Skipped: representation/reference row without a concrete target. |
+| 767 | 773 | PUB | Valve | — | Skipped: representation/reference row without a concrete target. |
+| 768 | 774 | PUB | Valve | — | Skipped: representation/reference row without a concrete target. |
+| 769 | 775 | NEA | Valve | — | Skipped: representation/reference row without a concrete target. |
+| 770 | 776 | NEA | Valve | — | Skipped: representation/reference row without a concrete target. |
+| 771 | 777 | PUB | Valve | — | Skipped: representation/reference row without a concrete target. |
+| 772 | 778 | All | Valve | `industry-all-valve-systemname-15c0191237bc`; `industry-all-valve-systemname-7c3a6d2316a6`; `industry-all-valve-systemname-8b5ce19030a0`; `industry-all-valve-systemname-f429592a2c24`; `industry-all-valve-systemname-9100d66aba84`; `industry-all-valve-systemname-8eb61cbad2e9`; `industry-all-valve-systemname-267e1dd6d140`; `industry-all-valve-systemname-d2e465a15fc4`; `industry-all-valve-systemname-0b738da13ce3` | Mapped |
+| 773 | 779 | All | Valve | `industry-all-valve-systemtype-963dda4af165`; `industry-all-valve-systemtype-0b4fb7619089`; `industry-all-valve-systemtype-79cc8741901f`; `industry-all-valve-systemtype-2b503ea1f3f2`; `industry-all-valve-systemtype-6c967bf40938`; `industry-all-valve-systemtype-b4f11a2d586e`; `industry-all-valve-systemtype-0850a09ff5cc`; `industry-all-valve-systemtype-8ff1b13d808e`; `industry-all-valve-systemtype-03e79c48919e` | Mapped |
+| 774 | 780 | NParks | Wall | — | Skipped: representation/reference row without a concrete target. |
+| 775 | 781 | URA | Wall | — | Skipped: representation/reference row without a concrete target. |
+| 776 | 782 | URA | Wall | — | Skipped: representation/reference row without a concrete target. |
+| 777 | 783 | BCA | Wall | `industry-bca-wall-constructionmethod-fd8aaee67e98`; `industry-bca-wall-constructionmethod-e5cf29a93926`; `industry-bca-wall-constructionmethod-c9371d472702` | Mapped |
+| 778 | 784 | BCA | Wall | `industry-bca-wall-ispartywall-c31cd74baeb7`; `industry-bca-wall-ispartywall-c141c4a0ada6`; `industry-bca-wall-ispartywall-e10c66eb7216` | Mapped |
+| 779 | 785 | BCA | Wall | `industry-bca-wall-arrangementtype-2728a51ecdbf` | Mapped |
+| 780 | 786 | BCA | Wall | `industry-bca-wall-beamfa-ade-c65af23c46b5` | Mapped |
+| 781 | 787 | BCA | Wall | `industry-bca-wall-constructionmethod-d83c55c0efbe` | Mapped |
+| 782 | 788 | BCA | Wall | `industry-bca-wall-doublebayfa-ade-6bf469b855e6` | Mapped |
+| 783 | 789 | BCA | Wall | `industry-bca-wall-horizontalrebar-ca1efa9de02a` | Mapped |
+| 784 | 790 | BCA | Wall | `industry-bca-wall-isexternal-988f969ce660` | Mapped |
+| 785 | 791 | BCA | Wall | `industry-bca-wall-loadbearing-d324a21e5f2d` | Mapped |
+| 786 | 792 | BCA | Wall | `industry-bca-wall-mark-8195ab70ef29` | Mapped |
+| 787 | 793 | BCA | Wall | `industry-bca-wall-materialgrade-56013dcea782` | Mapped |
+| 788 | 794 | BCA | Wall | `industry-bca-wall-mechanicalconnectiontype-c9062cebdee4` | Mapped |
+| 789 | 795 | BCA | Wall | `industry-bca-wall-prefabricatedreinforcementcage-60aa437d9d15` | Mapped |
+| 790 | 796 | BCA | Wall | `industry-bca-wall-prefinishedfa-ade-d2443e8c541c` | Mapped |
+| 791 | 797 | BCA | Wall | `industry-bca-wall-referto2ddetail-6b91a83ca8d4` | Mapped |
+| 792 | 798 | BCA | Wall | `industry-bca-wall-reinforcementsteelgrade-b4fda2cc5c6c` | Mapped |
+| 793 | 799 | BCA | Wall | `industry-bca-wall-shelterusage-ae6be4fc58e5` | Mapped |
+| 794 | 800 | BCA | Wall | `industry-bca-wall-stirrups-9c3dee709cf2` | Mapped |
+| 795 | 801 | BCA | Wall | `industry-bca-wall-stirrupstype-2d2ceb4f807c` | Mapped |
+| 796 | 802 | BCA | Wall | `industry-bca-wall-thickness-3718bae9a0e9` | Mapped |
+| 797 | 803 | BCA | Wall | `industry-bca-wall-verticalrebar-b5a463fc4894` | Mapped |
+| 798 | 804 | BCA | Wall | `industry-bca-wall-workingload-da1-1-512fcdf3b56c` | Mapped |
+| 799 | 805 | BCA | Wall | `industry-bca-wall-workingload-da1-2-b80bce3a469d` | Mapped |
+| 800 | 806 | PUB | Waste Terminal | — | Skipped: representation/reference row without a concrete target. |
+| 801 | 807 | PUB | Waste Terminal | — | Skipped: representation/reference row without a concrete target. |
+| 802 | 808 | PUB | Waste Terminal | — | Skipped: representation/reference row without a concrete target. |
+| 803 | 809 | PUB | Waste Terminal | — | Skipped: representation/reference row without a concrete target. |
+| 804 | 810 | PUB | Waste Terminal | — | Skipped: representation/reference row without a concrete target. |
+| 805 | 811 | PUB | Waste Terminal | — | Skipped: representation/reference row without a concrete target. |
+| 806 | 812 | PUB | Waste Terminal | `industry-pub-waste-terminal-material-b0639941f555`; `industry-pub-waste-terminal-material-4401ee9398be`; `industry-pub-waste-terminal-material-d4ba5f21d290`; `industry-pub-waste-terminal-material-3b71d6ec42b2`; `industry-pub-waste-terminal-material-c90307d6e05d`; `industry-pub-waste-terminal-material-9173c056df49` | Mapped |
+| 807 | 813 | NEA | Waste Terminal | `industry-nea-waste-terminal-tradeeffluent-504a0bb1f528`; `industry-nea-waste-terminal-tradeeffluent-867136297f7e`; `industry-nea-waste-terminal-tradeeffluent-92793f5ce58a`; `industry-nea-waste-terminal-tradeeffluent-167bb08939dd`; `industry-nea-waste-terminal-tradeeffluent-ddbd8312bdfe`; `industry-nea-waste-terminal-tradeeffluent-0c8f2f389a23` | Mapped |
+| 808 | 814 | All | Waste Terminal | `industry-all-waste-terminal-systemname-c76a39b4dcbe`; `industry-all-waste-terminal-systemname-910c8f86d120`; `industry-all-waste-terminal-systemname-d75d3e272a3f`; `industry-all-waste-terminal-systemname-a53c3a738372`; `industry-all-waste-terminal-systemname-02e2a58e6341`; `industry-all-waste-terminal-systemname-e9875b56bea1` | Mapped |
+| 809 | 815 | All | Waste Terminal | `industry-all-waste-terminal-systemtype-a2fb6f3fbb62`; `industry-all-waste-terminal-systemtype-310dcb0cfdb5`; `industry-all-waste-terminal-systemtype-69f98504b1b1`; `industry-all-waste-terminal-systemtype-11a1b2e584d8`; `industry-all-waste-terminal-systemtype-d9d55eb4b9bb`; `industry-all-waste-terminal-systemtype-033531cdf19a` | Mapped |
+| 810 | 816 | PUB | Water Meter | `industry-pub-water-meter-capacity-464e16c9b71a` | Mapped |
+| 811 | 817 | PUB | Water Meter | `industry-pub-water-meter-diameter-0c903640a005` | Mapped |
+| 812 | 818 | PUB | Water Meter | `industry-pub-water-meter-length-757d814ad4ae` | Mapped |
+| 813 | 819 | PUB | Water Meter | `industry-pub-water-meter-purpose-6f5dbe7d21e0` | Mapped |
+| 814 | 820 | PUB | Water Meter | `industry-pub-water-meter-unitnumber-a638736e2830` | Mapped |
+| 815 | 821 | PUB | Water Meter | `industry-pub-water-meter-unitnumbertag-67095676f26c` | Mapped |
+| 816 | 822 | PUB | Water Meter | `industry-pub-water-meter-watersupplysource-b963401bf62b` | Mapped |
+| 817 | 823 | PUB | Water Meter | `industry-pub-water-meter-systemname-363d17aa0517` | Mapped |
+| 818 | 824 | PUB | Water Meter | `industry-pub-water-meter-systemtype-6f706052de83` | Mapped |
+| 819 | 825 | BCA | Window | — | Skipped: representation/reference row without a concrete target. |
+| 820 | 826 | BCA | Window | — | Skipped: representation/reference row without a concrete target. |
+| 821 | 827 | BCA | Window | — | Skipped: representation/reference row without a concrete target. |
+| 822 | 828 | BCA | Window | — | Skipped: representation/reference row without a concrete target. |
+| 823 | 829 | BCA | Window | — | Skipped: representation/reference row without a concrete target. |
+| 824 | 830 | BCA | Window | `industry-bca-window-innerdiameter-5055bd76dac4` | COP subtype list unavailable: applies to every subtype of this IFC entity. |
+| 825 | 831 | BCA | Window | `industry-bca-window-outerdiameter-8c6b3d9d6b8b` | COP subtype list unavailable: applies to every subtype of this IFC entity. |
+| 826 | 832 | SCDF | Window | `industry-scdf-window-fireaccessopening-a3acfcd3b095` | COP subtype list unavailable: applies to every subtype of this IFC entity. |
+| 827 | 833 | BCA | Window | `industry-bca-window-structuralwidth-d44bd5065eb8` | COP subtype list unavailable: applies to every subtype of this IFC entity. |
+| 828 | 834 | BCA | Window | `industry-bca-window-structuralheight-d7a82fb5e1e5` | COP subtype list unavailable: applies to every subtype of this IFC entity. |
+| 829 | 835 | URA | Window | `industry-ura-window-material-524d8c31de6c` | COP subtype list unavailable: applies to every subtype of this IFC entity. |
+| 830 | 836 | SCDF | Window | `industry-scdf-window-safetybarrierheight-94272cede3b8` | COP subtype list unavailable: applies to every subtype of this IFC entity. |
+| 831 | 837 | BCA | Window | `industry-bca-window-percentageofopening-3cd88cc2c933` | COP subtype list unavailable: applies to every subtype of this IFC entity. |
+| 832 | 838 | All | Block Name | `industry-all-block-name-name-2095d9f625f4` | Mapped |
+| 833 | 839 | All | Block Name | `industry-all-block-name-name-2095d9f625f4` | Identical check deduplicated: industry-all-block-name-name-2095d9f625f4 |

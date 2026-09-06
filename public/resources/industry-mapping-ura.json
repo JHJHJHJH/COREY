@@ -1,0 +1,1841 @@
+{
+  "version": 4,
+  "severities": [
+    {
+      "id": "warn",
+      "label": "Warn",
+      "color": "#d29a2f",
+      "order": 1
+    },
+    {
+      "id": "error",
+      "label": "Error",
+      "color": "#bb5a36",
+      "order": 2
+    }
+  ],
+  "clauses": [
+    {
+      "id": "industry-ura-earthworks",
+      "title": "URA - Earthworks",
+      "rules": [
+        {
+          "id": "industry-ura-earthworks-status-773a19d79751",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "TERRAIN",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "Status"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Existing",
+              "Proposed"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-earthworks-area-582d1e7080b0",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "TERRAIN",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElementDimension",
+            "label": "Area"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "industry-ura-parking-lot-relevant-elements",
+      "title": "URA - Parking Lot (relevant elements)",
+      "rules": [
+        {
+          "id": "industry-ura-parking-lot-relevant-elements-agf-name-d12fe3013c2c",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_GFA",
+            "label": "AGF_Name"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Car Parking Lot (Mechanised)"
+            ]
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "industry-ura-site",
+      "title": "URA - Site",
+      "rules": [
+        {
+          "id": "industry-ura-site-numberofworkers-9a158cf8417b",
+          "ifcType": "IfcSite",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Site",
+            "label": "NumberOfWorkers"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "industry-ura-site-boundary",
+      "title": "URA - Site Boundary",
+      "rules": [
+        {
+          "id": "industry-ura-site-boundary-area-d7649a67aba8",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "CADASTRALLOT",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElementDimension",
+            "label": "Area"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-site-boundary-broadlanduse-108f726f2769",
+          "ifcType": "IfcGeographicElement",
+          "subtype": "SITEBOUNDARY",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_GeographicElement",
+            "label": "BroadLandUse"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Agriculture",
+              "Beach Area",
+              "Business 1",
+              "Business 1- White",
+              "Business 2",
+              "Business 2- White",
+              "Business Park",
+              "Business Park- White",
+              "Cemetery",
+              "Civic & Community Institution",
+              "Commercial",
+              "Commercial & Residential",
+              "Commercial/Institution",
+              "Educational Institution",
+              "Health & Medical Care",
+              "Hotel",
+              "Open Space",
+              "Park",
+              "Place of Worship",
+              "Port/Airport",
+              "Rapid Transit",
+              "Reserve Site",
+              "Residential",
+              "Residential with Commercial at 1st storey",
+              "Residential/Institution",
+              "Road",
+              "Special Use",
+              "Sports & Recreation",
+              "Transport Facilities",
+              "Utility",
+              "Waterbody",
+              "White"
+            ]
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "industry-ura-space-area",
+      "title": "URA - Space (Area)",
+      "rules": [
+        {
+          "id": "industry-ura-space-area-acn-activitygeneratingusetype-8c2c218246ff",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_Connectivity",
+            "label": "ACN_ActivityGeneratingUseType"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Single Side",
+              "Double Side"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-acn-closetime-966557039d62",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_Connectivity",
+            "label": "ACN_CloseTime"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-acn-connectivitytype-8ec426ae394d",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_Connectivity",
+            "label": "ACN_ConnectivityType"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Open Walkway",
+              "Covered Walkway",
+              "Covered Linkway",
+              "Through Block Link",
+              "Elevated Pedestrian Link",
+              "Underground Pedestrian Link",
+              "Public Space Node",
+              "Cycling Path",
+              "Sky Bridge"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-acn-isopen24hourstopublic-c75ead1afd47",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_Connectivity",
+            "label": "ACN_IsOpen24HoursToPublic"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-acn-ispavingspecified-9a9c0655043a",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_Connectivity",
+            "label": "ACN_IsPavingSpecified"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-acn-opentime-58f40f86f215",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_Connectivity",
+            "label": "ACN_OpenTime"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-acn-pavingspecification-aa201acf0fc9",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_Connectivity",
+            "label": "ACN_PavingSpecification"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-agf-bonusgfatype-6270361703bc",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_GFA",
+            "label": "AGF_BonusGFAType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-agf-buildingtypology-fe107d1d291e",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_GFA",
+            "label": "AGF_BuildingTypology"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-agf-developmentuse-f8cbc24b9741",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_GFA",
+            "label": "AGF_DevelopmentUse"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-agf-name-ec54dad65d8c",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_GFA",
+            "label": "AGF_Name"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-agf-note-1f3a0e000c2f",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_GFA",
+            "label": "AGF_Note"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-agf-supportingfacility-014204edb641",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_GFA",
+            "label": "AGF_SupportingFacility"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-agf-unitnumber-9ad5eb1ac5d1",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_GFA",
+            "label": "AGF_UnitNumber"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-agf-usequantum-78077da95dff",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_GFA",
+            "label": "AGF_UseQuantum"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Predominant",
+              "Ancillary"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-als-greeneryfeatures-af54bf1357f2",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_Landscape",
+            "label": "ALS_GreeneryFeatures"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-als-landscapetype-5e418611f0f3",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_Landscape",
+            "label": "ALS_LandscapeType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-als-species-d817cada0e01",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_Landscape",
+            "label": "ALS_Species"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-ast-areatype-cd8fb13212ff",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_Strata",
+            "label": "AST_AreaType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-ast-extg-stratalotnumber-e7e203edb29e",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_Strata",
+            "label": "AST_Extg_StrataLotNumber"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-ast-legalarea-96e9501474e4",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_Strata",
+            "label": "AST_LegalArea"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-ast-prop-stratalotnumber-3ae46c3a60f6",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_Strata",
+            "label": "AST_Prop_StrataLotNumber"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-ura-space-area-avf-includeasgfa-c8e7c56e00b5",
+          "ifcType": "IfcSpace",
+          "subtype": "AREA_GFA",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceArea_Verification",
+            "label": "AVF_IncludeAsGFA"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "industry-ura-window",
+      "title": "URA - Window",
+      "rules": [
+        {
+          "id": "industry-ura-window-material-524d8c31de6c",
+          "ifcType": "IfcWindow",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Material",
+            "label": "Material"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "industry-all-block-name",
+      "title": "Shared - Block Name",
+      "rules": [
+        {
+          "id": "industry-all-block-name-name-2095d9f625f4",
+          "ifcType": "IfcSite",
+          "target": {
+            "kind": "attribute",
+            "name": "Name"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "industry-all-sanitary-appliances",
+      "title": "Shared - Sanitary Appliances",
+      "rules": [
+        {
+          "id": "industry-all-sanitary-appliances-systemname-e8b0a360c73e",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "BATH",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemtype-c77e5dd7b4e0",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "BATH",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemname-4d08bb5c057e",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "BIDET",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemtype-84a73cd3e817",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "BIDET",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemname-98b59ae49f1c",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "SHOWER",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemtype-a6f5fa70b9f8",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "SHOWER",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemname-2230f8f21410",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "URINAL",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemtype-e9274ae6f9ff",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "URINAL",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemname-5d56d9960182",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "WASHHANDBASIN",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemtype-68a9ba097707",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "WASHHANDBASIN",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemname-6330a85967bf",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "WATERCLOSET",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-sanitary-appliances-systemtype-5d37180a6de4",
+          "ifcType": "IfcSanitaryTerminal",
+          "subtype": "WATERCLOSET",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SanitaryTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "industry-all-space-usage",
+      "title": "Shared - Space (Usage)",
+      "rules": [
+        {
+          "id": "industry-all-space-usage-accreditation-mas-31ee2d442cdd",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "Accreditation_MAS"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-ambulantdisabled-cac143de1073",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "AmbulantDisabled"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-barrierfreeaccessibility-b41d22f44b2c",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "BarrierFreeAccessibility"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-childrenfriendly-ed933c538be7",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "ChildrenFriendly"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-cvalue-901b0fc0b0cc",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "CValue"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-elderlyfriendly-82d5097a1506",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "ElderlyFriendly"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-emergencyvoicecommunicationsystem-3384008b0dad",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "EmergencyVoiceCommunicationSystem"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "1-way EVC System",
+              "2-way EVC System",
+              "Public Address System"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-firedetectionandsuppressionsystem-74e66220c23a",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "FireDetectionAndSuppressionSystem"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Automatic Fire Alarm System",
+              "Automatic Sprinkler System",
+              "Water Mist System",
+              "Video Image Fire Detector System",
+              "Kitchen Hood Fire Extinguishing System",
+              "Clean Agent Fire Extinguishing System",
+              "Automatic Foam Sprinkler System",
+              "Foam Extinguisher System"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-fireemergencyventilationmode-2c630f4fcaea",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "FireEmergencyVentilationMode"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Natural Ventilation",
+              "Mechanical Ventilation",
+              "Pressurisation",
+              "Cross-ventilation",
+              "Cross-ventilation with Intermediate Ventilation Opening",
+              "Vapour Extraction System (for spray painting room)"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-fireexit-1f612247de74",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "FireExit"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-fullycoveredwithtreesshrubs-1fc5fdfeeea3",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "FullyCoveredWithTreesShrubs"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-hearingenhancement-2d40f66bffbc",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "HearingEnhancement"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-largeraccessible-0f666a5584d8",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "LargerAccessible"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-occupancyload-113e404a24b6",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "OccupancyLoad"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-occupancytype-765e4b44fa67",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "OccupancyType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-parkingtype-2e971d6e2bb5",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "ParkingType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-purposegroup-6e1467d6b4ba",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "PurposeGroup"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-refuseoutput-61b9644f8159",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "RefuseOutput"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-retrofit-eb9523a18117",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "Retrofit"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-smokecontrolsystem-d32382e2835e",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "SmokeControlSystem"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Smoke Vent",
+              "Smoke Purging System",
+              "Ductless Jet Fan System",
+              "Engineered Smoke Control System"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-soundpowerlevel-883f640ee3fb",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "SoundPowerLevel"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-soundpressurelevel-5718e7488a68",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "SoundPressureLevel"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-spacename-51588b653be5",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "SpaceName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-steprampaccess-a40e59462fbf",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "StepRampAccess"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-twentyfourhourmannedstation-56cbb105a3cd",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "TwentyFourHourMannedStation"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "true",
+              "false",
+              "1",
+              "0",
+              "yes",
+              "no",
+              "y",
+              "n",
+              ".t.",
+              ".f.",
+              "t",
+              "f"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-unitnumber-e32db42586e5",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "UnitNumber"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-ventilationmode-ce8937c0d4c6",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "VentilationMode"
+          },
+          "check": {
+            "kind": "enum",
+            "allowedValues": [
+              "Natural Ventilation",
+              "Air Conditioning",
+              "Mechanical Ventilation"
+            ]
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-ventilationtype-586d520802df",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "VentilationType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-volume-401d85960d32",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Space",
+            "label": "Volume"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-area-fc2cec758739",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceDimension",
+            "label": "Area"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-space-usage-height-c8b1b4e2e933",
+          "ifcType": "IfcSpace",
+          "subtype": "SPACE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_SpaceDimension",
+            "label": "Height"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "industry-all-valve",
+      "title": "Shared - Valve",
+      "rules": [
+        {
+          "id": "industry-all-valve-systemname-15c0191237bc",
+          "ifcType": "IfcValve",
+          "subtype": "AIRADMITTANCE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemtype-963dda4af165",
+          "ifcType": "IfcValve",
+          "subtype": "AIRADMITTANCE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemname-7c3a6d2316a6",
+          "ifcType": "IfcValve",
+          "subtype": "CHECK",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemtype-0b4fb7619089",
+          "ifcType": "IfcValve",
+          "subtype": "CHECK",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemname-8b5ce19030a0",
+          "ifcType": "IfcValve",
+          "subtype": "DOUBLECHECK",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemtype-79cc8741901f",
+          "ifcType": "IfcValve",
+          "subtype": "DOUBLECHECK",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemname-f429592a2c24",
+          "ifcType": "IfcValve",
+          "subtype": "DRAINOFFCOCK",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemtype-2b503ea1f3f2",
+          "ifcType": "IfcValve",
+          "subtype": "DRAINOFFCOCK",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemname-9100d66aba84",
+          "ifcType": "IfcValve",
+          "subtype": "FAUCET",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemtype-6c967bf40938",
+          "ifcType": "IfcValve",
+          "subtype": "FAUCET",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemname-8eb61cbad2e9",
+          "ifcType": "IfcValve",
+          "subtype": "ISOLATING",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemtype-b4f11a2d586e",
+          "ifcType": "IfcValve",
+          "subtype": "ISOLATING",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemname-267e1dd6d140",
+          "ifcType": "IfcValve",
+          "subtype": "LANDINGVALVE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemtype-0850a09ff5cc",
+          "ifcType": "IfcValve",
+          "subtype": "LANDINGVALVE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemname-d2e465a15fc4",
+          "ifcType": "IfcValve",
+          "subtype": "MIXING",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemtype-8ff1b13d808e",
+          "ifcType": "IfcValve",
+          "subtype": "MIXING",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemname-0b738da13ce3",
+          "ifcType": "IfcValve",
+          "subtype": "SPRINKLERCONTROL",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-valve-systemtype-03e79c48919e",
+          "ifcType": "IfcValve",
+          "subtype": "SPRINKLERCONTROL",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_Valve",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        }
+      ]
+    },
+    {
+      "id": "industry-all-waste-terminal",
+      "title": "Shared - Waste Terminal",
+      "rules": [
+        {
+          "id": "industry-all-waste-terminal-systemname-c76a39b4dcbe",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "FLOORTRAP",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemtype-a2fb6f3fbb62",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "FLOORTRAP",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemname-910c8f86d120",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "FLOORWASTE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemtype-310dcb0cfdb5",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "FLOORWASTE",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemname-d75d3e272a3f",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "GULLYSUMP",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemtype-69f98504b1b1",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "GULLYSUMP",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemname-a53c3a738372",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "GULLYTRAP",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemtype-11a1b2e584d8",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "GULLYTRAP",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemname-02e2a58e6341",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "WASTESUMP",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemtype-d9d55eb4b9bb",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "WASTESUMP",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemname-e9875b56bea1",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "WASTETRAP",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemName"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        },
+        {
+          "id": "industry-all-waste-terminal-systemtype-033531cdf19a",
+          "ifcType": "IfcWasteTerminal",
+          "subtype": "WASTETRAP",
+          "target": {
+            "kind": "property",
+            "group": "SGPset_WasteTerminal",
+            "label": "SystemType"
+          },
+          "check": {
+            "kind": "empty"
+          },
+          "failSeverity": "error"
+        }
+      ]
+    }
+  ]
+}
