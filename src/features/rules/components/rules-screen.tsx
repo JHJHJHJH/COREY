@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import industryMappingManifest from "../../../../public/resources/industry-mapping-manifest.json";
 import {
   ArrowDown,
   ArrowUp,
@@ -10,6 +11,7 @@ import {
   ChevronsUpDown,
   CircleAlert,
   Download,
+  FileText,
   LayoutTemplate,
   Loader2,
   Plus,
@@ -37,7 +39,6 @@ import {
   listRuleTemplates,
   readRuleTemplate,
   ruleTemplateConfigEndpoint,
-  ruleTemplateSourceEndpoint,
   saveRuleTemplate,
 } from "@/features/rules/lib/rule-template-api";
 import type {
@@ -126,13 +127,7 @@ const columnDividerClassName = "border-r border-[color:var(--viewer-border)]";
 /* Pure helpers                                                         */
 /* ------------------------------------------------------------------ */
 
-function canDownloadTemplateSource(template: ViewerRuleTemplateSummary) {
-  return (
-    Boolean(template.sourceFileName) &&
-    template.templateId !== "industry-mapping-bca-column-beam" &&
-    template.name !== "BCA - Column + Beam"
-  );
-}
+const INDUSTRY_MAPPING_TEMPLATE_IDS = new Set(industryMappingManifest.map((template) => template.id));
 
 function enumText(check: ViewerValidationCheck) {
   return check.kind === "enum" ? check.allowedValues.join(", ") : "";
@@ -743,7 +738,7 @@ function TemplateRow({
           {template.name}
         </div>
         {template.description ? (
-          <p className="mt-0.5 truncate text-[11px] leading-4 text-[color:var(--muted-ink)]">
+          <p title={template.description} className="mt-0.5 truncate text-[11px] leading-4 text-[color:var(--muted-ink)]">
             {template.description}
           </p>
         ) : null}
@@ -780,15 +775,15 @@ function TemplateRow({
         >
           <Download className="h-3.5 w-3.5" />
         </a>
-        {canDownloadTemplateSource(template) ? (
+        {INDUSTRY_MAPPING_TEMPLATE_IDS.has(template.templateId) ? (
           <a
-            href={ruleTemplateSourceEndpoint(template.templateId)}
+            href="/resources/industry-mapping-coverage.md"
             download
-            aria-label={`Download ${template.name} as CSV`}
-            title="Download CSV"
-            className={`${iconButtonClassName()} font-mono text-[9px] font-semibold opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100`}
+            aria-label={`Download review notes for ${template.name}`}
+            title="Download review notes"
+            className={`${iconButtonClassName()} transition hover:border-[color:var(--accent)]`}
           >
-            CSV
+            <FileText className="h-3.5 w-3.5" />
           </a>
         ) : null}
         <button
