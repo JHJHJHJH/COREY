@@ -6,6 +6,15 @@ This project uses semantic versioning once public releases begin.
 
 ## Unreleased
 
+## 1.2.2 - 2026-09-06
+
+- Renamed the agency/shared template labels to CX Industry Mapping.
+- Grouped all agency/shared industry mapping templates under Starter and removed
+  the separate Industry filter and section.
+- Removed the review-notes page, its navigation links, and template row buttons.
+- Retired the BCA - Column + Beam starter, including its stored catalog entry on
+  existing installations.
+
 ## 1.2.1 - 2026-09-06
 
 - Moved the industry mapping review notes into Docs, with a user-guide navigation

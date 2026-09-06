@@ -16,8 +16,6 @@ import type {
   ViewerValidationTarget,
 } from "@/features/viewer/types";
 
-export const INDUSTRY_MAPPING_SOURCE = "industry-mapping-4-dec-csv.csv";
-export const INDUSTRY_MAPPING_REVIEW_PATH = "content/docs/industry-mapping-review.mdx";
 const AGENCIES = ["BCA", "SCDF", "URA", "NEA", "PUB", "LTA", "NParks", "All"];
 const HEADERS = {
   serial: "S/N",
@@ -34,7 +32,7 @@ type ManifestEntry = {
   id: string;
   name: string;
   description: string;
-  sourceKind: "industry-mapping";
+  sourceKind: "starter";
   configFileName: string;
   sourceFileName: null;
   sortOrder: number;
@@ -268,9 +266,9 @@ export async function generateIndustryMapping(csv: string): Promise<GeneratedInd
     return {
       manifest: {
         id,
-        name: shared ? "Shared Requirements - Industry Mapping" : `${agency} - Industry Mapping`,
-        description: `Manual review required. ${shared ? "Shared All-agency requirements" : `${agency} requirements, including shared All-agency clauses`} from the 4 Dec CSV. Component applicability can overlap or conflict, and referenced value lists are incomplete. Read the review notes in Docs for details.`,
-        sourceKind: "industry-mapping",
+        name: shared ? "Shared Requirements - CX Industry Mapping" : `${agency} - CX Industry Mapping`,
+        description: `Manual review required. ${shared ? "Shared All-agency requirements" : `${agency} requirements, including shared All-agency clauses`} from the 4 Dec CSV. Component applicability can overlap or conflict, and referenced value lists are incomplete.`,
+        sourceKind: "starter",
         configFileName: `${id}.json`,
         sourceFileName: null,
         sortOrder: 40 + index,
@@ -281,44 +279,9 @@ export async function generateIndustryMapping(csv: string): Promise<GeneratedInd
   return { sourceHash: hash(csv), templates, records, overlaps: findOverlaps(templates) };
 }
 
-function tableCell(value: string) {
-  return value.replace(/&/g, "&amp;").replace(/[<>{}]/g, (character) => `&#${character.charCodeAt(0)};`)
-    .replace(/\|/g, "\\|").replace(/[\r\n]+/g, " ");
-}
-
-function coverageMdx(result: GeneratedIndustryMapping) {
-  const mapped = result.records.filter((record) => record.ruleIds.length > 0).length;
-  const lines = [
-    "---",
-    "title: Industry mapping review notes",
-    "description: Source coverage, skipped checks, and applicability conflicts in the agency starter templates.",
-    "full: true",
-    "---", "",
-    `Generated from \`${INDUSTRY_MAPPING_SOURCE}\`. The source CSV is not distributed with COREY. Regeneration requires a separately supplied file: \`pnpm templates:generate --source /path/to/mapping.csv\`. Do not edit generated artifacts.`, "",
-    `Source SHA-256: \`${result.sourceHash}\`.`, "",
-    `${result.records.length} source records: ${mapped} mapped, ${result.records.length - mapped} skipped. Identical checks are deduplicated within a component; subtype lists expand into multiple rules. Shared clauses appear in every agency template and in the standalone shared template.`, "",
-    "## Review before running", "",
-    "These starter mappings require manual review. Component names group clauses but do not restrict applicability: the evaluator only filters by IFC entity and subtype. In particular, household shelters, refuse chutes, and staircases can impose incompatible SpaceName values on the same IfcSpace / SPACE. All source checks are retained for the reviewer to edit or remove.", "",
-    "N.A means any subtype, including mixed N.A/subtype lists. The unavailable COP subtype list also becomes any subtype. A leading * is removed to match the runtime's resolved USERDEFINED/ObjectType value. Missing Space Values lists become presence checks. Sample values and property units do not create constraints; material-set metadata does not add material relationship checks. Positive numbers use decimal/scientific text syntax. Enum comparisons are case-insensitive, with both boolean values accepted in the runtime's supported spellings.", "",
-    "The overlap table identifies shared targets across component clauses, including unrestricted rules overlapping a specific subtype. Different checks may conflict; equal checks can still have overly broad component applicability. This is a review aid, not proof that other mappings apply to every project.", "",
-    "## Templates", "", "| Template | Clauses | Rules |", "| --- | ---: | ---: |",
-    ...result.templates.map(({ manifest, config }) => `| [${manifest.name}](/resources/${manifest.configFileName}) | ${config.clauses.length} | ${config.clauses.reduce((sum, clause) => sum + clause.rules.length, 0)} |`),
-    "", "## Component overlaps", "",
-    "| Template | Entity / target / subtype | Clauses | Checks | Rule IDs |", "| --- | --- | --- | --- | --- |",
-    ...result.overlaps.map((overlap) => `| ${overlap.templateId} | ${tableCell(overlap.target)} | ${overlap.clauseTitles.map(tableCell).join("; ")} | ${overlap.differentChecks ? "Different — review for conflicts" : "Equal — review applicability"} | ${overlap.ruleIds.map((id) => `\`${id}\``).join("; ")} |`),
-    "", "## Source record coverage", "",
-    "Record numbers count CSV data records, excluding the multiline header; they are not physical file line numbers. S/N is preserved for reference and is not unique (609 occurs twice). Rule IDs locate checks in the JSON templates; shared IDs are intentionally reused across template configs.", "",
-    "| Record | S/N | Agency | Component | Rule IDs | Notes |", "| ---: | --- | --- | --- | --- | --- |",
-    ...result.records.map((record) => `| ${record.record} | ${tableCell(record.serial)} | ${record.agency} | ${tableCell(record.component)} | ${record.ruleIds.map((id) => `\`${id}\``).join("; ") || "—"} | ${record.notes.map(tableCell).join("; ") || "Mapped"} |`),
-    "",
-  ];
-  return lines.join("\n");
-}
-
 export function industryMappingArtifacts(result: GeneratedIndustryMapping): Map<string, string> {
   return new Map([
     ...result.templates.map(({ manifest, config }): [string, string] => [`public/resources/${manifest.configFileName}`, `${serializeViewerValidationConfig(config)}\n`]),
     ["public/resources/industry-mapping-manifest.json", `${JSON.stringify(result.templates.map(({ manifest }) => manifest), null, 2)}\n`],
-    [INDUSTRY_MAPPING_REVIEW_PATH, coverageMdx(result)],
   ]);
 }

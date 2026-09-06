@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import industryMappingManifest from "../../../../public/resources/industry-mapping-manifest.json";
 import {
   ArrowDown,
   ArrowUp,
@@ -11,7 +10,6 @@ import {
   ChevronsUpDown,
   CircleAlert,
   Download,
-  FileText,
   LayoutTemplate,
   Loader2,
   Plus,
@@ -126,8 +124,6 @@ const columnDividerClassName = "border-r border-[color:var(--viewer-border)]";
 /* ------------------------------------------------------------------ */
 /* Pure helpers                                                         */
 /* ------------------------------------------------------------------ */
-
-const INDUSTRY_MAPPING_TEMPLATE_IDS = new Set(industryMappingManifest.map((template) => template.id));
 
 function enumText(check: ViewerValidationCheck) {
   return check.kind === "enum" ? check.allowedValues.join(", ") : "";
@@ -628,7 +624,6 @@ const TEMPLATE_SOURCE_FILTERS: { id: TemplateSourceFilter; label: string }[] = [
   { id: "all", label: "All" },
   { id: "user", label: "Yours" },
   { id: "starter", label: "Starter" },
-  { id: "industry-mapping", label: "Industry" },
 ];
 
 function countLabel(count: number, noun: string) {
@@ -775,18 +770,6 @@ function TemplateRow({
         >
           <Download className="h-3.5 w-3.5" />
         </a>
-        {INDUSTRY_MAPPING_TEMPLATE_IDS.has(template.templateId) ? (
-          <a
-            href="/docs/industry-mapping-review"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={`Read review notes for ${template.name} in Docs (opens in a new tab)`}
-            title="Read review notes in Docs (opens in a new tab)"
-            className={`${iconButtonClassName()} transition hover:border-[color:var(--accent)]`}
-          >
-            <FileText className="h-3.5 w-3.5" />
-          </a>
-        ) : null}
         <button
           type="button"
           onClick={onRequestDelete}
@@ -853,7 +836,6 @@ function TemplatesPopover({
       all: templates.length,
       user: 0,
       starter: 0,
-      "industry-mapping": 0,
     };
     for (const template of templates) {
       counts[template.sourceKind] += 1;
@@ -879,11 +861,6 @@ function TemplatesPopover({
           id: "starter",
           label: "Starter",
           items: matched.filter((t) => t.sourceKind === "starter"),
-        },
-        {
-          id: "industry-mapping",
-          label: "Industry mapping",
-          items: matched.filter((t) => t.sourceKind === "industry-mapping"),
         },
       ].filter((group) => group.items.length > 0),
     [matched],

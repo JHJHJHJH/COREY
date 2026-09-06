@@ -73,18 +73,9 @@ const BUILT_IN_RULE_TEMPLATES = [
     sourceFileName: null,
     sortOrder: 20,
   },
-  {
-    id: "industry-mapping-bca-column-beam",
-    name: "BCA - Column + Beam",
-    description: "BCA industry mapping checks for column and beam SGPset requirements.",
-    sourceKind: "industry-mapping",
-    configFileName: "industry-mapping-bca-column-beam.json",
-    sourceFileName: null,
-    sortOrder: 30,
-  },
   ...industryMappingManifest.map((template) => ({
     ...template,
-    sourceKind: "industry-mapping" as const,
+    sourceKind: "starter" as const,
   })),
 ] satisfies BuiltInRuleTemplate[];
 
@@ -95,10 +86,6 @@ function countRules(config: ViewerValidationConfig) {
 }
 
 function normalizeSourceKind(value: string): ViewerRuleTemplateSourceKind {
-  if (value === "industry-mapping") {
-    return "industry-mapping";
-  }
-
   return value === "user" ? "user" : "starter";
 }
 
@@ -148,6 +135,12 @@ async function readOptionalSourceText(fileName: string | null) {
 }
 
 async function seedBuiltInRuleTemplates() {
+  // Removing a seed alone leaves its previously stored entry live on existing installs.
+  await prisma.ruleTemplateRecord.updateMany({
+    where: { id: "industry-mapping-bca-column-beam", ...LIVE_TEMPLATE },
+    data: { deletedAt: new Date() },
+  });
+
   const existing = await prisma.ruleTemplateRecord.findMany({
     where: { id: { in: BUILT_IN_RULE_TEMPLATES.map((template) => template.id) } },
     select: { id: true, deletedAt: true },

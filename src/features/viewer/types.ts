@@ -98,7 +98,7 @@ export interface ViewerValidationConfig {
   clauses: ViewerValidationClause[];
 }
 
-export type ViewerRuleTemplateSourceKind = "starter" | "industry-mapping" | "user";
+export type ViewerRuleTemplateSourceKind = "starter" | "user";
 
 /**
  * What a template holds. A `config` template carries a whole clause set and
