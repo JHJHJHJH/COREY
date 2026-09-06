@@ -21,13 +21,13 @@ async function main() {
   if (!sourcePath) {
     throw new Error("The source CSV is not bundled. Supply it with --source /path/to/mapping.csv.");
   }
-  const resources = resolve(import.meta.dirname, "../public/resources");
+  const root = resolve(import.meta.dirname, "..");
   const source = await readFile(resolve(sourcePath), "utf8");
   const generated = await generateIndustryMapping(source);
   const artifacts = industryMappingArtifacts(generated);
   const stale: string[] = [];
   for (const [fileName, contents] of artifacts) {
-    const path = resolve(resources, fileName);
+    const path = resolve(root, fileName);
     if (check) {
       const existing = await readFile(path, "utf8").catch((error: NodeJS.ErrnoException) => {
         if (error.code === "ENOENT") return null;
@@ -41,7 +41,7 @@ async function main() {
   if (stale.length) {
     throw new Error(`Generated templates are stale: ${stale.join(", ")}. Regenerate with the same --source file.`);
   }
-  console.log(`${check ? "Verified" : "Generated"} ${generated.templates.length} templates and their manifest/coverage report from ${generated.records.length} CSV records.`);
+  console.log(`${check ? "Verified" : "Generated"} ${generated.templates.length} templates, their manifest, and the review notes docs page from ${generated.records.length} CSV records.`);
 }
 
 main().catch((error: unknown) => {

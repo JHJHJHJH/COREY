@@ -6,6 +6,14 @@ This project uses semantic versioning once public releases begin.
 
 ## Unreleased
 
+## 1.2.1 - 2026-09-06
+
+- Moved the industry mapping review notes into Docs, with a user-guide navigation
+  entry and a link from Clauses & Checks. Template review buttons open the guide
+  in a new tab, preserving the current model session.
+- Updated offline generation to write the review notes into the docs content
+  directory and keep template JSON links working from the guide.
+
 ## 1.2.0 - 2026-09-06
 
 - Added eight industry mapping starter templates for BCA, SCDF, URA, NEA,

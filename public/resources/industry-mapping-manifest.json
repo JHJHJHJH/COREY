@@ -2,7 +2,7 @@
   {
     "id": "industry-mapping-bca",
     "name": "BCA - Industry Mapping",
-    "description": "Manual review required. BCA requirements, including shared All-agency clauses from the 4 Dec CSV. Component applicability can overlap or conflict, and referenced value lists are incomplete. Download the review notes for details.",
+    "description": "Manual review required. BCA requirements, including shared All-agency clauses from the 4 Dec CSV. Component applicability can overlap or conflict, and referenced value lists are incomplete. Read the review notes in Docs for details.",
     "sourceKind": "industry-mapping",
     "configFileName": "industry-mapping-bca.json",
     "sourceFileName": null,
@@ -11,7 +11,7 @@
   {
     "id": "industry-mapping-scdf",
     "name": "SCDF - Industry Mapping",
-    "description": "Manual review required. SCDF requirements, including shared All-agency clauses from the 4 Dec CSV. Component applicability can overlap or conflict, and referenced value lists are incomplete. Download the review notes for details.",
+    "description": "Manual review required. SCDF requirements, including shared All-agency clauses from the 4 Dec CSV. Component applicability can overlap or conflict, and referenced value lists are incomplete. Read the review notes in Docs for details.",
     "sourceKind": "industry-mapping",
     "configFileName": "industry-mapping-scdf.json",
     "sourceFileName": null,
@@ -20,7 +20,7 @@
   {
     "id": "industry-mapping-ura",
     "name": "URA - Industry Mapping",
-    "description": "Manual review required. URA requirements, including shared All-agency clauses from the 4 Dec CSV. Component applicability can overlap or conflict, and referenced value lists are incomplete. Download the review notes for details.",
+    "description": "Manual review required. URA requirements, including shared All-agency clauses from the 4 Dec CSV. Component applicability can overlap or conflict, and referenced value lists are incomplete. Read the review notes in Docs for details.",
     "sourceKind": "industry-mapping",
     "configFileName": "industry-mapping-ura.json",
     "sourceFileName": null,
@@ -29,7 +29,7 @@
   {
     "id": "industry-mapping-nea",
     "name": "NEA - Industry Mapping",
-    "description": "Manual review required. NEA requirements, including shared All-agency clauses from the 4 Dec CSV. Component applicability can overlap or conflict, and referenced value lists are incomplete. Download the review notes for details.",
+    "description": "Manual review required. NEA requirements, including shared All-agency clauses from the 4 Dec CSV. Component applicability can overlap or conflict, and referenced value lists are incomplete. Read the review notes in Docs for details.",
     "sourceKind": "industry-mapping",
     "configFileName": "industry-mapping-nea.json",
     "sourceFileName": null,
@@ -38,7 +38,7 @@
   {
     "id": "industry-mapping-pub",
     "name": "PUB - Industry Mapping",
-    "description": "Manual review required. PUB requirements, including shared All-agency clauses from the 4 Dec CSV. Component applicability can overlap or conflict, and referenced value lists are incomplete. Download the review notes for details.",
+    "description": "Manual review required. PUB requirements, including shared All-agency clauses from the 4 Dec CSV. Component applicability can overlap or conflict, and referenced value lists are incomplete. Read the review notes in Docs for details.",
     "sourceKind": "industry-mapping",
     "configFileName": "industry-mapping-pub.json",
     "sourceFileName": null,
@@ -47,7 +47,7 @@
   {
     "id": "industry-mapping-lta",
     "name": "LTA - Industry Mapping",
-    "description": "Manual review required. LTA requirements, including shared All-agency clauses from the 4 Dec CSV. Component applicability can overlap or conflict, and referenced value lists are incomplete. Download the review notes for details.",
+    "description": "Manual review required. LTA requirements, including shared All-agency clauses from the 4 Dec CSV. Component applicability can overlap or conflict, and referenced value lists are incomplete. Read the review notes in Docs for details.",
     "sourceKind": "industry-mapping",
     "configFileName": "industry-mapping-lta.json",
     "sourceFileName": null,
@@ -56,7 +56,7 @@
   {
     "id": "industry-mapping-nparks",
     "name": "NParks - Industry Mapping",
-    "description": "Manual review required. NParks requirements, including shared All-agency clauses from the 4 Dec CSV. Component applicability can overlap or conflict, and referenced value lists are incomplete. Download the review notes for details.",
+    "description": "Manual review required. NParks requirements, including shared All-agency clauses from the 4 Dec CSV. Component applicability can overlap or conflict, and referenced value lists are incomplete. Read the review notes in Docs for details.",
     "sourceKind": "industry-mapping",
     "configFileName": "industry-mapping-nparks.json",
     "sourceFileName": null,
@@ -65,7 +65,7 @@
   {
     "id": "industry-mapping-shared",
     "name": "Shared Requirements - Industry Mapping",
-    "description": "Manual review required. Shared All-agency requirements from the 4 Dec CSV. Component applicability can overlap or conflict, and referenced value lists are incomplete. Download the review notes for details.",
+    "description": "Manual review required. Shared All-agency requirements from the 4 Dec CSV. Component applicability can overlap or conflict, and referenced value lists are incomplete. Read the review notes in Docs for details.",
     "sourceKind": "industry-mapping",
     "configFileName": "industry-mapping-shared.json",
     "sourceFileName": null,
