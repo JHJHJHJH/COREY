@@ -3399,7 +3399,7 @@ export function ViewerShell() {
       data-viewer-theme={viewerTheme}
       className="flex h-full min-h-0 flex-col bg-[color:var(--background)] text-[color:var(--foreground)]"
     >
-      <header className="w-full border-b border-[color:var(--viewer-border)] [background:var(--viewer-header-bg)] shadow-[var(--viewer-shadow)]">
+      <header className="relative z-30 w-full border-b border-[color:var(--viewer-border)] [background:var(--viewer-header-bg)] shadow-[var(--viewer-shadow)]">
         <div className="flex w-full flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="min-w-0 flex-1">
@@ -3653,7 +3653,7 @@ export function ViewerShell() {
       ) : null}
 
       <div className="flex min-h-0 w-full flex-1 flex-col">
-        <main className="flex min-h-0 flex-1">
+        <main className="relative z-0 flex min-h-0 flex-1">
           <div
             ref={workspaceRef}
             className="corey-blueprint relative -mt-px flex min-h-0 flex-1 flex-col overflow-hidden rounded-b-[var(--r-panel)] border border-t-0 border-[color:var(--viewer-border)] shadow-[var(--viewer-shadow)]"
