@@ -115,7 +115,7 @@ services:
       retries: 10
 
   minio-init:
-    image: minio/mc:latest
+    image: pgsty/mc:RELEASE.2026-09-16T00-00-00Z
     environment:
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-corey}
       S3_SECRET_KEY: ${S3_SECRET_KEY:-corey-secret}

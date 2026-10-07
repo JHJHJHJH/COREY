@@ -119,7 +119,7 @@ services:
 
   # One-shot: create the models bucket once MinIO is healthy.
   minio-init:
-    image: minio/mc:latest
+    image: pgsty/mc:RELEASE.2026-09-16T00-00-00Z
     container_name: corey-minio-init
     environment:
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-corey}
