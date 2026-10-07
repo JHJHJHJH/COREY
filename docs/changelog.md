@@ -14,6 +14,8 @@ This project uses semantic versioning once public releases begin.
   version sides, and cleared property details when resetting the view.
 - Fixed the Export IFC dropdown stacking so properties panel controls cannot
   cover the menu.
+- Updated Next.js, the MCP SDK, and affected transitive dependencies to patched
+  versions identified by the production dependency audit.
 
 ## 1.2.3 - 2026-09-14
 
