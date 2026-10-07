@@ -6,6 +6,14 @@ This project uses semantic versioning once public releases begin.
 
 ## Unreleased
 
+## 1.2.5 - 2026-10-07
+
+- Fixed visual comparison alignment when IFC versions use different import
+  origins. The target model now loads relative to the base model's origin so
+  synchronized cameras show matching geometry during navigation, focus, and reset.
+- Reset the shared coordinate frame for each comparison and update model
+  transforms before fitting the camera or inspecting element bounds.
+
 ## 1.2.4 - 2026-10-07
 
 - Fixed side-by-side model comparison camera synchronization so either pane can

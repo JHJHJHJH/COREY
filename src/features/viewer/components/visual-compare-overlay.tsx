@@ -31,6 +31,7 @@ import type {
   ModelCompareFieldChange,
   ViewerSelection,
   ViewerSelectionDetails,
+  ViewerModelOrigin,
   VisualCompareRequest,
 } from "@/features/viewer/types";
 
@@ -197,6 +198,7 @@ export function VisualCompareOverlay({ request, theme, onClose }: VisualCompareO
       handle: CompareViewportHandle | null,
       bytes: Uint8Array,
       version: number,
+      referenceOrigin?: ViewerModelOrigin,
     ) => {
       await waitForViewport(handle);
       if (cancelled || !handle) {
@@ -204,10 +206,16 @@ export function VisualCompareOverlay({ request, theme, onClose }: VisualCompareO
       }
 
       setPane(pane, { phase: "loading", message: `Converting v${version}…` });
-      await handle.loadModel(bytes, `${request.name} v${version}`, (percent) => {
-        setPane(pane, { phase: "loading", message: `Converting v${version}… ${percent}%` });
-      });
+      const origin = await handle.loadModel(
+        bytes,
+        `${request.name} v${version}`,
+        (percent) => {
+          setPane(pane, { phase: "loading", message: `Converting v${version}… ${percent}%` });
+        },
+        referenceOrigin,
+      );
       setPane(pane, { phase: "ready", message: "" });
+      return origin;
     };
 
     void (async () => {
@@ -221,11 +229,11 @@ export function VisualCompareOverlay({ request, theme, onClose }: VisualCompareO
         }
 
         // Sequential loads keep only one WASM conversion in flight at a time.
-        await loadPane("base", baseRef.current, baseBytes, request.baseVersion);
+        const baseOrigin = await loadPane("base", baseRef.current, baseBytes, request.baseVersion);
         if (cancelled) {
           return;
         }
-        await loadPane("target", targetRef.current, targetBytes, request.targetVersion);
+        await loadPane("target", targetRef.current, targetBytes, request.targetVersion, baseOrigin);
         if (cancelled) {
           return;
         }
