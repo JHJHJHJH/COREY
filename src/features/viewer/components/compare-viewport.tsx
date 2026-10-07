@@ -336,8 +336,8 @@ export const CompareViewport = forwardRef<CompareViewportHandle, CompareViewport
         world.scene.three.background = new THREE.Color(sceneTheme.background);
         world.renderer = new OBF.PostproductionRenderer(components, container);
         world.camera = new OBC.OrthoPerspectiveCamera(components);
-        // Anchored orbit is off here: it works by writing a focal offset, which the
-        // pane-to-pane camera link in `visual-compare-overlay.tsx` does not mirror.
+        // Keep the compare panes' existing free-orbit navigation. Camera state,
+        // including focal offsets, is linked by the visual compare overlay.
         const viewportCamera = configureViewportCamera(world);
         await world.camera.controls?.setLookAt(18, 16, 18, 0, 0, 0);
 
