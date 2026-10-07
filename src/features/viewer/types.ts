@@ -368,6 +368,9 @@ export interface ModelCompareResult {
   validation: ModelCompareValidationDiff | null;
 }
 
+/** IFC import origin shared by comparison panes to keep their geometry aligned. */
+export type ViewerModelOrigin = readonly [x: number, y: number, z: number];
+
 /** Everything the visual (side-by-side 3D) compare overlay needs to open. */
 export interface VisualCompareRequest {
   modelId: string;
