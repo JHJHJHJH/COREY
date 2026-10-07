@@ -11,6 +11,7 @@ import {
   type ViewportCameraController,
 } from "@/features/viewer/lib/camera-setup";
 import { elementInspectionDataConfig } from "@/features/viewer/lib/ifc-data";
+import type { ViewerModelOrigin } from "@/features/viewer/types";
 
 /** camera-controls instance type, derived from the camera rather than re-imported. */
 export type CompareCameraControls = NonNullable<OBC.OrthoPerspectiveCamera["controls"]>;
@@ -28,7 +29,13 @@ export type CompareViewportVisualState =
   | { mode: "focus"; focusLocalId: number | null; tone?: "added" | "removed" | "modified" };
 
 export interface CompareViewportHandle {
-  loadModel(bytes: Uint8Array, modelId: string, onProgress?: (percent: number) => void): Promise<void>;
+  /** Returns the import origin; subsequent panes must load relative to it. */
+  loadModel(
+    bytes: Uint8Array,
+    modelId: string,
+    onProgress?: (percent: number) => void,
+    referenceOrigin?: ViewerModelOrigin,
+  ): Promise<ViewerModelOrigin>;
   getControls(): CompareCameraControls | null;
   fitModel(): Promise<void>;
   /** Zooms to the element; resolves false when it has no renderable geometry. */
@@ -147,7 +154,7 @@ export const CompareViewport = forwardRef<CompareViewportHandle, CompareViewport
     }, [theme]);
 
     useImperativeHandle(ref, () => ({
-      async loadModel(bytes, modelId, onProgress) {
+      async loadModel(bytes, modelId, onProgress, referenceOrigin) {
         const runtime = runtimeRef.current;
         if (!runtime) {
           throw new Error("The compare viewport is not ready yet.");
@@ -177,6 +184,11 @@ export const CompareViewport = forwardRef<CompareViewportHandle, CompareViewport
           },
         });
 
+        // IFC conversion can choose a different origin after an otherwise
+        // geometry-preserving rewrite. Each pane has its own fragments manager,
+        // so explicitly share the base model's origin before loading the target.
+        // Reset it on every load to avoid retaining a previous comparison's frame.
+        runtime.fragments.core.baseCoordinates = referenceOrigin ? [...referenceOrigin] : null;
         const model = await runtime.fragments.core.load(fragmentsBytes, {
           modelId,
           camera: runtime.world.camera.three as
@@ -184,6 +196,7 @@ export const CompareViewport = forwardRef<CompareViewportHandle, CompareViewport
             | THREE.OrthographicCamera,
         });
         runtime.model = model;
+        model.object.updateMatrixWorld(true);
 
         await runtime.fragments.core.update(true);
 
@@ -198,6 +211,9 @@ export const CompareViewport = forwardRef<CompareViewportHandle, CompareViewport
             paddingRight: 0.2,
           });
         }
+
+        const [x, y, z] = await model.getCoordinates();
+        return [x, y, z] as const;
       },
       getControls() {
         return runtimeRef.current?.world.camera.controls ?? null;
