@@ -4,6 +4,8 @@ import {
   BookOpenText,
   ChevronDown,
   ClipboardCheck,
+  Eye,
+  EyeOff,
   FileOutput,
   FileSpreadsheet,
   FolderOpen,
@@ -1096,6 +1098,7 @@ export function ViewerShell() {
   const [validationHighlights, setValidationHighlights] = useState<ViewerValidationHighlights>(
     emptyValidationHighlights,
   );
+  const [showValidationOverlays, setShowValidationOverlays] = useState(true);
   const [validationResult, setValidationResult] = useState<ViewerValidationRunResult | null>(null);
   // What the viewport is currently isolated to. Both panels own their own severity filter, so
   // this is the one shared record of which of them last drove the 3D view.
@@ -3008,6 +3011,17 @@ export function ViewerShell() {
     setSeverityIsolation((current) => (current === "all" ? current : "all"));
   }, [validationHighlights]);
 
+  const hasValidationOverlays = !areValidationHighlightsEqual(
+    validationHighlights,
+    emptyValidationHighlights,
+  );
+  const effectiveValidationHighlights = showValidationOverlays
+    ? validationHighlights
+    : emptyValidationHighlights;
+  const validationOverlayToggleLabel = showValidationOverlays
+    ? "Hide validation overlays"
+    : "Show validation overlays";
+
   const showDataTableDialog = useCallback(() => {
     setShowDataTable(true);
     setShowDataTableInWindow(false);
@@ -3459,14 +3473,35 @@ export function ViewerShell() {
               className="hidden"
             />
             <div className="hidden flex-wrap items-center gap-2 lg:flex xl:justify-end">
-              <button
-                type="button"
-                onClick={() => setShowRulesModal(true)}
-                className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-4 text-sm font-semibold text-[color:var(--foreground)] no-underline shadow-sm transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)]"
-              >
-                <ClipboardCheck className="h-4 w-4 shrink-0" />
-                <span>Clauses</span>
-              </button>
+              <div className="inline-flex h-10 overflow-hidden rounded-[var(--r-control)] shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setShowRulesModal(true)}
+                  className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap border border-r-0 border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-4 text-sm font-semibold text-[color:var(--foreground)] no-underline transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)]"
+                >
+                  <ClipboardCheck className="h-4 w-4 shrink-0" />
+                  <span>Clauses</span>
+                </button>
+                <button
+                  type="button"
+                  aria-label={validationOverlayToggleLabel}
+                  aria-pressed={showValidationOverlays}
+                  title={validationOverlayToggleLabel}
+                  disabled={!hasValidationOverlays}
+                  onClick={() => setShowValidationOverlays((current) => !current)}
+                  className={`flex h-10 w-10 cursor-pointer items-center justify-center border transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                    showValidationOverlays && hasValidationOverlays
+                      ? "border-[color:var(--accent-strong)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
+                      : "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-strong)]"
+                  }`}
+                >
+                  {showValidationOverlays ? (
+                    <Eye className="h-4 w-4" />
+                  ) : (
+                    <EyeOff className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
               <McpSettingsControl
                 theme={viewerTheme}
                 onSettingsChange={() => {
@@ -3564,17 +3599,41 @@ export function ViewerShell() {
                 setCompareModel({ modelId: model.modelId, name: model.name });
               }}
             />
-            <button
-              type="button"
-              onClick={() => {
-                setMobileNavOpen(false);
-                setShowRulesModal(true);
-              }}
-              className="inline-flex h-10 w-full items-center justify-start gap-2 rounded-[var(--r-control)] border border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-4 text-sm font-semibold text-[color:var(--foreground)] shadow-sm transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)]"
-            >
-              <ClipboardCheck className="h-4 w-4 shrink-0" />
-              <span>Clauses</span>
-            </button>
+            <div className="flex h-10 w-full overflow-hidden rounded-[var(--r-control)] shadow-sm">
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileNavOpen(false);
+                  setShowRulesModal(true);
+                }}
+                className="inline-flex h-10 min-w-0 flex-1 items-center justify-start gap-2 border border-r-0 border-[color:var(--viewer-border)] bg-[color:var(--surface-strong)] px-4 text-sm font-semibold text-[color:var(--foreground)] transition hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-hover)]"
+              >
+                <ClipboardCheck className="h-4 w-4 shrink-0" />
+                <span>Clauses</span>
+              </button>
+              <button
+                type="button"
+                aria-label={validationOverlayToggleLabel}
+                aria-pressed={showValidationOverlays}
+                title={validationOverlayToggleLabel}
+                disabled={!hasValidationOverlays}
+                onClick={() => {
+                  setShowValidationOverlays((current) => !current);
+                  setMobileNavOpen(false);
+                }}
+                className={`flex h-10 w-12 shrink-0 items-center justify-center border transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                  showValidationOverlays && hasValidationOverlays
+                    ? "border-[color:var(--accent-strong)] bg-[color:var(--accent)] text-[color:var(--accent-ink)]"
+                    : "border-[color:var(--viewer-border)] bg-[color:var(--surface-soft)] text-[color:var(--foreground)] hover:border-[color:var(--viewer-border-strong)] hover:bg-[color:var(--surface-strong)]"
+                }`}
+              >
+                {showValidationOverlays ? (
+                  <Eye className="h-4 w-4 shrink-0" />
+                ) : (
+                  <EyeOff className="h-4 w-4 shrink-0" />
+                )}
+              </button>
+            </div>
             <McpSettingsControl
               theme={viewerTheme}
               variant="mobile"
@@ -3809,7 +3868,7 @@ export function ViewerShell() {
                       theme={viewerTheme}
                       status={status}
                       activeTool={session.activeTool}
-                      validationHighlights={validationHighlights}
+                      validationHighlights={effectiveValidationHighlights}
                       onOpenFile={openFilePicker}
                       openFileLabel={openFileLabel}
                       filesButton={

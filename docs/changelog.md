@@ -6,6 +6,22 @@ This project uses semantic versioning once public releases begin.
 
 ## Unreleased
 
+## 1.2.4 - 2026-10-07
+
+- Fixed side-by-side model comparison camera synchronization so either pane can
+  drive navigation smoothly, including wheel zoom, animated focus, and reset.
+- Improved comparison properties loading when selecting elements or switching
+  version sides, and cleared property details when resetting the view.
+- Fixed the Export IFC dropdown stacking so properties panel controls cannot
+  cover the menu.
+- Updated Next.js, the MCP SDK, and affected transitive dependencies to patched
+  versions identified by the production dependency audit.
+
+## 1.2.3 - 2026-09-14
+
+- Added a show/hide toggle for validation overlays in the desktop header and
+  mobile menu.
+
 ## 1.2.2 - 2026-09-06
 
 - Renamed the agency/shared template labels to CX Industry Mapping.
