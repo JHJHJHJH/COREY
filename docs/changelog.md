@@ -6,6 +6,15 @@ This project uses semantic versioning once public releases begin.
 
 ## Unreleased
 
+## 1.2.4 - 2026-10-07
+
+- Fixed side-by-side model comparison camera synchronization so either pane can
+  drive navigation smoothly, including wheel zoom, animated focus, and reset.
+- Improved comparison properties loading when selecting elements or switching
+  version sides, and cleared property details when resetting the view.
+- Fixed the Export IFC dropdown stacking so properties panel controls cannot
+  cover the menu.
+
 ## 1.2.2 - 2026-09-06
 
 - Renamed the agency/shared template labels to CX Industry Mapping.
