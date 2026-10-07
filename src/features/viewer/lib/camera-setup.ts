@@ -75,9 +75,7 @@ export interface ViewportCameraOptions {
   /**
    * Re-anchor the orbit pivot onto the current anchor when a Shift-drag starts.
    *
-   * Left off in the compare panes: `setOrbitPoint` keeps the image still by writing a
-   * focal offset, and the pane-to-pane camera link in `visual-compare-overlay.tsx`
-   * mirrors only position and target, so an offset on one pane would desync the other.
+   * Left off in the compare panes to preserve their free-orbit navigation.
    */
   anchoredOrbit?: boolean;
 }

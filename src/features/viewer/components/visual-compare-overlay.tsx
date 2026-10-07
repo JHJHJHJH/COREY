@@ -13,10 +13,8 @@ import {
   PanelRightOpen,
   X,
 } from "lucide-react";
-import * as THREE from "three";
 import {
   CompareViewport,
-  type CompareCameraControls,
   type CompareViewportHandle,
   type CompareViewportVisualState,
 } from "@/features/viewer/components/compare-viewport";
@@ -26,6 +24,7 @@ import {
   type PropertyDiffTone,
 } from "@/features/viewer/components/properties-panel";
 import { buildSelectionInspection } from "@/features/viewer/lib/ifc-data";
+import { synchronizeCompareCameras } from "@/features/viewer/lib/compare-camera-sync";
 import type {
   ModelCompareChangedElement,
   ModelCompareElementRef,
@@ -125,7 +124,6 @@ export function VisualCompareOverlay({ request, theme, onClose }: VisualCompareO
   const { result } = request;
   const baseRef = useRef<CompareViewportHandle | null>(null);
   const targetRef = useRef<CompareViewportHandle | null>(null);
-  const cameraSyncLockRef = useRef(false);
 
   const [paneStatus, setPaneStatus] = useState<Record<PaneKey, PaneStatus>>({
     base: { phase: "loading", message: "Downloading…" },
@@ -212,48 +210,6 @@ export function VisualCompareOverlay({ request, theme, onClose }: VisualCompareO
       setPane(pane, { phase: "ready", message: "" });
     };
 
-    const linkCameras = (source: CompareCameraControls, follower: CompareCameraControls) => {
-      const sourcePosition = new THREE.Vector3();
-      const sourceTarget = new THREE.Vector3();
-      const followerPosition = new THREE.Vector3();
-      const followerTarget = new THREE.Vector3();
-
-      const handleUpdate = () => {
-        if (cameraSyncLockRef.current) {
-          return;
-        }
-
-        source.getPosition(sourcePosition);
-        source.getTarget(sourceTarget);
-        follower.getPosition(followerPosition);
-        follower.getTarget(followerTarget);
-        if (
-          sourcePosition.distanceToSquared(followerPosition) < 1e-10 &&
-          sourceTarget.distanceToSquared(followerTarget) < 1e-10
-        ) {
-          return;
-        }
-
-        cameraSyncLockRef.current = true;
-        try {
-          void follower.setLookAt(
-            sourcePosition.x,
-            sourcePosition.y,
-            sourcePosition.z,
-            sourceTarget.x,
-            sourceTarget.y,
-            sourceTarget.z,
-            false,
-          );
-        } finally {
-          cameraSyncLockRef.current = false;
-        }
-      };
-
-      source.addEventListener("update", handleUpdate);
-      return () => source.removeEventListener("update", handleUpdate);
-    };
-
     void (async () => {
       try {
         const [baseBytes, targetBytes] = await Promise.all([
@@ -280,25 +236,7 @@ export function VisualCompareOverlay({ request, theme, onClose }: VisualCompareO
           return;
         }
 
-        // Align the target pane to the base pose once, then keep both linked.
-        const position = new THREE.Vector3();
-        const lookTarget = new THREE.Vector3();
-        baseControls.getPosition(position);
-        baseControls.getTarget(lookTarget);
-        await targetControls.setLookAt(
-          position.x,
-          position.y,
-          position.z,
-          lookTarget.x,
-          lookTarget.y,
-          lookTarget.z,
-          false,
-        );
-
-        unlinkers.push(
-          linkCameras(baseControls, targetControls),
-          linkCameras(targetControls, baseControls),
-        );
+        unlinkers.push(synchronizeCompareCameras(baseControls, targetControls));
         if (!cancelled) {
           setPanesReady(true);
         }
@@ -367,7 +305,6 @@ export function VisualCompareOverlay({ request, theme, onClose }: VisualCompareO
   // selected version side.
   useEffect(() => {
     if (!panesReady || !focusedElement) {
-      setPropertyDetails({ selection: null, inspection: null, loading: false });
       return;
     }
 
@@ -382,15 +319,11 @@ export function VisualCompareOverlay({ request, theme, onClose }: VisualCompareO
       category: focusedElement.ifcType,
     };
 
-    if (localId === null || !handle) {
-      setPropertyDetails({ selection, inspection: null, loading: false });
-      return;
-    }
-
     let cancelled = false;
-    setPropertyDetails({ selection, inspection: null, loading: true });
-    void (async () => {
-      const data = await handle.getItemData(localId);
+    const itemData = localId !== null && handle
+      ? handle.getItemData(localId)
+      : Promise.resolve(null);
+    void itemData.then((data) => {
       if (cancelled) {
         return;
       }
@@ -400,7 +333,7 @@ export function VisualCompareOverlay({ request, theme, onClose }: VisualCompareO
         inspection: data ? buildSelectionInspection(selection, data) : null,
         loading: false,
       });
-    })();
+    });
 
     return () => {
       cancelled = true;
@@ -415,7 +348,24 @@ export function VisualCompareOverlay({ request, theme, onClose }: VisualCompareO
 
   const clearFocus = () => {
     setFocusedElement(null);
+    setPropertyDetails({ selection: null, inspection: null, loading: false });
     resetView();
+  };
+
+  const selectPropertySide = (element: ModelCompareElementRef, side: PaneKey) => {
+    const localId = side === "target" ? element.targetExpressId : element.baseExpressId;
+    const version = side === "target" ? request.targetVersion : request.baseVersion;
+    setPropertySide(side);
+    setPropertyDetails({
+      selection: {
+        modelId: `${request.name} v${version}`,
+        localId: localId ?? -1,
+        label: element.name ?? element.globalId,
+        category: element.ifcType,
+      },
+      inspection: null,
+      loading: localId !== null,
+    });
   };
 
   const handleRowClick = (element: ModelCompareElementRef) => {
@@ -429,7 +379,7 @@ export function VisualCompareOverlay({ request, theme, onClose }: VisualCompareO
     }
 
     setFocusedElement(element);
-    setPropertySide(element.targetExpressId !== null ? "target" : "base");
+    selectPropertySide(element, element.targetExpressId !== null ? "target" : "base");
     // Zoom the pane that owns the element; camera sync carries the other one.
     // Elements without renderable geometry (e.g. property-only changes) fall
     // back to the initial framing so the click always answers with a view.
@@ -575,7 +525,11 @@ export function VisualCompareOverlay({ request, theme, onClose }: VisualCompareO
           <button
             key={side}
             type="button"
-            onClick={() => setPropertySide(side)}
+            onClick={() => {
+              if (side !== propertySide) {
+                selectPropertySide(focusedElement, side);
+              }
+            }}
             aria-pressed={propertySide === side}
             className={`rounded px-1.5 py-0.5 font-semibold tabular-nums transition ${
               propertySide === side
