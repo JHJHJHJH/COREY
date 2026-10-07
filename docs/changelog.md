@@ -15,6 +15,11 @@ This project uses semantic versioning once public releases begin.
 - Fixed the Export IFC dropdown stacking so properties panel controls cannot
   cover the menu.
 
+## 1.2.3 - 2026-09-14
+
+- Added a show/hide toggle for validation overlays in the desktop header and
+  mobile menu.
+
 ## 1.2.2 - 2026-09-06
 
 - Renamed the agency/shared template labels to CX Industry Mapping.
